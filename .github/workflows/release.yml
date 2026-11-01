@@ -1,0 +1,138 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']        # e.g. v1.2.0
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write       # needed to create the GitHub Release
+
+env:
+  APP_NAME: MurtenUtilities
+
+jobs:
+  release:
+    name: Build & publish (unsigned)
+    runs-on: macos-26
+    timeout-minutes: 45   # don't let a wedged build stall a release for 6h
+    steps:
+      # Actions are pinned to immutable commit SHAs: a mutable tag can be repointed
+      # at tampered code, a commit SHA cannot. This workflow holds contents:write
+      # and produces the bytes users download, so it gets the same pin-and-verify
+      # discipline zai-code-review.yml already uses.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing in this job runs git after checkout; don't leave a
+          # contents:write token sitting in .git/config for the whole build.
+          persist-credentials: false
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+        # Must match ci.yml. A release built on a toolchain CI has never used is
+        # a build nobody has tested.
+        with:
+          xcode-version: '26.0'
+
+      - name: Install tooling
+        run: brew install create-dmg
+
+      - name: Version from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      # Gate the release on the test suite. With no signing/notarization
+      # downstream, tests are the only automated quality check — a tag on a
+      # broken commit must not publish.
+      - name: Test
+        run: swift test
+
+      - name: Build the universal app
+        run: ./scripts/build-app.sh --universal
+
+      - name: Stamp version & re-sign
+        run: |
+          APP=dist/$APP_NAME.app
+          test -d "$APP" || { echo "::error::$APP not found"; exit 1; }
+
+          # The tag is the source of truth. scripts/release.sh already bumped the
+          # committed plist, so this is idempotent on a scripted release and still
+          # corrects a tag pushed by hand; CFBundleVersion tracks the build itself.
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" "$APP/Contents/Info.plist"
+
+          # Editing the plist broke the seal from build-app.sh: re-sign (ad-hoc,
+          # identity "-": no certificate, keychain or API key needed, but required
+          # for the app to launch on Apple Silicon) and re-verify. This is not a
+          # Developer ID signature and the app is not notarized.
+          codesign --force --sign - "$APP"
+          codesign --verify --deep --strict "$APP" \
+            || { echo "::error::the signed app failed verification — it would not launch"; exit 1; }
+
+      - name: Package zip + DMG
+        run: |
+          ZIP="$RUNNER_TEMP/$APP_NAME-$VERSION-macos-universal.zip"
+          DMG="$RUNNER_TEMP/$APP_NAME-$VERSION-macos-universal.dmg"
+          ditto -c -k --keepParent "dist/$APP_NAME.app" "$ZIP"
+          # create-dmg can exit non-zero on a headless runner even on success — verify the file.
+          create-dmg \
+            --volname "$APP_NAME $VERSION" \
+            --window-size 540 380 \
+            --icon-size 100 \
+            --icon "$APP_NAME.app" 150 185 \
+            --app-drop-link 390 185 \
+            "$DMG" "dist/$APP_NAME.app" || true
+          [ -f "$DMG" ] || { echo "::error::DMG was not created"; exit 1; }
+          # create-dmg's exit code is unreliable, so verify the image itself: a
+          # truncated/corrupt DMG must not ship as the release's preferred asset.
+          hdiutil verify "$DMG" || { echo "::error::DMG failed hdiutil verification — the image is corrupt or truncated"; exit 1; }
+          echo "ZIP=$ZIP" >> "$GITHUB_ENV"
+          echo "DMG=$DMG" >> "$GITHUB_ENV"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          name: ${{ env.APP_NAME }} ${{ env.VERSION }}
+          files: |
+            ${{ env.DMG }}
+            ${{ env.ZIP }}
+          # A pre-release tag (contains a hyphen, e.g. v1.1.0-beta.1) is marked as a
+          # prerelease and is not made "latest" — a user following releases/latest
+          # should land on a stable build.
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          make_latest: ${{ !contains(github.ref_name, '-') }}
+          generate_release_notes: true
+          body: |
+            ### Unsigned build
+
+            This app is **not** code-signed with a Developer ID or notarized, so macOS
+            Gatekeeper will warn on first launch. To open it:
+
+            - **Right-click** (or Control-click) the app → **Open** → **Open**, or
+            - run `xattr -dr com.apple.quarantine /Applications/${{ env.APP_NAME }}.app`
+
+      # Never trust an upload: download what GitHub actually serves for the tag and
+      # byte-compare it against what was just built. A truncated or corrupt upload
+      # would otherwise ship silently.
+      - name: Verify published assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir "$RUNNER_TEMP/published"
+          gh release download "$GITHUB_REF_NAME" --dir "$RUNNER_TEMP/published" \
+            --pattern "$(basename "$ZIP")" --pattern "$(basename "$DMG")"
+          failed=0
+          for f in "$ZIP" "$DMG"; do
+            if ! cmp -- "$f" "$RUNNER_TEMP/published/$(basename "$f")"; then
+              # The published copy provably differs from what was built: take it
+              # down before failing. Keep checking, so a second bad asset is also
+              # caught and removed in the same run.
+              gh release delete-asset "$GITHUB_REF_NAME" "$(basename "$f")" -y \
+                || echo "::warning::failed to remove mismatched asset $(basename "$f") — take it down manually"
+              echo "::error::published $(basename "$f") differed from the built artifact and was removed"
+              failed=1
+            fi
+          done
+          [ "$failed" -eq 0 ] || exit 1
