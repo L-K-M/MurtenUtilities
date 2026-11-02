@@ -142,15 +142,33 @@ Manages system-wide CIDR exemptions from the macOS local-network privacy
 restriction. Already fleet-standard: `HallPassCore` is pure; writes go through
 privileged osascript with baseline re-check and rollback.
 
-- **Migrates:** `HallPassCore` + pane. Its privileged write path keeps its
-  own confirmation, baseline re-check and rollback inside the suite; this is
-  a repair-flow boundary, not OS-enforced isolation from other modules.
-- **Watcher:** keep it on-demand. The current read service also requests
+- **Status:** available. `HallPassCore` and its Swift Testing suites moved
+  in unchanged apart from English messages; the app target became
+  `HallPassModule` (provider, pane, privileged service). Both keep the
+  source's Swift 6 language mode.
+- **Provenance:** HallPass@831065aa50626e5633bd87a150c18e90db3ab81b
+- **Migrated:** the pane with its preview mode, backups menu and in-pane
+  confirmations. The privileged write path keeps its own confirmation,
+  baseline re-check and rollback inside the suite; this is a repair-flow
+  boundary, not OS-enforced isolation from other modules.
+- **Changed for the suite:** the UI and every message are English
+  ("WLAN" is "Wi-Fi"). The window-close and quit guard became the
+  provider's `interruptionWarning` (an unsaved draft, a load or an apply
+  in progress). The TN3179 menu item is the Tool menu's *Open Apple
+  Documentation*. The `--demo` flag is gone; *Preview* in the pane remains.
+  The sidebar shows the `ticket.fill` symbol instead of the app's `.icns`.
+  No dark-appearance accent.
+- **State:** backups stay in
+  `~/Library/Application Support/HallPass/Backups`, shared with the
+  standalone app. The restart reminder's keys (`restartRequiredAtUptime`,
+  `restartRequiredBootTime`) live in the module's defaults, so a restart
+  the standalone app asked for is not shown here. The source keeps no
+  draft file.
+- **Watcher:** none; HallPass stays on-demand. The read service requests
   administrator access, so it cannot back a watcher. A future "exemptions
   changed" check needs an unprivileged signal first.
-- **Source facts:** every UI string is German and hardcoded; every other
-  module is English. The suite needs a language decision before this pane
-  moves.
+- **Preselection:** nothing. The provider declares no route actions, so
+  only the bare route opens the pane.
 
 ### Zen Backup Manager — effort: medium — phase 3
 
