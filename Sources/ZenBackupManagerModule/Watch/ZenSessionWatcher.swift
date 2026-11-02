@@ -24,8 +24,10 @@ struct ZenSessionWatcher: Watcher {
         let observedAt = now()
 
         let profiles: [ZenProfile]
+        let listed: Set<String>
         do {
             profiles = try source.profiles()
+            listed = try source.listedProfileDirectories()
         } catch {
             return .unavailable(moduleID: moduleID, at: observedAt, ObservationFailure(
                 kind: .failed, message: "Zen's profile list could not be read: \(error.localizedDescription)"))
@@ -55,7 +57,16 @@ struct ZenSessionWatcher: Watcher {
             }
         }
 
-        // Zen's profile list is every scope that exists, so a profile absent
+        // A profile profiles.ini names but discovery skipped (no readable
+        // prefs.js) still exists: report it unchecked so its suggestion goes
+        // stale instead of resolving.
+        for directory in listed.subtracting(profiles.map(\.id)).sorted() {
+            failures.append(ObservationFailure(
+                kind: .failed, scope: FindingScope(directory),
+                message: "The Zen profile at \(directory) could not be read."))
+        }
+
+        // profiles.ini names every scope that exists, so a profile absent
         // from it is gone: its suggestion resolves even after a relaunch.
         return WatchObservation(moduleID: moduleID, observedAt: observedAt, findings: findings,
                                 completedScopes: completed, failures: failures, coverage: .exhaustive)

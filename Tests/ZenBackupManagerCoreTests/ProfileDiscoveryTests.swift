@@ -37,6 +37,11 @@ final class ProfileDiscoveryTests: XCTestCase {
         XCTAssertEqual(profiles.map(\.name), ["B", "A"])
         XCTAssertTrue(profiles[0].isDefault)
         XCTAssertFalse(profiles[1].isDefault)
+
+        // The watcher's view: every listed profile exists, readable or not.
+        let listed = try ProfileDiscovery.listedDirectories(root: root)
+        XCTAssertEqual(listed, Set(["a", "b", "missing"].map { root.appendingPathComponent($0).standardizedFileURL.path }))
+        XCTAssertTrue(Set(profiles.map(\.id)).isSubset(of: listed), "ids match the listed directories")
     }
 
     func testCatalogIncludesCorruptFilesAsDisabledRecords() throws {

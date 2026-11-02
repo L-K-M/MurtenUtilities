@@ -39,11 +39,16 @@ struct PermissionWatcher: Watcher {
         let started = now()
 
         let apps: [WatchedApp]
+        // A missing file can also mean a folder that could not be searched,
+        // so only a loaded list proves which apps exist.
+        let coverage: WatchObservation.ScopeCoverage
         switch WatchListFile.read(at: watchList) {
         case .missing:
             apps = []
+            coverage = .listed
         case .loaded(let state):
             apps = state.apps
+            coverage = .exhaustive
         case .unreadable:
             return .unavailable(moduleID: moduleID, at: started, ObservationFailure(
                 kind: .malformedResponse,
@@ -75,10 +80,10 @@ struct PermissionWatcher: Watcher {
             }
         }
 
-        // The watch list names every scope that exists: an app absent from
-        // it was removed, so its suggestion resolves even after a relaunch.
+        // A loaded watch list names every scope that exists: an app absent
+        // from it was removed, so its suggestion resolves even after a relaunch.
         return WatchObservation(moduleID: moduleID, observedAt: started, findings: findings,
-                                completedScopes: completed, failures: failures, coverage: .exhaustive)
+                                completedScopes: completed, failures: failures, coverage: coverage)
     }
 
     // MARK: - One app

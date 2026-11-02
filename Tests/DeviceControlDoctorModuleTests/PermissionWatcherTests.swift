@@ -24,7 +24,7 @@ final class PermissionWatcherTests: XCTestCase {
 
     /// Observes with `watcher`, or the shared one, and proves it wrote nothing.
     private func observeWithoutWriting(_ watcher: PermissionWatcher? = nil) async throws -> WatchObservation {
-        let observer = watcher ?? self.watcher
+        let observer = watcher ?? self.watcher!
         let before = try? Data(contentsOf: mac.watchList)
         let observation = await observer.observe()
         XCTAssertEqual(try? Data(contentsOf: mac.watchList), before, "the watcher must never write the watch list")
@@ -232,6 +232,15 @@ final class PermissionWatcherTests: XCTestCase {
 
         XCTAssertEqual(observation.outcome, .unavailable)
         XCTAssertEqual(observation.failures.first?.kind, .malformedResponse)
+    }
+
+    func testMissingWatchListClaimsNothingAboutWhichAppsExist() async {
+        // A missing file may be a folder that could not be searched.
+        let now = self.now
+        let absent = mac.watchList.deletingLastPathComponent().appendingPathComponent("absent.json")
+        let observation = await PermissionWatcher(watchList: absent, runner: runner,
+                                                  home: mac.home.path, now: { now }).observe()
+        XCTAssertEqual(observation.coverage, .listed)
     }
 
     func testRemovedAppIsCheckedAndAbsent() async throws {
