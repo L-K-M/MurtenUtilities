@@ -67,10 +67,14 @@ let obtainintoshModule: [Target.Dependency] = []
 let runningManTargets: [Target] = [
     .target(name: "RunningManCore", dependencies: ["MurtenCore"]),
     .target(name: "RunningManServices", dependencies: ["RunningManCore"]),
+    .target(name: "RunningManModule",
+            dependencies: ["RunningManCore", "RunningManServices", "MurtenCore", "MurtenModuleKit"]),
     .testTarget(name: "RunningManCoreTests", dependencies: ["RunningManCore", "MurtenCore"]),
-    .testTarget(name: "RunningManServicesTests", dependencies: ["RunningManCore", "RunningManServices"])
+    .testTarget(name: "RunningManServicesTests", dependencies: ["RunningManCore", "RunningManServices"]),
+    .testTarget(name: "RunningManModuleTests",
+                dependencies: ["RunningManModule", "RunningManCore", "RunningManServices", "MurtenCore", "MurtenModuleKit"])
 ]
-let runningManModule: [Target.Dependency] = []
+let runningManModule: [Target.Dependency] = ["RunningManModule"]
 
 // MARK: Coreography
 let coreographyTargets: [Target] = []
