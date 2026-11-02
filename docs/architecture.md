@@ -17,10 +17,14 @@ Sources/
     (later)             DeepLinkRouter, per-module pane hosts, Settings
   <Tool>Core/         migrated pure logic per tool (DockVacCore, …) — one
                       target each, kept free of AppKit/spawn/privilege
+  <Tool>Services/     the IO side a watcher needs when the source app has
+                      one (DockVacDocker's Engine client, a runner front) —
+                      library targets with injectable boundaries
   <Tool>Pane or in-app  each module's SwiftUI pane
 Tests/
   MurtenCoreTests/    contracts: registry invariants, dedupe/snooze rules
   <Tool>CoreTests/    each migrated core keeps its existing suite
+  <Tool>ServicesTests/  watcher logic against fixtures, never the live system
 ```
 
 Current v0.1 scaffold contracts (not yet the full pipeline):
@@ -45,6 +49,13 @@ The scaffold's `poll() -> Suggestion?` skips the finding/rule boundary and
 returns at most one result. Phase 1 must separate observation from rules and
 support multiple findings before module watchers depend on this API. The
 following lifecycle is the acceptance contract, not implemented behavior.
+
+Watcher implementations live in the `<Tool>Services` layer, not in
+`MurtenCore` (which stays pure) and not in the app executable: a SwiftPM
+test target cannot import an executable target, so fixture-tested watchers
+must sit in importable libraries behind injectable process/socket
+boundaries. DockVac's existing `DockVacDocker` + `DockVacDockerTests` pair
+is the pattern to copy.
 
 ## The suggestion pipeline
 
