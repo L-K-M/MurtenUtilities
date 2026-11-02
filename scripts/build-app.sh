@@ -55,7 +55,9 @@ swift "$PROJECT_ROOT/scripts/make-icon.swift" "$PROJECT_ROOT/assets/MurtenUtilit
 # Set CODE_SIGN_IDENTITY for a stable Apple Development or Developer ID identity.
 # Ad-hoc signing is sufficient for a local build; no privacy grant is requested.
 if [[ -n "${CODE_SIGN_IDENTITY:-}" ]]; then
-    codesign --force --options runtime --sign "$CODE_SIGN_IDENTITY" "$APP_PATH"
+    # The hardened runtime blocks Apple Events unless entitled.
+    codesign --force --options runtime --entitlements "$PROJECT_ROOT/Resources/MurtenUtilities.entitlements" \
+        --sign "$CODE_SIGN_IDENTITY" "$APP_PATH"
 else
     codesign --force --sign - "$APP_PATH"
 fi

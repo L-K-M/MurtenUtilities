@@ -44,27 +44,43 @@ public struct WatchObservation: Sendable {
         case unavailable
     }
 
+    /// What the listed scopes say about scopes that are not listed.
+    public enum ScopeCoverage: Sendable {
+        /// Unlisted scopes were not looked at; their suggestions stay as
+        /// they are. The default.
+        case listed
+        /// The completed and failed scopes are every scope that exists now;
+        /// suggestions for any other scope resolve, because the endpoint,
+        /// runner or profile behind them is gone (e.g. deleted while the
+        /// suite was not running). Ignored when the whole check failed.
+        case exhaustive
+    }
+
     public let moduleID: String
     public let observedAt: Date
     public let findings: [Finding]
     public let completedScopes: Set<FindingScope>
     public let failures: [ObservationFailure]
+    public let coverage: ScopeCoverage
 
     public init(moduleID: String, observedAt: Date, findings: [Finding],
-                completedScopes: Set<FindingScope>, failures: [ObservationFailure]) {
+                completedScopes: Set<FindingScope>, failures: [ObservationFailure],
+                coverage: ScopeCoverage = .listed) {
         self.moduleID = moduleID
         self.observedAt = observedAt
         self.findings = findings
         self.completedScopes = completedScopes
         self.failures = failures
+        self.coverage = coverage
     }
 
     /// Every listed scope was checked; findings may be empty.
     public static func complete(moduleID: String, at date: Date,
                                 scopes: Set<FindingScope> = [.local],
-                                findings: [Finding] = []) -> WatchObservation {
+                                findings: [Finding] = [],
+                                coverage: ScopeCoverage = .listed) -> WatchObservation {
         WatchObservation(moduleID: moduleID, observedAt: date, findings: findings,
-                    completedScopes: scopes, failures: [])
+                         completedScopes: scopes, failures: [], coverage: coverage)
     }
 
     /// Nothing could be checked.

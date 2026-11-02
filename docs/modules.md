@@ -9,8 +9,9 @@ Legend — **effort**: cheap (SwiftPM core moves nearly unchanged) · medium
 
 ## Platform floors
 
-The suite declares macOS 14 (`Package.swift`, `LSMinimumSystemVersion`). The
-source repos declare these floors (checked 2026-11-02 against each `main`):
+The suite declares macOS 26 (`Package.swift`, `LSMinimumSystemVersion`;
+PLAN.md, *Deployment floor*). The source repos declare these floors
+(checked 2026-11-02 against each `main`):
 
 | Module | Declared floor | Declared in | What needs it |
 | --- | --- | --- | --- |
@@ -21,19 +22,13 @@ source repos declare these floors (checked 2026-11-02 against each `main`):
 | Shortking | 14 | `Package.swift` | fits the suite |
 | RunningMan | 14 | `Package.swift` | fits the suite |
 | Zen Backup Manager | 14 | `.xcodeproj` | fits the suite |
-| HallPass | 26 | `Package.swift` | The pane uses Tahoe-only SwiftUI (`ToolbarSpacer`). The feature needs 15.5: local network privacy arrived in macOS 15 and the exemption defaults in 15.5 (TN3179). |
+| HallPass | 15.5 | `Package.swift` | The feature: local network privacy arrived in macOS 15 and the exemption defaults in 15.5 (TN3179). |
 | Coreography | 26 | `Package.swift`, `.xcodeproj` | A product decision in its own plan (`docs/plan.md`, decision 1), not an API gate: the tree has no `#available` checks. Its private NetworkStatistics keys are verified only "as the framework publishes them on macOS 26". |
 | Obtainintosh | Tauri app | `tauri.conf.json` | a port; no Swift floor yet |
 
-Two modules sit above the suite floor, so "moves in nearly unchanged" holds
-for their pure cores at most, not their panes or samplers. Either the suite
-floor rises, or both modules run below the floor they were built for:
-HallPass's pane needs availability fallbacks, and Coreography's private
-framework reads run on releases they were never verified on. CI covers
-neither (`ci.yml` tests only on `macos-26`). Any floor below 15.5 also
-needs HallPass marked inapplicable on those releases
-([architecture.md](architecture.md#module-applicability)). The choice is open
-(PLAN.md, *Deployment floor*).
+Every module's floor is at or below the suite's, so no module needs an
+availability fallback or an OS applicability check, and CI (`macos-26`)
+tests the only supported release.
 
 ## Confirmed roster
 

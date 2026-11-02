@@ -88,6 +88,37 @@ final class SuggestionLedgerTests: XCTestCase {
         XCTAssertEqual(ledger.suggestions(at: at(60)).count, 1)
     }
 
+    func testExhaustiveCoverageResolvesScopesThatNoLongerExist() {
+        var ledger = SuggestionLedger()
+        ledger.apply(complete([reclaimable(8 * gigabyte, scope: sshScope)], scopes: [sshScope]), rule: rule)
+
+        // After a relaunch the watcher lists every endpoint; the SSH one is gone.
+        let gone = WatchObservation.complete(moduleID: dockvac, at: at(60), scopes: [socketScope],
+                                             coverage: .exhaustive)
+        XCTAssertEqual(ledger.apply(gone, rule: rule), [.resolved(reclaimable(0, scope: sshScope).key)])
+    }
+
+    func testExhaustiveCoverageKeepsFailedScopesStale() {
+        var ledger = SuggestionLedger()
+        ledger.apply(complete([reclaimable(8 * gigabyte, scope: sshScope)], scopes: [sshScope]), rule: rule)
+
+        let failing = WatchObservation(
+            moduleID: dockvac, observedAt: at(60), findings: [], completedScopes: [socketScope],
+            failures: [ObservationFailure(kind: .unreachable, scope: sshScope, message: "host down")],
+            coverage: .exhaustive)
+        XCTAssertEqual(ledger.apply(failing, rule: rule), [.becameStale(reclaimable(0, scope: sshScope).key)])
+    }
+
+    func testExhaustiveCoverageIgnoresAWholeCheckFailure() {
+        var ledger = SuggestionLedger()
+        ledger.apply(complete([reclaimable(8 * gigabyte, scope: sshScope)], scopes: [sshScope]), rule: rule)
+
+        let failed = WatchObservation(
+            moduleID: dockvac, observedAt: at(60), findings: [], completedScopes: [],
+            failures: [ObservationFailure(kind: .toolMissing, message: "no docker")], coverage: .exhaustive)
+        XCTAssertEqual(ledger.apply(failed, rule: rule), [.becameStale(reclaimable(0, scope: sshScope).key)])
+    }
+
     func testFindingsFromAnotherModuleAreIgnored() {
         var ledger = SuggestionLedger()
         let foreign = Finding(moduleID: "repomen", condition: "reclaimable", observedAt: t0,
