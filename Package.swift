@@ -66,7 +66,33 @@ let runningManTargets: [Target] = []
 let runningManModule: [Target.Dependency] = []
 
 // MARK: Coreography
-let coreographyTargets: [Target] = []
+// The engine moved as SwiftPM targets (Coreography@664a49f). Its sources
+// are Swift 6, so every Coreography target keeps that language mode.
+// CSQLite became CoreographySQLite: target names are package-wide.
+let coreographySwift6: [SwiftSetting] = [.swiftLanguageMode(.v6)]
+let coreographyTargets: [Target] = [
+    .target(name: "CoreographySystem", linkerSettings: [
+        .linkedFramework("IOKit", .when(platforms: [.macOS]))
+    ]),
+    .systemLibrary(name: "CoreographySQLite", path: "Sources/CoreographySQLite"),
+    .target(
+        name: "CoreographyDrivers",
+        dependencies: [.target(name: "CoreographySystem", condition: .when(platforms: [.macOS])), "CoreographySQLite"],
+        swiftSettings: coreographySwift6
+    ),
+    .target(name: "CoreographyKit", dependencies: ["CoreographyDrivers"], swiftSettings: coreographySwift6),
+    .target(name: "CoreographyServices", dependencies: ["CoreographyKit"], swiftSettings: coreographySwift6),
+    .testTarget(
+        name: "CoreographyKitTests",
+        dependencies: ["CoreographyKit", "CoreographyDrivers"],
+        swiftSettings: coreographySwift6
+    ),
+    .testTarget(
+        name: "CoreographyServicesTests",
+        dependencies: ["CoreographyServices", "CoreographyKit", "CoreographyDrivers"],
+        swiftSettings: coreographySwift6
+    )
+]
 let coreographyModule: [Target.Dependency] = []
 
 // MARK: - Assembly

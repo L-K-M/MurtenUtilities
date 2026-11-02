@@ -1,0 +1,5 @@
+module CoreographySQLite [system] {
+    header "shim.h"
+    link "sqlite3"
+    export *
+}
