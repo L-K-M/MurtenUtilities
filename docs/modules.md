@@ -129,21 +129,45 @@ app + CLI; **GitHub-only, not yet cloned**.
 ### DeviceControlDoctor — effort: cheap — phase 2
 
 Diagnoses Device Control / Data Access (TCC) permission records that look
-granted but fail functionally. Already fleet-standard: `DoctorCore` is pure,
-`ProcessRunner` is the only subprocess boundary, `tccutil`/`codesign` run via
-fixed paths, repair is user-confirmed per service.
+granted but fail functionally. `DoctorCore` is pure, `ProcessRunning` is the
+only subprocess boundary, `tccutil`/`codesign` run via fixed paths, repair is
+user-confirmed per service.
 
-- **Migrates:** `DoctorCore` + the pane nearly unchanged — it is the model
-  every other module's boundary copies.
-- **Watcher:** periodic grant-vs-function drift checks where a cheap signal
-  exists → "X lost its working permission after the update". No
-  watcher-triggered resets, ever.
+- **Status:** available. `DoctorCore` (in `Sources/DeviceControlDoctorCore`)
+  and `DeviceControlDoctorModule`; the source's tests run as
+  `DeviceControlDoctorCoreTests` and `DeviceControlDoctorIntegrationTests`.
+- **Provenance:** DeviceControlDoctor@09accf844d6118bf0eea927ef4f6a8dd52fd033b
+- **Pane:** the standalone main window. It checks when it appears and, while
+  *Check every minute* is on (the default), every minute and after app
+  launches and wake, only while visible. The Test Pad is a module window
+  (`test-pad`); the File-menu commands are Tool-menu commands with the same
+  shortcuts (⌘O, ⌘R, ⇧⌘E); the menu-bar extra is a companion section
+  (watched apps, apps needing review, Refresh, Test Pad). Launch at login
+  is the suite's.
+- **Watcher:** every 30 minutes (120 s timeout, local), per watched app:
+  `tccutil list` for its expected permissions and `codesign` against the
+  identity the pane saved. One finding per app (scope: its watch-list id)
+  when an expected permission reads denied or limited, the signing identity
+  changed, or an earlier change has no passing test since → "Verify <App>'s
+  permissions again", route `review` with context `app`. Unclear answers,
+  timeouts and a missing `tccutil list` (macOS 26) are failures, never
+  healthy. Apps in, or linked into, privacy-guarded places (Desktop,
+  Documents, Downloads, iCloud Drive and file providers, other apps'
+  containers, other volumes, any home folder but `~/Applications` and
+  `~/Library`) are left to the pane. It never resets, writes or prompts.
+- **Preselection:** the route selects the named app in the watch list and
+  nothing else. The repair sheet opens only on the user's click, with the
+  app's expected permissions checked, as in the standalone app.
+- **State:** the watch list stays at
+  `~/Library/Application Support/DeviceControlDoctor/watchlist.json`, read
+  and written in place; `monitorEnabled` is in the module's defaults.
+- **Coexistence:** the standalone app writes the same file, so the last save
+  wins; the pane says so while the standalone app runs. App discovery skips
+  the suite and the standalone app.
 - **Source facts:** the cheap signal detects identity and record changes, not
   functional failure, so a suggestion can only say "verify again". Reads use
   `tccutil list`, which its AGENTS.md records as verified only on macOS 27.2;
-  elsewhere they degrade to unavailable. `ProcessRunner` is a concrete struct,
-  so the reset path has no fake seam. The app inserts its `MenuBarExtra`
-  unconditionally and monitors by default (`monitorEnabled = true`).
+  elsewhere they degrade to unavailable.
 
 ### Shortking — effort: medium — phase 3
 
@@ -181,10 +205,32 @@ privileged osascript with baseline re-check and rollback.
 ### Zen Backup Manager — effort: medium — phase 3
 
 Inspects browser tabs and Spaces on a timeline of session backups; restores
-with a verified safety copy and undo. **GitHub-only**.
+with a verified safety copy and undo.
 
-- **Migrates:** the backup-timeline/restore core and its pane.
-- **Watcher:** backup freshness → "last session snapshot is 9 days old".
+- **Status:** available. The `.xcodeproj` is ported to SwiftPM:
+  `ZenBackupManagerCore` (session decoding, timeline, restore with safety
+  copies, the rule) and `ZenBackupManagerModule` (pane, provider, watcher).
+  The source's 23 tests moved to `ZenBackupManagerCoreTests`.
+- **Provenance:** ZenBackupManager@14efe4434430e453b5a53e79434d2ea828ad70ba
+- **Applicability:** a profile listed in Zen's `profiles.ini`; otherwise
+  "Zen Browser is not installed".
+- **Watcher:** hourly, unprivileged and metadata only: `profiles.ini`, then
+  the dates of each profile's session files (current state,
+  `zen-sessions-backup/`, `sessionstore-backups/`; never the safety copies).
+  One finding per profile, scoped by its folder path. At 7 days or more:
+  "Zen has not saved a session in N days", opening
+  `murten://zenbackupmanager/timeline?profile=<path>`. A restore rewrites the
+  current session file, so it counts as a save.
+- **Preselection:** the profile only. The pane re-scans it and selects its
+  current state, never a backup to restore; restoring still takes the
+  confirmation sheet, which offers to quit Zen.
+- **State:** safety copies stay in
+  `~/Library/Application Support/ZenBackupManager/Safety Copies` and are read
+  in place, so undo sees the standalone app's copies too. No preferences
+  migrate: the standalone app's only ones belonged to its update checker,
+  which is removed. Quitting during a restore asks first.
+- **Coexistence:** both apps take Zen's profile lock while restoring, so a
+  restore in one is refused while the other is writing.
 - **Source facts:** Zen Browser only. Zen writes the session snapshots; the
   app reads them and writes safety copies around restores. A stale snapshot
   means Zen has not saved a session (unused, or crashing), not an overdue
