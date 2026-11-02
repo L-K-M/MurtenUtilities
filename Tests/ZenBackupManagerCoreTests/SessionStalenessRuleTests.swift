@@ -24,12 +24,14 @@ final class SessionStalenessRuleTests: XCTestCase {
     }
 
     func testSnapshotDatedInTheFutureCountsAsFresh() {
-        XCTAssertEqual(finding(age: -day).seconds("age"), 0)
+        let future = finding(age: -day)
+        XCTAssertEqual(future.seconds("age"), 0)
+        XCTAssertNil(rule.suggestion(for: future, state: .inactive))
     }
 
     func testUnderAWeekSuggestsNothing() {
         XCTAssertNil(rule.suggestion(for: finding(age: 7 * day - 1), state: .inactive))
-        XCTAssertNil(rule.suggestion(for: finding(age: 7 * day - 1), state: .active), "a save resolves the episode")
+        XCTAssertNil(rule.suggestion(for: finding(age: 7 * day - 1), state: .active), "a fresh save resolves an active episode")
     }
 
     func testAWeekSaysZenHasNotSavedNotThatABackupIsOverdue() throws {

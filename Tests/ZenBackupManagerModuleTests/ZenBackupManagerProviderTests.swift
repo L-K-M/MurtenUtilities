@@ -103,6 +103,26 @@ final class ZenBackupManagerProviderTests: XCTestCase {
         XCTAssertNotEqual(model.selected?.canRestore, true, "a suggestion never preselects a backup to restore")
     }
 
+    func testAFailedDiscoveryIsRetriedOnTheNextVisit() async throws {
+        let zen = try makeZenFolder()
+        let unreadable = zen.root.appendingPathComponent("profiles.ini")
+        try FileManager.default.createDirectory(at: unreadable, withIntermediateDirectories: true)
+        let model = makeProvider(zen).model
+
+        model.appear(for: ModuleRoute(moduleID: "zenbackupmanager"))
+        XCTAssertNotNil(model.error)
+        XCTAssertTrue(model.profiles.isEmpty)
+
+        try FileManager.default.removeItem(at: unreadable)
+        try zen.list(["Work"])
+        model.error = nil
+        model.appear(for: ModuleRoute(moduleID: "zenbackupmanager"))
+        await scanned(model)
+
+        XCTAssertNil(model.error)
+        XCTAssertEqual(model.profile?.name, "Work", "the suite outlives one launch, so a plain visit discovers again")
+    }
+
     func testAPlainRevisitKeepsThePanesState() async throws {
         let zen = try makeZenFolder()
         try zen.list(["Work"])

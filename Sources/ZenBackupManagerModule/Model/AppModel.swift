@@ -55,15 +55,16 @@ final class AppModel: ObservableObject {
         records.filter { (showLegacy || $0.kind != .legacy) && (showSafety || $0.kind != .safety) }
     }
 
-    /// The pane appeared. The first visit discovers profiles and scans, as
-    /// the standalone app did at launch; a later plain visit keeps its state.
-    /// A suggestion's route discovers again, opens the profile it names and
-    /// re-scans without selecting a backup to restore; it waits for nothing
-    /// but a running restore, which re-scans when it ends.
+    /// The pane appeared. Until a visit finds profiles, every visit discovers
+    /// them and scans, as the standalone app did at launch; the suite runs far
+    /// longer than one launch, so a failed or empty discovery is retried.
+    /// After that a plain visit keeps its state. A suggestion's route
+    /// discovers again, opens the profile it names and re-scans without
+    /// selecting a backup to restore. Nothing starts while a restore is
+    /// writing: the pane stays on that profile, which re-scans when it ends.
     func appear(for route: ModuleRoute?) {
         let fromSuggestion = route?.action == ZenBackupRoute.timelineAction
-        guard !hasStarted || (fromSuggestion && !isWritingSession) else { return }
-        hasStarted = true
+        guard !isWritingSession, !hasStarted || fromSuggestion else { return }
 
         do {
             let discovered = try ProfileDiscovery.discover(root: zenRoot)
@@ -77,6 +78,7 @@ final class AppModel: ObservableObject {
             return
         }
 
+        hasStarted = true
         let requested = route?.context[ZenBackupRoute.profileKey]
         profileID = profiles.first { $0.id == requested }?.id ?? profiles.first { $0.id == profileID }?.id ?? profiles.first?.id
         notice = nil
