@@ -216,30 +216,71 @@ SwiftPM.
   Health states and 48 hours of activity samples exist, but there is no
   offline-for-10-minutes rule yet.
 
-### Coreography — effort: medium — phase 3
+### Coreography — effort: medium — phase 3 — migrated
 
 The system monitor: CPU/memory/disk/network lanes, process table, menu-bar
 extra, widgets, Shortcuts actions, a `coreo` CLI. `.xcodeproj` today.
 
-- **Migrates:** the sampling/rendering core is the biggest port in the
-  roster — worth it, because its samples feed half the watcher ideas. Its own
-  menu-bar presence likely folds into the suite's (one menu face, many
-  instruments).
-- **Privilege:** ships a root XPC sampling daemon today (counters, open
-  files, sockets, signal/renice, spindump, BTM dump) that refuses to start
-  under ad-hoc signing. It embeds per-module like BootCaptain's helper —
-  same signing gate (docs/architecture.md § Module packaging).
-- **Watcher:** sustained-pressure signals → "X has pinned a core for an hour";
-  thermal/disk-full warnings.
-- **Source facts:** the engine is already SwiftPM (`CoreographyKit`,
-  `CoreographyServices`, `CoreographyDrivers`, plus the `coreo` and helper
-  executables); Xcode builds only the app shell, widgets and packaging. Its
-  menu-bar extra is the primary surface, not chrome. It keeps a one-hour
-  in-memory history and SQLite rollups, and already ships its own alerts and
-  notifications (memory, thermal, battery, disk). Unmentioned surfaces: App
-  Intents, a `coreography://` scheme, a local MCP server (off by default) and
-  "Ask", which sends system context to Anthropic or an OpenAI-compatible
-  endpoint on request.
+- **Status:** available. The pane is the monitor window (lanes, process
+  table, inspector, connections, startup items, sensors, sessions, Ask,
+  the command palette); the menu section is its menu-bar extra (CPU,
+  memory, network and disk mini lanes, the top process, pause, hold, HUD);
+  Settings has a Coreography tab.
+- **Provenance:** Coreography@664a49f6f40e35b2072af76bace8bac58afa427b
+- **Targets:** `CoreographySystem` (C), `CoreographySQLite` (the source's
+  `CSQLite`, renamed because target names are package-wide),
+  `CoreographyDrivers`, `CoreographyKit`, `CoreographyServices` with their
+  test suites; `CoreographyCore` (watcher, rule); `CoreographyModule`
+  (provider, pane, menu section, settings). All Swift 6, as in the source.
+  The C bridge contract tests moved to `scripts/coreography-bridge-tests/`
+  (`run.sh`); `swift test` does not run them.
+- **Sampling:** one model serves every surface, as in the standalone app,
+  but it samples only while the pane or the menu section shows, the HUD is
+  up, a recording runs or an MCP client is connected. History (the same
+  SQLite rollups, `~/Library/Application Support/Coreography/History`)
+  therefore covers the time Coreography was in use, not the whole session.
+  Its alert rules still tint lanes while it samples; they no longer notify.
+- **Watcher:** every 15 minutes, unprivileged, local (no `.network`), behind
+  `SystemObserving`. Four checks, each its own scope: `processes` (a process
+  averaging ≥ 0.8 of a core over the last hour, from CPU-time deltas between
+  polls kept in memory; stays open while ≥ 0.5), `memory` (critical pressure
+  at two checks in a row; stays open while warning or worse), `thermal`
+  (heavy pressure at two checks in a row; stays open while moderate or
+  worse), `startup-volume` (under 10 % free; clears at 12 %). It reads only
+  the person's own processes: other users' need the helper. The process
+  name sits in the condition (`sustained-cpu:<name>`) under the single
+  `processes` scope, so an exited process resolves at the next complete
+  check, and nothing resolves before the watcher has measured a full hour.
+  The standalone battery alert stays out: macOS warns itself and watchers
+  pause on battery by default.
+- **Preselection:** nothing. Routes only navigate: `process?name=` filters
+  the process table by name and sorts by CPU, `memory` and `storage` sort it
+  by memory or disk writes, `thermal` shows the sensors. No row is selected
+  and no action is armed; quitting or signalling a process keeps its own
+  confirmation.
+- **Privilege:** the root XPC helper is Team-ID pinned, so ad-hoc suite
+  builds leave it out (not embedded). Features behind it (other users'
+  processes, spindump, raising priority, login and background items) show
+  "Needs a signed build"; Settings shows the helper as unavailable.
+- **Left out:** the helper; the widgets and the briefing writer that feeds
+  them; App Intents (SwiftPM cannot extract their metadata); the `coreo`
+  CLI; the self update checker; the Dock tile graph and the menu-bar title
+  items (the shell owns the Dock and the status item); `coreography://`
+  links and opening `.coreotrace` from Finder (the suite registers no URL
+  scheme or document type; Open Recording… in the Tool menu reads them).
+- **State:** preferences use the module's store under their old keys, so
+  the standalone app's settings do not carry over. History, sessions
+  (`…/Coreography/Sessions`), the MCP socket (`…/Coreography/mcp.sock`) and
+  the Keychain items (`ch.lkmc.Coreography.provider`) keep their places.
+  Whether an Ask key exists is read from Keychain attributes, so opening
+  the pane does not prompt; using a key the standalone app saved may.
+- **MCP and Ask:** kept, off by default and on request as before. The suite
+  does not ship `coreo`; clients use the standalone app's
+  `Coreography.app/Contents/Helpers/coreo mcp --stdio`, which the client
+  resolver treats as the bridge, so approvals still name the app behind it.
+  An approval request opens the pane; with the window closed it times out.
+- **Coexistence:** with the standalone app running too, both write the same
+  history store and only the first to listen gets the MCP socket.
 
 ## What a suggestion may preselect
 
