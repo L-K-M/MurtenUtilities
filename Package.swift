@@ -46,7 +46,18 @@ let deviceControlDoctorTargets: [Target] = []
 let deviceControlDoctorModule: [Target.Dependency] = []
 
 // MARK: Shortking
-let shortkingTargets: [Target] = []
+// Moved from Shortking (docs/modules.md, Provenance). ShortkingCore is the pure
+// model and conflict analysis split out of the source's ShortkingKit, which keeps
+// the AppKit, Carbon, SkyLight and process side. ShortkingProbe is the
+// short-lived probe helper; scripts/build-app.sh embeds it as
+// Contents/MacOS/shortking-probe.
+let shortkingTargets: [Target] = [
+    .target(name: "ShortkingCore"),
+    .target(name: "ShortkingKit", dependencies: ["ShortkingCore"]),
+    .executableTarget(name: "ShortkingProbe", dependencies: ["ShortkingKit", "ShortkingCore"]),
+    .testTarget(name: "ShortkingCoreTests", dependencies: ["ShortkingCore"]),
+    .testTarget(name: "ShortkingKitTests", dependencies: ["ShortkingKit", "ShortkingCore"])
+]
 let shortkingModule: [Target.Dependency] = []
 
 // MARK: HallPass
