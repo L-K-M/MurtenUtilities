@@ -128,6 +128,11 @@ struct PermissionWatcher: Watcher {
             }
         }
 
+        // Without a finished baseline check there is nothing to compare a
+        // new signature against, so codesign would be wasted work.
+        guard app.identity.signatureValid != nil else {
+            return .read(WatchedAppReading(permissions: permissions, identity: AppIdentity()))
+        }
         let identity = await IdentityInspector(runner: runner).inspect(path: app.path)
         guard !Task.isCancelled else { return .cancelled }
         return .read(WatchedAppReading(permissions: permissions, identity: identity))

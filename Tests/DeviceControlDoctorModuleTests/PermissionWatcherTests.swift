@@ -139,6 +139,18 @@ final class PermissionWatcherTests: XCTestCase {
         XCTAssertFalse(runner.calls.contains { $0 == [SystemTool.tccutil] }, "no probe when no app needs it")
     }
 
+    func testAppWithoutABaselineIdentitySkipsCodesign() async throws {
+        var app = try mac.installApp("Fresh", bundleID: "com.example.Fresh", expecting: [])
+        app.identity = AppIdentity()
+        try mac.saveWatchList([app])
+
+        let observation = try await observeWithoutWriting()
+
+        XCTAssertEqual(observation.outcome, .complete)
+        XCTAssertEqual(observation.completedScopes, [scope(app)])
+        XCTAssertTrue(runner.calls.isEmpty)
+    }
+
     // MARK: - Apps the watcher cannot or may not read
 
     func testMissingAppAndReplacedBundleAreFailuresNotResolutions() async throws {
