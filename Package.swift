@@ -59,8 +59,17 @@ let dockVacTargets: [Target] = [
 let dockVacModule: [Target.Dependency] = ["DockVacModule"]
 
 // MARK: RepoMen
-let repoMenTargets: [Target] = []
-let repoMenModule: [Target.Dependency] = []
+// Ported from an .xcodeproj (Swift 5 mode there too). RepoMenCore: scan, ageing,
+// selection and reclaim verification, Foundation only. RepoMenModule: the pane,
+// the privileged and tmutil runners, the watcher and auto-trash.
+let repoMenTargets: [Target] = [
+    .target(name: "RepoMenCore", dependencies: ["MurtenCore"]),
+    .target(name: "RepoMenModule", dependencies: ["RepoMenCore", "MurtenCore", "MurtenModuleKit"]),
+    .testTarget(name: "RepoMenCoreTests", dependencies: ["RepoMenCore", "MurtenCore"]),
+    .testTarget(name: "RepoMenModuleTests",
+                dependencies: ["RepoMenModule", "RepoMenCore", "MurtenCore", "MurtenModuleKit"])
+]
+let repoMenModule: [Target.Dependency] = ["RepoMenModule"]
 
 // MARK: BootCaptain
 // Core and Kit move in from BootCaptain's own package; Core adds the

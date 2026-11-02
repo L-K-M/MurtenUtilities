@@ -76,26 +76,56 @@ Docker disk-usage treemap with selective reclaim — deliberately not a broad
   menu's checkmarks on Show Everything / Show Reclaimable Only (the bar's
   segmented control shows the filter).
 
-### RepoMen — effort: medium — phase 3
+### RepoMen — effort: medium — phase 3 — available
 
 Finds developer caches and build artifacts — `target/`, `node_modules/`,
 DerivedData, Homebrew caches — and reclaims them by age and size.
 
-- **Migrates:** needs a `.xcodeproj` → SwiftPM port. The scan/ageing logic is
-  the core; the review-and-delete UI becomes the pane.
-- **Watcher:** periodic scan of configured roots → "N GB of build products
-  older than 60 days".
-- **Existing automation:** RepoMen's Watch mode can move stale artifacts to
-  the Trash after every periodic check once the user arms it
-  (`watchAutoTrash`, off by default; `RepoMen/Watch/WatchManager.swift`).
-  That is a watcher with a write path, which the suite forbids, so it cannot
-  migrate as a watcher. Whether it survives in another form is open
-  (PLAN.md, *User-armed automation*).
-- **Source facts:** Watch mode already scans user-added folders (none by
-  default) every 6 hours, with a 30-day idle default. A scan walks up to 16
-  levels and sizes every candidate, so it is not a cheap poll, and the default
-  manual roots include `~/Documents`, which raises a Files & Folders prompt.
-  RepoMen already has its own `MenuBarExtra`, login item and notifications.
+- **Provenance:** RepoMen@afd1fcb02929ecbeec0deeef5bb84b30d0a89b19
+- **Status:** available. The `.xcodeproj` is ported to SwiftPM:
+  `RepoMenCore` (scan, ageing, selection, reclaim verification; Foundation
+  only) and `RepoMenModule` (the pane, the osascript and `tmutil` runners,
+  the watcher, auto-trash). The source's tests moved with the code, except the
+  update checker's.
+- **Watcher:** every 6 hours (timeout 30 minutes), scans the pane's scan
+  folders (Settings › RepoMen › Folders, idle after the pane's 30-day
+  default) and the enabled watched folders (Settings › RepoMen › Watch, each
+  with its own threshold; a path in both follows its watched entry), and
+  reports the bytes of build artifacts idle past the threshold per folder,
+  scope = the folder's path. Rule: suggest at ≥ 5 GB, resolve below 4 GB.
+  Folders in Desktop, Documents, Downloads, iCloud Drive, File Provider
+  storage or under `/Volumes` are not scanned and are reported unavailable
+  (`permissionDenied`); the user scans them in the pane. A scanned folder
+  walks around those locations and does not follow Git worktree
+  registrations into them. The observation lists every folder surveyed
+  (`coverage: .exhaustive`), so suggestions for removed or paused folders
+  resolve. The scan folders' defaults often sit in
+  `~/Documents`, so for many users part of the check is unavailable until
+  they add folders elsewhere.
+- **Auto-trash (user-armed):** armed per watched folder, off by default; the
+  standalone `watchAutoTrash` switch is not imported. Every 6 hours, only
+  while `backgroundWorkAllowed()` (checked again before trashing), it moves the
+  stale artifacts of armed folders to the Trash through `Reclaimer`'s
+  re-verification, never deletes, and logs each item (pane: Watch › Auto-trash
+  log). The menu section shows the armed folders, the last pass and a switch
+  that disarms them all. Folders in protected locations cannot be armed.
+- **Preselection:** nothing. A suggestion opens a review that re-scans the
+  configured folders plus the watched folder it names (ignored unless it is
+  one); the user checks items and confirms.
+- **Left out:** the update checker, login item, its own menu-bar extra and
+  notifications (the suite owns them); the quit deferral, replaced by the
+  suite's quit warning; the app icon asset catalog.
+- **Privilege:** System Scan and system-area reclaims keep their per-action
+  `osascript` administrator prompt; snapshot delete and thin keep `tmutil` with
+  that prompt as fallback. No helper, so nothing depends on the signing
+  decision, but folder grants (Documents) do not survive ad-hoc-signed
+  updates; the pane says so.
+- **State:** preferences keep their standalone keys in the module's domain.
+  On first launch the standalone app's scan folders, exclusions, rules, idle
+  days, Trash choice, lifetime tally and watched folders are copied once
+  from `ch.lkmc.RepoMen`; its domain is only read. RepoMen keeps no files.
+- **Coexistence:** both apps can scan and reclaim the same folders; a
+  standalone app with auto-clean on keeps trashing on its own schedule.
 
 ### BootCaptain — effort: medium — phase 3
 
