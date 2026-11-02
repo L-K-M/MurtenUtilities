@@ -66,12 +66,12 @@ fixed paths, repair is user-confirmed per service.
 - **Watcher:** periodic grant-vs-function drift checks where a cheap signal
   exists → "X lost its working permission after the update". No
   watcher-triggered resets, ever.
-- **Source facts:** the cheap signal detects identity and record changes,
-  not functional failure, so a suggestion can only say "verify again". Reads
-  use `tccutil list`, verified only on macOS 27.2; elsewhere they degrade to
-  unavailable. `ProcessRunner` is a concrete struct, so the reset path has no
-  fake seam. The app inserts its `MenuBarExtra` unconditionally and monitors
-  by default (`monitorEnabled = true`).
+- **Source facts:** the cheap signal detects identity and record changes, not
+  functional failure, so a suggestion can only say "verify again". Reads use
+  `tccutil list`, which its AGENTS.md records as verified only on macOS 27.2;
+  elsewhere they degrade to unavailable. `ProcessRunner` is a concrete struct,
+  so the reset path has no fake seam. The app inserts its `MenuBarExtra`
+  unconditionally and monitors by default (`monitorEnabled = true`).
 
 ### Shortking — effort: medium — phase 3
 
@@ -144,8 +144,8 @@ SwiftPM.
   widget publishing are about 7,200 lines in the app target. It has its own
   unconditional `MenuBarExtra`, login item, `runningman://` scheme and a
   WidgetKit extension that `scripts/build-app.sh` assembles from SwiftPM.
-  Health states and 48 hours of activity samples exist; no
-  offline-for-10-minutes rule does.
+  Health states and 48 hours of activity samples exist, but there is no
+  offline-for-10-minutes rule yet.
 
 ### Coreography — effort: medium — phase 3
 
