@@ -109,18 +109,18 @@ consume.
 Per-module update checks do not migrate. Four roster apps poll their own
 GitHub releases, on by default:
 
-| App | Default on | Announces with |
+| App | Checker | Announces with |
 | --- | --- | --- |
-| Coreography | `Sources/CoreographyServices/UpdateChecker.swift:69` | a notification |
-| RunningMan | `Sources/RunningMan/AppUpdateChecker.swift:104` | an in-app banner |
-| RepoMen | `RepoMen/Updates/UpdateChecker.swift:71` | a modal alert, from a background check |
-| Zen Backup Manager | `ZenBackupManager/Updates/UpdateChecker.swift:71` | the same modal alert |
+| Coreography | `Sources/CoreographyServices/UpdateChecker.swift` | a notification |
+| RunningMan | `Sources/RunningMan/AppUpdateChecker.swift` | an in-app banner |
+| RepoMen | `RepoMen/Updates/UpdateChecker.swift` | a modal alert, from a background check |
+| Zen Backup Manager | `ZenBackupManager/Updates/UpdateChecker.swift` | the same modal alert |
 
 Inside the suite a module has no version of its own, so these checks would
-announce standalone releases the suite cannot install, and two of them do it
-through surfaces the suite rules out (a default-on notification, a modal).
-The suite checks for its own updates in one place (PLAN.md, open question
-*Suite updates*).
+announce standalone releases the suite cannot install, and three of them do
+it through surfaces the suite rules out (a default-on notification, a modal).
+The suite has one update check for its own bundle; whether it runs by default
+is open (PLAN.md, *Suite updates*).
 
 ## Testing strategy
 
