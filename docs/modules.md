@@ -207,7 +207,7 @@ stops them, sets launch-at-login, registers new ones, follows job logs.
 SwiftPM.
 
 - **Status:** available.
-- **Provenance:** RunningMan@21aebe8da5ff20b96fd0bbece1335da2b5ab6778
+- **Provenance:** RunningMan@248772f7e0aeeaed4eecbc35a3f1a2ebf7ec798c (release 1.5.1)
 - **Migrated:** `RunningManCore` and `RunningManServices` with their tests;
   the app target became `RunningManModule`: the manager pane (Overview,
   Runners, Workload, Job history, Cleanup), the stop-after-job drain engine,
