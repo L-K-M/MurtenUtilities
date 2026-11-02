@@ -67,7 +67,7 @@ public enum ModuleRegistry {
         SuiteModule(
             id: "obtainintosh", name: "Obtainintosh",
             summary: "Track updates for apps and fonts installed from releases.",
-            systemImage: "arrow.down.circle", sourceRepository: "Obtainintosh"),
+            systemImage: "arrow.down.circle", status: .available, sourceRepository: "Obtainintosh"),
         SuiteModule(
             id: "runningman", name: "RunningMan",
             summary: "Run, watch and register self-hosted GitHub and Forgejo runners.",
