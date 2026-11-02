@@ -50,7 +50,12 @@ let shortkingTargets: [Target] = []
 let shortkingModule: [Target.Dependency] = []
 
 // MARK: HallPass
-let hallPassTargets: [Target] = []
+// The source package (tools 6.0, no explicit mode) builds in Swift 6.
+let hallPassSwiftSettings: [SwiftSetting] = [.swiftLanguageMode(.v6)]
+let hallPassTargets: [Target] = [
+    .target(name: "HallPassCore", swiftSettings: hallPassSwiftSettings),
+    .testTarget(name: "HallPassCoreTests", dependencies: ["HallPassCore"], swiftSettings: hallPassSwiftSettings)
+]
 let hallPassModule: [Target.Dependency] = []
 
 // MARK: ZenBackupManager
