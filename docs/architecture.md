@@ -111,6 +111,10 @@ consume.
 - `MurtenCore`: registry invariants, dedupe/snooze/threshold rules, deep-link
   parsing — pure and fully unit-testable.
 - Each `<Tool>Core` keeps the test suite it brings with it.
+- App-level macOS smoke tests cover home/suggestion/pane routing, cancellation
+  and focus with fake services. Keyboard, VoiceOver, contrast and text-size
+  acceptance live in [UI direction](ui-direction.md#accessibility-acceptance);
+  unit tests and screenshots do not substitute for these checks.
 - Watcher behaviour is tested against fixture command output, never the real
   system (same boundary discipline as DeviceControlDoctor's `ProcessRunner`).
 - The privileged write paths stay manual-verification-only, exactly as in the
