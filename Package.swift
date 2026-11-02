@@ -38,7 +38,15 @@ let repoMenTargets: [Target] = []
 let repoMenModule: [Target.Dependency] = []
 
 // MARK: BootCaptain
-let bootCaptainTargets: [Target] = []
+// Core and Kit move in from BootCaptain's own package unchanged; the app
+// target's sources become BootCaptainModule. The CLI and the root helper stay
+// in the BootCaptain repo (docs/modules.md, BootCaptain).
+let bootCaptainTargets: [Target] = [
+    .target(name: "BootCaptainCore"),
+    .target(name: "BootCaptainKit", dependencies: ["BootCaptainCore"]),
+    .testTarget(name: "BootCaptainCoreTests", dependencies: ["BootCaptainCore"]),
+    .testTarget(name: "BootCaptainKitTests", dependencies: ["BootCaptainKit", "BootCaptainCore"])
+]
 let bootCaptainModule: [Target.Dependency] = []
 
 // MARK: DeviceControlDoctor
