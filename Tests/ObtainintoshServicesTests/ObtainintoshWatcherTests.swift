@@ -46,7 +46,7 @@ final class ObtainintoshWatcherTests: XCTestCase {
         .success(Release(version: version, downloadURL: "u", fileName: "f.dmg", fileSize: 1))
     }
 
-    private func observe(_ observer: FixtureObserver) async -> Observation {
+    private func observe(_ observer: FixtureObserver) async -> WatchObservation {
         await ObtainintoshWatcher(observer: observer, now: { [now] in now }).observe()
     }
 

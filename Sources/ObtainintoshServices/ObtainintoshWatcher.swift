@@ -29,7 +29,7 @@ public struct ObtainintoshWatcher: Watcher {
         self.now = now
     }
 
-    public func observe() async -> Observation {
+    public func observe() async -> WatchObservation {
         let observedAt = now()
         let data: TrackedAppData?
         do {
@@ -85,11 +85,11 @@ public struct ObtainintoshWatcher: Watcher {
                                                        + error.localizedDescription)))
             }
         }
-        return Observation(moduleID: moduleID, observedAt: observedAt, findings: findings,
+        return WatchObservation(moduleID: moduleID, observedAt: observedAt, findings: findings,
                            completedScopes: completed, failures: failures)
     }
 
-    private func cancelled(at date: Date) -> Observation {
+    private func cancelled(at date: Date) -> WatchObservation {
         .unavailable(moduleID: moduleID, at: date, ObservationFailure(kind: .failed, message: "The check was stopped."))
     }
 
