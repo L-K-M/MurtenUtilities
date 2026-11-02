@@ -41,11 +41,12 @@ public struct SuiteScenes: Scene {
         // Resident mode governs the menu extra; it is off by default and
         // independent of launch at login (docs/architecture.md, Resident mode).
         MenuBarExtra(isInserted: residentBinding) {
-            MenuBarContent(model: model)
+            MenuBarPanel(model: model)
         } label: {
             MenuBarLabel(model: model)
         }
-        .menuBarExtraStyle(.menu)
+        // A panel rather than a menu, so modules can show live instruments.
+        .menuBarExtraStyle(.window)
     }
 
     private var residentBinding: Binding<Bool> {

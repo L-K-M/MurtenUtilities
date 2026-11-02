@@ -16,13 +16,20 @@ public struct ModuleContext {
     /// Opens a pane, this module's or another's. Routes are validated
     /// against the allowlist before anything opens.
     public let open: (ModuleRoute) -> Void
+    /// Whether the user currently allows this module to work in the
+    /// background: resident mode on and the module's background check not
+    /// switched off. User-armed automation (RepoMen's auto-trash) runs only
+    /// while this is true.
+    public let backgroundWorkAllowed: () -> Bool
 
     public init(moduleID: String, defaults: UserDefaults,
-                requestRecheck: @escaping () -> Void, open: @escaping (ModuleRoute) -> Void) {
+                requestRecheck: @escaping () -> Void, open: @escaping (ModuleRoute) -> Void,
+                backgroundWorkAllowed: @escaping () -> Bool = { false }) {
         self.moduleID = moduleID
         self.defaults = defaults
         self.requestRecheck = requestRecheck
         self.open = open
+        self.backgroundWorkAllowed = backgroundWorkAllowed
     }
 }
 
@@ -64,6 +71,11 @@ public protocol SuiteModuleProvider: AnyObject {
     /// `openWindow(module:)`; nil for an unknown kind.
     func makeWindow(_ request: ModuleWindowRequest) -> AnyView?
 
+    /// A compact section for the menu-bar companion: live instruments
+    /// (Coreography) or what the module does on its own (RepoMen's armed
+    /// auto-trash). nil when the module has nothing to show there.
+    func makeMenuSection() -> AnyView?
+
     /// Non-nil while quitting would interrupt work, e.g. "A cleanup is still
     /// running." The shell asks before quitting.
     var interruptionWarning: String? { get }
@@ -75,6 +87,7 @@ public extension SuiteModuleProvider {
     func applicability() async -> Applicability { .applicable }
     func makeSettings() -> AnyView? { nil }
     func makeWindow(_ request: ModuleWindowRequest) -> AnyView? { nil }
+    func makeMenuSection() -> AnyView? { nil }
     var interruptionWarning: String? { nil }
 }
 

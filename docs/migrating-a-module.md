@@ -58,6 +58,18 @@ creates it once at launch with a `ModuleContext`:
 - Menu commands and their shortcuts: publish them with
   `.moduleCommands([...])`; they appear in the Tool menu while the pane is
   focused.
+- A source app's own menu-bar extra folds into the suite's companion:
+  `makeMenuSection()` returns a compact view shown there (live
+  instruments, a review count, armed automation). Keep it small; it is a
+  panel, not a second app.
+
+## User-armed automation
+
+Only RepoMen's Watch mode (PLAN.md, *User-armed automation*): armed per
+target by the user, off by default, reversible (to the Trash), visible in
+the module's menu section while armed, and run only while
+`context.backgroundWorkAllowed()` is true. It is module code, never the
+watcher: the watcher still only observes.
 
 ## What the shell owns
 

@@ -188,6 +188,19 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(checking.model.availableUpdate?.version, ReleaseVersion("9.9.9"))
     }
 
+    func testBackgroundWorkNeedsResidentModeAndAnEnabledModule() async {
+        let harness = Harness()
+        await harness.model.start()
+        XCTAssertFalse(harness.provider.context.backgroundWorkAllowed())
+
+        harness.model.settings.residentMode = .on
+        XCTAssertTrue(harness.provider.context.backgroundWorkAllowed())
+
+        harness.model.settings.disabledWatchers = [fakeModuleID]
+        XCTAssertFalse(harness.provider.context.backgroundWorkAllowed())
+        await harness.model.stop()
+    }
+
     func testQuitGuardListsBusyModules() async {
         let harness = Harness()
         XCTAssertTrue(harness.model.interruptionWarnings().isEmpty)

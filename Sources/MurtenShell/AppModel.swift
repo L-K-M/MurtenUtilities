@@ -108,7 +108,8 @@ public final class AppModel {
             let context = ModuleContext(
                 moduleID: moduleID, defaults: moduleDefaults,
                 requestRecheck: { weakSelf()?.recheck(moduleID) },
-                open: { weakSelf()?.open($0) })
+                open: { _ = weakSelf()?.open($0) },
+                backgroundWorkAllowed: { weakSelf()?.allowsBackgroundWork(moduleID) ?? false })
             let provider = factory.make(context)
             built[moduleID] = provider
             defaults[moduleID] = moduleDefaults
@@ -188,6 +189,21 @@ public final class AppModel {
 
     public func window(for request: ModuleWindowRequest) -> AnyView? {
         providers[request.moduleID]?.makeWindow(request)
+    }
+
+    /// Modules with a menu-bar section, in home-screen order.
+    public var modulesWithMenuSections: [SuiteModule] {
+        modules.filter { providers[$0.id]?.makeMenuSection() != nil }
+    }
+
+    public func menuSection(for moduleID: String) -> AnyView? {
+        providers[moduleID]?.makeMenuSection()
+    }
+
+    /// Resident mode on and the module's background check not switched off.
+    public func allowsBackgroundWork(_ moduleID: String) -> Bool {
+        settings.residentMode == .on && !settings.disabledWatchers.contains(moduleID)
+            && applicability[moduleID] == .applicable
     }
 
     public func defaults(for moduleID: String) -> UserDefaults {
