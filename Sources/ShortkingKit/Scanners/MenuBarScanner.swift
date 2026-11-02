@@ -17,13 +17,6 @@ public final class MenuBarScanner: ClaimSource {
     public let displayName = "Menu bar shortcuts"
     public let requirement: ScanRequirement = .accessibility
 
-    /// How deep to recurse. Real menu bars are 3–4 deep; the bound exists so a
-    /// pathological (or hostile) menu tree cannot spin the scan.
-    private let maxDepth = 6
-
-    /// Per-app item budget, for the same reason.
-    private let maxItemsPerApp = 4_000
-
     private let cache: MenuCache
 
     public init(cache: MenuCache = MenuCache()) {
@@ -44,9 +37,7 @@ public final class MenuBarScanner: ClaimSource {
             targets = targets.filter(\.isActive)
         }
 
-        // One write per scan rather than one per app. In a `defer` so that a
-        // cancelled or timed-out scan still keeps the menus it managed to read —
-        // a partial cache is strictly better than none.
+        // Persist completed apps even if a later app times out or is cancelled.
         defer { cache.flush() }
 
         var claims: [Claim] = []
@@ -62,7 +53,8 @@ public final class MenuBarScanner: ClaimSource {
         if let cached = cache.entries(forKey: app.cacheKey) {
             entries = cached
         } else {
-            entries = walk(app: app)
+            guard let completed = walk(app: app).cacheableEntries else { return [] }
+            entries = completed
             cache.store(entries, forKey: app.cacheKey)
         }
 
@@ -89,34 +81,44 @@ public final class MenuBarScanner: ClaimSource {
         }
     }
 
-    private func walk(app: RunningApp) -> [MenuEntry] {
-        let element = AXBridge.application(pid: pid_t(app.pid), timeout: 0.25)
-        guard let menuBar = AXBridge.menuBar(of: element) else { return [] }
-
+    private func walk(app: RunningApp) -> MenuWalkResult<MenuEntry> {
+        var budget = MenuWalkBudget()
+        let reader = AXMenuReader(budget: budget)
+        let element = AXBridge.application(
+            pid: pid_t(app.pid), timeout: Float(MenuWalkBudget.messagingTimeout)
+        )
         var entries: [MenuEntry] = []
-        var budget = maxItemsPerApp
-        for child in AXBridge.children(menuBar) {
-            recurse(element: child, path: [], depth: 0, entries: &entries, budget: &budget)
-            if budget <= 0 { break }
+
+        do {
+            let menuBar = try reader.menuBar(of: element)
+            for child in try reader.children(of: menuBar) {
+                try recurse(element: child, path: [], depth: 0, reader: reader,
+                    entries: &entries, budget: &budget)
+            }
+            _ = try budget.readTimeout()
+            guard !budget.wasTruncated else { return .incomplete }
+            return .complete(entries)
+        } catch {
+            // An unavailable or truncated menu must be retried on the next scan.
+            return .incomplete
         }
-        return entries
     }
 
     private func recurse(
         element: AXUIElement,
         path: [String],
         depth: Int,
+        reader: AXMenuReader,
         entries: inout [MenuEntry],
-        budget: inout Int
-    ) {
-        guard depth <= maxDepth, budget > 0 else { return }
-        budget -= 1
+        budget: inout MenuWalkBudget
+    ) throws {
+        guard try budget.visit(depth: depth) else { return }
 
-        let title = AXBridge.title(of: element)
+        let title = try reader.title(of: element)
         let currentPath = title.map { path + [$0] } ?? path
 
-        if let combo = AXBridge.shortcut(of: element), !combo.isBare {
-            let enabled = AXBridge.int(element, AXBridge.MenuAttribute.enabled).map { $0 != 0 } ?? true
+        if let combo = try reader.shortcut(of: element), !combo.isBare {
+            let enabled = try reader.enabled(of: element)
             entries.append(
                 MenuEntry(
                     combo: combo,
@@ -127,9 +129,9 @@ public final class MenuBarScanner: ClaimSource {
             )
         }
 
-        for child in AXBridge.children(element) {
-            recurse(element: child, path: currentPath, depth: depth + 1, entries: &entries, budget: &budget)
-            if budget <= 0 { return }
+        for child in try reader.children(of: element) {
+            try recurse(element: child, path: currentPath, depth: depth + 1, reader: reader,
+                entries: &entries, budget: &budget)
         }
     }
 }

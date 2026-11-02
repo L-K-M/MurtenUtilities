@@ -22,7 +22,7 @@ struct DetectiveContent: View {
     @State private var blackoutDuration: Double = 10
     /// Set when a blackout has run *and finished*, which is what makes the
     /// "It worked" / "Still broken" answers mean anything.
-    @State private var hasCompletedBlackout = false
+    @State private var blackoutAnswer = BlackoutAnswerState()
     @State private var confirmingBlackout = false
 
     var body: some View {
@@ -55,13 +55,15 @@ struct DetectiveContent: View {
             combo = session.combo
         }
         .onChange(of: state.detective.blackoutActive) { wasActive, isActive in
-            if wasActive && !isActive { hasCompletedBlackout = true }
+            if isActive { blackoutAnswer.began() }
+            if wasActive && !isActive { blackoutAnswer.ended() }
         }
         // Keeps the recorder in step when something else points the session at a
         // combination — the Overview's "Investigate live", say — while this screen is
         // already on show. The two guards are what stop it looping against the
         // recorder's own `onChange`, which calls back into `investigate`.
         .onChange(of: session.combo) { _, newValue in
+            blackoutAnswer.targetChanged()
             if let newValue, newValue != combo { combo = newValue }
         }
     }
@@ -75,6 +77,7 @@ struct DetectiveContent: View {
 
             ComboRecorder(combo: $combo)
                 .onChange(of: combo) { _, newValue in
+                    blackoutAnswer.targetChanged()
                     guard let newValue else { return }
                     state.detective.investigate(
                         combo: newValue,
@@ -182,9 +185,9 @@ struct DetectiveContent: View {
                         }
                         .controlSize(.small)
                     }
-                    .disabled(!hasCompletedBlackout)
+                    .disabled(!blackoutAnswer.canReport)
 
-                    if !hasCompletedBlackout {
+                    if !blackoutAnswer.canReport {
                         Text("Available once a blackout has run and hotkeys are back on.")
                             .font(.caption)
                             .foregroundStyle(.tertiary)

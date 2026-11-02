@@ -164,20 +164,9 @@ public final class SideChannelCorrelator {
 
     /// Total CPU time per process, in nanoseconds.
     static func cpuTimes() -> [Int32: UInt64] {
-        var pids = [Int32](repeating: 0, count: 4096)
-        let byteCount = proc_listallpids(&pids, Int32(pids.count * MemoryLayout<Int32>.size))
-        guard byteCount > 0 else { return [:] }
-        let count = Int(byteCount) / MemoryLayout<Int32>.size
-
-        var result: [Int32: UInt64] = [:]
-        result.reserveCapacity(count)
-
-        for index in 0..<min(count, pids.count) {
-            let pid = pids[index]
-            guard pid > 0 else { continue }
-            if let total = cpuTime(forPID: pid) { result[pid] = total }
-        }
-        return result
+        var pids = [Int32](repeating: 0, count: ProcessSampling.initialPIDCapacity)
+        let count = proc_listallpids(&pids, Int32(pids.count * MemoryLayout<Int32>.size))
+        return ProcessSampling.cpuTimes(pids: pids, reportedCount: count, sample: cpuTime(forPID:))
     }
 
     static func cpuTime(forPID pid: Int32) -> UInt64? {

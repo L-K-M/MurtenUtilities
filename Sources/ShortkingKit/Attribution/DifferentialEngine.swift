@@ -36,7 +36,7 @@ public final class DifferentialEngine {
     private var watchedCombos: [KeyCombo] = []
     private var observers: [NSObjectProtocol] = []
     private var pendingWork: Task<Void, Never>?
-    private var recentTransitions: [(owner: Owner, at: Date)] = []
+    private var recentTransitions: [DifferentialObservations.Transition] = []
 
     /// Called whenever new attributions land, so the UI can refresh.
     public var onAttributionChanged: (() -> Void)?
@@ -116,7 +116,9 @@ public final class DifferentialEngine {
         )
 
         let now = Date()
-        recentTransitions.append((owner: owner, at: now))
+        let direction: DifferentialObservations.Direction =
+            notification.name == NSWorkspace.didLaunchApplicationNotification ? .launch : .termination
+        recentTransitions.append(.init(owner: owner, direction: direction, at: now))
         recentTransitions.removeAll { now.timeIntervalSince($0.at) > ambiguityWindow * 2 }
 
         // Debounce: collapse a burst of transitions into a single re-probe.
@@ -155,33 +157,9 @@ public final class DifferentialEngine {
         // More than one app moved inside the window: we genuinely cannot tell which
         // one owns the combination, so every candidate gets a half-weight, flagged
         // observation rather than one of them getting a confident wrong answer.
-        let ambiguous = Set(candidates.map(\.owner.identity)).count > 1
-
-        var observations: [AttributionObservation] = []
-        for candidate in candidates {
-            for combo in freed {
-                observations.append(
-                    AttributionObservation(
-                        comboKey: combo.groupingKey,
-                        ownerIdentity: candidate.owner.identity,
-                        ownerName: candidate.owner.name,
-                        kind: .freedOnQuit,
-                        ambiguous: ambiguous
-                    )
-                )
-            }
-            for combo in newlyClaimed {
-                observations.append(
-                    AttributionObservation(
-                        comboKey: combo.groupingKey,
-                        ownerIdentity: candidate.owner.identity,
-                        ownerName: candidate.owner.name,
-                        kind: .claimedOnLaunch,
-                        ambiguous: ambiguous
-                    )
-                )
-            }
-        }
+        let observations = DifferentialObservations.build(
+            candidates: candidates, freed: freed, newlyClaimed: newlyClaimed
+        )
 
         store.record(observations)
         recentTransitions.removeAll()

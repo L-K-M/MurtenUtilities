@@ -82,6 +82,7 @@ public final class SandwichTaps {
 
     public private(set) var isRunning = false
     private var onObservation: ((Observation) -> Void)?
+    private var onPress: ((KeyCombo, Date) -> Void)?
 
     public init() {}
 
@@ -89,8 +90,12 @@ public final class SandwichTaps {
 
     /// Starts both taps. Returns `false` when Input Monitoring is missing.
     @discardableResult
-    public func start(onObservation: @escaping (Observation) -> Void) -> Bool {
+    public func start(
+        onPress: @escaping (KeyCombo, Date) -> Void,
+        onObservation: @escaping (Observation) -> Void
+    ) -> Bool {
         stop()
+        self.onPress = onPress
         self.onObservation = onObservation
 
         let mask = CGEventMask(
@@ -159,6 +164,7 @@ public final class SandwichTaps {
         teardown()
         isRunning = false
         onObservation = nil
+        onPress = nil
     }
 
     private func teardown() {
@@ -197,6 +203,8 @@ public final class SandwichTaps {
 
     private func sawAtA(event: CGEvent) {
         let (key, combo) = Self.key(for: event)
+        // Report at the head tap, before the delayed swallow verdict.
+        onPress?(combo, Date())
 
         // If B never reports this key inside the window, it was swallowed.
         let work = DispatchWorkItem { [weak self] in

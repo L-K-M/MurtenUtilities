@@ -34,16 +34,9 @@ public final class SymbolicHotKeyScanner: ClaimSource {
         }
 
         // Live values override the plist: they are what actually matches.
-        for claim in scanLive() {
+        for (claim, enabled) in scanLive() {
             guard let id = claim.symbolicID else { continue }
-            if var existing = byID[id] {
-                existing.merge(claim)
-                // The live combo is authoritative even when the plist disagrees.
-                existing.combo = claim.combo
-                byID[id] = existing
-            } else {
-                byID[id] = claim
-            }
+            byID[id] = SymbolicHotKeyParsing.merge(plist: byID[id], live: claim, liveEnabled: enabled)
         }
 
         return Array(byID.values)
@@ -80,11 +73,7 @@ public final class SymbolicHotKeyScanner: ClaimSource {
             if let keyCodeValue, keyCodeValue >= 0, keyCodeValue != 65535 {
                 keyCode = UInt16(truncatingIfNeeded: keyCodeValue)
             }
-            var character: String?
-            if let asciiValue, asciiValue > 0, asciiValue != 65535,
-               let scalar = Unicode.Scalar(UInt32(asciiValue)) {
-                character = String(Character(scalar))
-            }
+            let character = SymbolicHotKeyParsing.character(asciiValue)
             guard keyCode != nil || character != nil else { continue }
 
             let combo = KeyCombo(keyCode: keyCode, character: character, modifiers: modifiers)
@@ -102,11 +91,11 @@ public final class SymbolicHotKeyScanner: ClaimSource {
 
     // MARK: - Live CGS
 
-    private func scanLive() -> [Claim] {
+    private func scanLive() -> [(claim: Claim, enabled: Bool?)] {
         let skylight = SkyLight.shared
         guard skylight.supportsSymbolicHotKeys else { return [] }
 
-        var claims: [Claim] = []
+        var claims: [(claim: Claim, enabled: Bool?)] = []
         for id in liveIDRange {
             guard let value = skylight.symbolicHotKey(id: id) else { continue }
 
@@ -126,9 +115,11 @@ public final class SymbolicHotKeyScanner: ClaimSource {
             )
             guard !combo.isBare else { continue }
 
-            claims.append(
-                makeClaim(id: id, combo: combo, enabled: value.enabled, source: .live, path: nil)
-            )
+            let enabled = skylight.isSymbolicHotKeyEnabled(id: id)
+            claims.append((
+                makeClaim(id: id, combo: combo, enabled: enabled ?? value.enabled, source: .live, path: nil),
+                enabled
+            ))
         }
         return claims
     }

@@ -99,20 +99,28 @@ public enum AXBridge {
     /// Carbon glyph code — the three ways AX can describe a shortcut, only one of
     /// which any given item populates.
     public static func shortcut(of menuItem: AXUIElement) -> KeyCombo? {
-        let rawModifiers = int(menuItem, MenuAttribute.cmdModifiers)
+        shortcut(of: menuItem, read: copyAttribute)
+    }
+
+    static func shortcut(
+        of menuItem: AXUIElement,
+        read: (AXUIElement, String) throws -> CFTypeRef?
+    ) rethrows -> KeyCombo? {
+        let rawModifiers = (try read(menuItem, MenuAttribute.cmdModifiers) as? NSNumber)?.intValue
         let modifiers = Modifiers(axMenuItemModifiers: rawModifiers ?? 0)
 
-        if let char = string(menuItem, MenuAttribute.cmdChar), !char.isEmpty {
+        if let char = try read(menuItem, MenuAttribute.cmdChar) as? String, !char.isEmpty {
             // AX reports the *unshifted* character; a shift in the modifier mask is
             // authoritative, so we do not re-derive it from letter case here.
             return KeyCombo(keyCode: nil, character: char, modifiers: modifiers)
         }
 
-        if let virtualKey = int(menuItem, MenuAttribute.cmdVirtualKey), virtualKey != 0xFFFF {
+        if let virtualKey = (try read(menuItem, MenuAttribute.cmdVirtualKey) as? NSNumber)?.intValue,
+           virtualKey != 0xFFFF {
             return KeyCombo(keyCode: UInt16(truncatingIfNeeded: virtualKey), modifiers: modifiers)
         }
 
-        if let glyph = int(menuItem, MenuAttribute.cmdGlyph),
+        if let glyph = (try read(menuItem, MenuAttribute.cmdGlyph) as? NSNumber)?.intValue,
            let keyCode = KeyCodes.glyphToKeyCode[glyph] {
             return KeyCombo(keyCode: keyCode, modifiers: modifiers)
         }

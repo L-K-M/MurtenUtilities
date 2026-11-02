@@ -69,6 +69,8 @@ public final class DetectiveSession: ObservableObject {
     private var blackoutTicker: Timer?
     private var suspectPIDs: Set<Int32> = []
     private var beforeSnapshot: SideChannelCorrelator.Snapshot?
+    private var captureID: UUID?
+    private var captureCorrelation = LiveCaptureCorrelation()
 
     /// How long a live capture stays armed before tearing itself down.
     public var captureDuration: TimeInterval = 30
@@ -171,6 +173,9 @@ public final class DetectiveSession: ObservableObject {
     ) {
         guard !isCapturing else { return }
         lastError = nil
+        let captureID = UUID()
+        self.captureID = captureID
+        captureCorrelation.reset(target: combo)
 
         let suspects = SystemDefinedSniffer.suspects(
             eventTaps: eventTaps,
@@ -181,14 +186,29 @@ public final class DetectiveSession: ObservableObject {
 
         // Both callbacks are delivered on the main queue by their sources.
         let attached = sniffer.start(apps: suspects) { [weak self] delivery in
-            MainActor.assumeIsolated { self?.record(delivery: delivery) }
+            MainActor.assumeIsolated {
+                guard let self, self.captureID == captureID else { return }
+                self.record(delivery: delivery)
+            }
         }
 
-        let sandwichStarted = sandwich.start { [weak self] observation in
-            MainActor.assumeIsolated { self?.record(observation: observation) }
-        }
+        let sandwichStarted = sandwich.start(
+            onPress: { [weak self] combo, at in
+                MainActor.assumeIsolated {
+                    guard let self, self.captureID == captureID else { return }
+                    self.captureCorrelation.recordPress(combo, at: at)
+                }
+            },
+            onObservation: { [weak self] observation in
+                MainActor.assumeIsolated {
+                    guard let self, self.captureID == captureID else { return }
+                    self.record(observation: observation)
+                }
+            }
+        )
 
         guard !attached.isEmpty || sandwichStarted else {
+            stopCapture()
             lastError = "Could not install any event taps. Grant Input Monitoring in "
                 + "System Settings ▸ Privacy & Security, then try again."
             return
@@ -218,6 +238,8 @@ public final class DetectiveSession: ObservableObject {
     }
 
     public func stopCapture() {
+        captureID = nil
+        captureCorrelation.reset()
         captureTimeout?.cancel()
         captureTimeout = nil
         sniffer.stop()
@@ -227,7 +249,8 @@ public final class DetectiveSession: ObservableObject {
     }
 
     private func record(delivery: SystemDefinedSniffer.Delivery) {
-        guard delivery.isKeyDown else { return }
+        guard isCapturing, delivery.isKeyDown,
+              captureCorrelation.takeMatchingDelivery(at: delivery.receivedAt) else { return }
         guard let combo else { return }
 
         findings.insert(
