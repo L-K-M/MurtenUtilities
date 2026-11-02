@@ -329,7 +329,7 @@ struct ContentView: View {
                 } else if let notice = model.notice {
                     Text(notice)
                 } else if model.isLoaded {
-                    Text(searchText.isEmpty ? "\(rows.count) IP ranges" : "\(visibleRows.count) of \(rows.count) IP ranges")
+                    Text(searchText.isEmpty ? Self.rangeCount(rows.count) : "\(visibleRows.count) of \(Self.rangeCount(rows.count))")
                     if !selection.isEmpty { Text("· \(selection.count) selected") }
                 } else {
                     Text("No configuration loaded")
@@ -341,6 +341,10 @@ struct ContentView: View {
             .fixedSize(horizontal: false, vertical: true)
         }
         .background(.bar)
+    }
+
+    private static func rangeCount(_ count: Int) -> String {
+        count == 1 ? "1 IP range" : "\(count) IP ranges"
     }
 
     private func perform(_ command: WorkspaceCommand) {

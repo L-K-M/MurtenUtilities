@@ -67,6 +67,9 @@ struct NetworkInspector: View {
             }
         }
         .frame(minWidth: Self.minimumWidth, idealWidth: Self.idealWidth, maxWidth: Self.maximumWidth)
+        // One labelled container, so the label names the inspector instead
+        // of replacing each row's own label.
+        .accessibilityElement(children: .contain)
         .accessibilityLabel("Information About the Selection")
     }
 }
