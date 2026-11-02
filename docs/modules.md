@@ -169,36 +169,43 @@ with a verified safety copy and undo. **GitHub-only**.
 
 Tracks applications and fonts distributed through GitHub or Forgejo
 releases, compares them with what is installed, downloads a matching asset
-and reveals it in the file manager. It does not install or replace
-anything. Tauri 2 and SvelteKit, shipped for macOS and Linux.
+and reveals it in Finder. It does not install or replace anything.
 
-- **Size:** about 10,400 lines of Rust, 186 tests included, and 2,500 lines
-  of TypeScript/Svelte. A native port re-implements all of it.
-- **Scope is already generic:** users add any GitHub or Forgejo repository.
-  The repo's `GENERIC_SOURCES.md` designs arbitrary vendor download pages
-  behind an identity and SSRF contract. PLAN.md's open question is whether
-  the suite keeps, narrows or extends that.
-- **Installed-app identity** on macOS is the user-typed name matched
-  against `<name>.app` in `/Applications` and `~/Applications`
-  (`src-tauri/src/installer.rs`), not a bundle id. A count like "3 app
-  updates available" inherits that guess; the repo's `ANALYSIS.md` already
-  specifies bundle-id matching.
-- **State:** `~/Library/Application Support/Obtainintosh/apps.json` holds
-  the tracked list and GitHub and Forgejo tokens in plain text
-  (`src-tauri/src/models.rs`). A migration imports the tokens into the
-  Keychain instead of copying the file, and leaves the standalone app's copy
-  alone while that app still runs.
-- **Platforms:** a Swift port is macOS-only. Linux users (deb, AppImage,
-  Flatpak) keep the Tauri app, so it stays maintained whatever the suite
-  does.
-- **Shapes, decide at phase 4:** (a) a pane that ports today's
-  download-and-reveal flow; (b) the suite's updater, which also needs the
-  verified install `ANALYSIS.md` specifies and does not exist yet (mount,
-  bundle id, signature, signer continuity) before "update" means more than
-  "download".
-- **Watcher:** checks run at launch and on demand; nothing polls today. The
-  suite's scheduler would supply the cadence. Checks use GitHub's REST API:
-  60 requests an hour unauthenticated, 5,000 with a token.
+- **Status:** migrated as a native port of the Tauri 2 and SvelteKit app:
+  `ObtainintoshCore` (models, the `apps.json` and `.obtainintosh` formats,
+  asset filters and the macOS asset picker, release selection, font version
+  reading, version comparison, the Add Program form, the watcher's rule),
+  `ObtainintoshServices` (GitHub and Forgejo REST clients behind an
+  injectable transport, installed-version detection for apps and fonts, the
+  tracked list, the Keychain vault, downloads, the watcher) and
+  `ObtainintoshModule` (the pane and provider). The Rust and Svelte tests
+  moved along as XCTest cases; the Linux-only parts (dpkg and AppImage
+  detection, the Linux asset picker) stayed behind with their tests.
+- **Provenance:** Obtainintosh@108a6c3e6bacb5485c87f490b1f3cc1d95651878
+- **Scope stays generic:** any GitHub or Forgejo repository the user adds.
+- **Installed-app identity:** the typed name matched against `<name>.app`
+  in `/Applications` and `~/Applications`, as before; an entry may also
+  record a bundle identifier, which is preferred when set.
+- **State:** the suite keeps its own list at
+  `~/Library/Application Support/MurtenUtilities/Obtainintosh/apps.json`
+  (the standalone shape, without secrets). Tokens live in the Keychain
+  (service `ch.lkmc.MurtenUtilities.obtainintosh`). When the standalone
+  app's `~/Library/Application Support/Obtainintosh/apps.json` exists, the
+  pane offers a one-click import, never automatic; that file is only read.
+  Downloads share the standalone app's `$TMPDIR/obtainintosh-downloads`.
+- **Watcher:** every 6 hours (`.network`), for each installed tracked
+  program, is a newer release out? One finding per program, scoped by its
+  entry id; the rule suggests when the latest version is newer, with the
+  pane's comparison. Programs that are not installed cost no request.
+  A poll spends at most 20 GitHub API requests without a token and keeps
+  10 of GitHub's hourly 60 in reserve. Tokens come only from memory the
+  pane already filled, so the check never reads the Keychain; a private
+  Forgejo program whose key is not in memory is reported as not checked.
+  Removed programs are reported as checked, so their suggestions resolve.
+- **Preselection:** none. The suggestion's route `updates` opens the pane,
+  which checks again; downloading stays a click.
+- **Platforms:** macOS only. Linux users (deb, AppImage, Flatpak) keep the
+  Tauri app.
 
 ### RunningMan — effort: cheap — phase 2
 
