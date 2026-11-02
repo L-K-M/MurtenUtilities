@@ -71,6 +71,8 @@ not a notification center bolted on.
   that while modules are still unmigrated. If it is ever revisited it is a
   product decision plus Rigi work — not per-screen dark patches, which is how
   apps end up with the worst of both.
+  The key is per-bundle: any future helper, extension or satellite bundle that
+  presents its own UI must set it too, or it will go dark on a dark system.
 - **Subtlety over skins**: the classic look lives in chrome, typography scale
   and the grid — not in texture overload. If a screen needs four kinds of
   bevel to feel classic, it's wrong; two is enough.
