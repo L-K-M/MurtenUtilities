@@ -38,8 +38,26 @@ let repoMenTargets: [Target] = []
 let repoMenModule: [Target.Dependency] = []
 
 // MARK: BootCaptain
-let bootCaptainTargets: [Target] = []
-let bootCaptainModule: [Target.Dependency] = []
+// Core and Kit move in from BootCaptain's own package; Core adds the
+// watcher's pure diff and rule (Watch/). The app target's sources become
+// BootCaptainModule. The CLI and the root helper stay in the BootCaptain repo
+// (docs/modules.md, BootCaptain).
+let bootCaptainTargets: [Target] = [
+    // MurtenCore for the watcher's rule, which stays pure and lives here.
+    .target(name: "BootCaptainCore", dependencies: ["MurtenCore"]),
+    .target(name: "BootCaptainKit", dependencies: ["BootCaptainCore"]),
+    .target(
+        name: "BootCaptainModule",
+        dependencies: ["BootCaptainCore", "BootCaptainKit", "MurtenCore", "MurtenModuleKit"]
+    ),
+    .testTarget(name: "BootCaptainCoreTests", dependencies: ["BootCaptainCore"]),
+    .testTarget(name: "BootCaptainKitTests", dependencies: ["BootCaptainKit", "BootCaptainCore"]),
+    .testTarget(
+        name: "BootCaptainModuleTests",
+        dependencies: ["BootCaptainModule", "BootCaptainCore", "BootCaptainKit", "MurtenCore", "MurtenModuleKit"]
+    )
+]
+let bootCaptainModule: [Target.Dependency] = ["BootCaptainModule"]
 
 // MARK: DeviceControlDoctor
 // DoctorCore keeps its upstream name; its directory carries the tool's

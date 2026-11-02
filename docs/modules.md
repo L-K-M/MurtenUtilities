@@ -74,26 +74,49 @@ DerivedData, Homebrew caches — and reclaims them by age and size.
 ### BootCaptain — effort: medium — phase 3
 
 Inventories launch agents, login items and other startup mechanisms,
-attributes them to installed products, and investigates boot failures. SwiftUI
-app + CLI; **GitHub-only, not yet cloned**.
+attributes them to installed products, and investigates boot failures.
 
-- **Migrates:** inventory/attribution core; its investigator UI as the pane.
-  The CLI could survive as a bundled tool or stay in its repo.
-- **Privilege:** ships a root helper today (`SMAppService.daemon`) whose
-  enabled actions are reversible vault moves — launchd/cron mutations stay
-  gated off in the current build — and the app itself is Developer ID
-  signed, notarized and non-sandboxed. The helper embeds per-module at
-  migration and gates on the signing decision (docs/architecture.md §
+- **Status:** available.
+- **Provenance:** BootCaptain@1fd84a9f6ec8626fa7ef8a5a100554944a733940
+- **Migrated:** `BootCaptainCore` and `BootCaptainKit` with their test
+  suites; the app's views, view model and services as `BootCaptainModule`.
+  The `bootcaptain` CLI stays in its repo. Rescan (⌘R) and Run Boot Audit
+  (⇧⌘R) are in the Tool menu; the pane scans when it appears, as the app
+  did.
+- **Privilege:** the root helper (`SMAppService.daemon`, bundle ID and
+  Team ID pinned both ways) is left out, because ad-hoc suite builds cannot
+  authenticate it. Moving `/Library` items to the root vault, and the
+  launchd/cron toggles the standalone build already gates off, stay visible
+  but disabled: "Needs a signed build of Murten Utilities". User-scope vault
+  moves and login-item removal keep working, with their session undo. The
+  helper embeds per module once the suite is signed (docs/architecture.md §
   Module packaging).
-- **Watcher:** diff the startup inventory on a cadence → "X installed 2 new
-  login items". Boot-failure diagnosis stays an on-demand flow.
-- **Source facts:** the shipping app and helper build from XcodeGen
-  `project.yml`; `Package.swift` builds only the libraries and the CLI. Spawns
-  live in `BootCaptainKit`, so the module needs Kit as well as Core. launchd
-  plist folders are readable unprivileged, but Background Task Management
-  (`sfltool dumpbtm`), the source for modern login items, needs root and
-  likely Full Disk Access, and System Events login-item reads need Automation
-  consent. An unprivileged watcher sees plists only.
+- **State:** Clean Up's vault and journal stay in
+  `~/Library/Application Support/BootCaptain/{Vault,Journal}`. Items the
+  standalone helper moved to `/Library/Application Support/BootCaptain/Vault`
+  can only be restored by the standalone app. Undo history is per session,
+  as before. The reviewed inventory is the module default
+  `reviewedStartupInventory`.
+- **Consent:** login-item reads and removals through System Events
+  (Automation; `NSAppleEventsUsageDescription`), the Full Disk Access probe
+  and Background Task Management (`sfltool dumpbtm` needs root, so the scan
+  reports a coverage gap) stay in the pane's on-demand scan.
+- **Watcher:** hourly, unprivileged read of `/Library/LaunchDaemons`,
+  `/Library/LaunchAgents`, `~/Library/LaunchAgents` and the launchd plists
+  apps embed (`/Applications`, `/Applications/Setapp`, `~/Applications`),
+  compared with the inventory the user last reviewed in the pane → one
+  suggestion per product, "Docker installed 2 new startup items", route
+  `review`. The pane's first completed scan becomes the reviewed inventory;
+  its review bar marks the current list as reviewed. Not watched: Apple's
+  folders and `com.apple.` labels, BTM, login items, other users' homes.
+  Without a reviewed inventory the check is unavailable; an unreadable
+  folder makes it partial, so a suggestion goes stale instead of resolving.
+- **Preselection:** none. `review` opens the "New since last review" filter
+  with nothing selected; Clean Up preselects nothing, as before.
+- **Source facts:** the standalone app and helper build from XcodeGen
+  `project.yml`; `Package.swift` builds only the libraries and the CLI.
+  Spawns live in `BootCaptainKit`, so the module needs Kit as well as Core.
+  The app is Developer ID signed, notarized and non-sandboxed.
 
 ### DeviceControlDoctor — effort: cheap — phase 2
 

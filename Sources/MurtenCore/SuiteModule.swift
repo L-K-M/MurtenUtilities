@@ -47,7 +47,7 @@ public enum ModuleRegistry {
         SuiteModule(
             id: "bootcaptain", name: "BootCaptain",
             summary: "Inventory startup items and investigate boot failures.",
-            systemImage: "power", sourceRepository: "BootCaptain"),
+            systemImage: "power", status: .available, sourceRepository: "BootCaptain"),
         SuiteModule(
             id: "devicecontroldoctor", name: "DeviceControlDoctor",
             summary: "Diagnose privacy permissions that look granted but fail.",
