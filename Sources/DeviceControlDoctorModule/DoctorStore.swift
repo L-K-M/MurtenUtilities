@@ -1,10 +1,17 @@
 import AppKit
 import Combine
 import DoctorCore
-import ServiceManagement
+import MurtenCore
 import UniformTypeIdentifiers
 
+/// The module's long-lived state, owned by the provider so it outlives the
+/// pane views. It checks only when asked or while the pane is visible
+/// (`monitorWhileVisible()`); background checks are the watcher's job.
 @MainActor final class DoctorStore: ObservableObject {
+    static let monitorEnabledKey = "monitorEnabled"
+    /// Bundle id of the standalone app, which shares the watch list file.
+    static let standaloneBundleIdentifier = "ch.lkmc.DeviceControlDoctor"
+
     @Published var apps: [WatchedApp] = []
     @Published var selectedID: UUID?
     @Published var candidates: [WatchedApp] = []
@@ -17,33 +24,78 @@ import UniformTypeIdentifiers
     @Published var capabilityDetail = "Permission querying has not been checked yet."
     @Published var lastChecked: Date?
     @Published var notice: String?
+    /// Re-check every minute while the pane is visible (the standalone
+    /// app's "Check every minute").
     @Published var monitorEnabled = true {
-        didSet { UserDefaults.standard.set(monitorEnabled, forKey: "monitorEnabled") }
+        didSet { defaults.set(monitorEnabled, forKey: Self.monitorEnabledKey) }
     }
-    @Published var launchAtLogin = false
-    private let runner = ProcessRunner()
-    private var timer: Timer?
+    private let defaults: UserDefaults
+    private let runner: any ProcessRunning
+    /// Tells the suite to re-run the watcher after a change the user made,
+    /// so a suggestion that change settled resolves soon.
+    private let watchListChanged: @MainActor () -> Void
     private var subscriptions = Set<AnyCancellable>()
+    private var visiblePanes = 0
     private var storageHealthy = true
     private let storageURL: URL
 
     var selectedApp: WatchedApp? { apps.first { $0.id == selectedID } }
 
-    init() {
-        storageURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("DeviceControlDoctor/watchlist.json")
-        if UserDefaults.standard.object(forKey: "monitorEnabled") != nil {
-            monitorEnabled = UserDefaults.standard.bool(forKey: "monitorEnabled")
+    /// Loads the watch list; spawns nothing until a check is asked for.
+    init(defaults: UserDefaults, runner: any ProcessRunning = ProcessRunner(),
+         storageURL: URL = WatchListFile.defaultURL, watchListChanged: @escaping @MainActor () -> Void = {}) {
+        self.defaults = defaults
+        self.runner = runner
+        self.storageURL = storageURL
+        self.watchListChanged = watchListChanged
+        if defaults.object(forKey: Self.monitorEnabledKey) != nil {
+            monitorEnabled = defaults.bool(forKey: Self.monitorEnabledKey)
         }
-        launchAtLogin = SMAppService.mainApp.status == .enabled
         load()
         selectedID = apps.first?.id
-        timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                guard let self, self.monitorEnabled, !self.apps.isEmpty else { return }
-                self.refresh()
-            }
+    }
+
+    // MARK: - While the pane is visible
+
+    /// The standalone app's monitor, scoped to the pane: one check when the
+    /// pane appears, then every minute while it stays visible and monitoring
+    /// is on, plus launch and wake follow-ups. Runs until the calling task
+    /// (the pane's `.task`) is cancelled.
+    func monitorWhileVisible() async {
+        visiblePanes += 1
+        if visiblePanes == 1 { observeWorkspace() }
+        defer {
+            visiblePanes -= 1
+            if visiblePanes == 0 { subscriptions.removeAll() }
         }
+
+        noteStandaloneApp()
+        refresh()
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: 60 * 1_000_000_000)
+            guard !Task.isCancelled else { return }
+            if monitorEnabled && !apps.isEmpty { refresh() }
+        }
+    }
+
+    /// Applies a suggestion's route: selects the app it names. It never opens
+    /// the repair sheet; the check the pane runs on appearing re-reads it.
+    func apply(_ route: ModuleRoute?) {
+        guard let appID = DoctorRoute.appID(in: route) else { return }
+        guard apps.contains(where: { $0.id == appID }) else {
+            notice = "The app from that suggestion is no longer on your watch list."
+            return
+        }
+        selectedID = appID
+    }
+
+    private func noteStandaloneApp() {
+        guard notice == nil,
+              !NSRunningApplication.runningApplications(withBundleIdentifier: Self.standaloneBundleIdentifier).isEmpty else { return }
+        notice = "The standalone DeviceControlDoctor app is also running. Both save the same watch list, so quit one of them to keep changes from overwriting each other."
+    }
+
+    private func observeWorkspace() {
         let center = NSWorkspace.shared.notificationCenter
         center.publisher(for: NSWorkspace.didLaunchApplicationNotification).receive(on: RunLoop.main).sink { [weak self] notification in
             guard let self, let running = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
@@ -61,16 +113,17 @@ import UniformTypeIdentifiers
         center.publisher(for: NSWorkspace.didWakeNotification).receive(on: RunLoop.main).sink { [weak self] _ in
             if self?.monitorEnabled == true { self?.scheduleRefresh(after: 10) }
         }.store(in: &subscriptions)
-        refresh()
     }
 
     private func scheduleRefresh(after seconds: UInt64) {
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: seconds * 1_000_000_000)
-            guard let self, self.monitorEnabled else { return }
+            guard let self, self.monitorEnabled, self.visiblePanes > 0 else { return }
             self.refresh()
         }
     }
+
+    // MARK: - Checks
 
     func refresh() { beginCheck(ids: apps.map(\.id)) }
     func refresh(appID: UUID) { beginCheck(ids: [appID]) }
@@ -87,7 +140,7 @@ import UniformTypeIdentifiers
     }
 
     private func checkCapability() async {
-        let help = await runner.run("/usr/bin/tccutil", [])
+        let help = await runner.run(SystemTool.tccutil, [])
         queryAvailable = !help.timedOut && TCCOutputParser.supportsListing(help: help.output)
         capabilityDetail = queryAvailable == true
             ? "This Mac supports tccutil list. Results describe OS-reported authorization, not a functional test."
@@ -105,18 +158,17 @@ import UniformTypeIdentifiers
             } else if initial.canReset && current?.bundleID != initial.bundleID {
                 result = .init(state: .unknown, detail: "The app at this path now has a different bundle identifier. Remove this watch entry and add the current app.")
             } else if queryAvailable == true {
-                let command = await runner.run("/usr/bin/tccutil", ["list", "-s", service.rawValue, "-b", initial.bundleID])
+                let command = await runner.run(SystemTool.tccutil, ["list", "-s", service.rawValue, "-b", initial.bundleID])
                 result = command.timedOut ? .init(state: .unknown, detail: "The permission query timed out.") : TCCOutputParser.parseQuery(output: command.output, exitCode: command.exitCode)
             } else {
                 result = .init(state: .unavailable, detail: "This Mac does not currently provide permission listing to DeviceControlDoctor.")
             }
             readings.append(.init(service: service, result: result))
         }
-        let identity = current == nil ? AppIdentity() : await IdentityInspector().inspect(path: initial.path)
+        let identity = current == nil ? AppIdentity() : await IdentityInspector(runner: runner).inspect(path: initial.path)
         guard let index = apps.firstIndex(where: { $0.id == id }) else { return }
-        let oldIdentity = apps[index].identity
-        let identityChanged = oldIdentity.signatureValid != nil && identity.signatureValid != nil &&
-            (oldIdentity.requirement != identity.requirement || oldIdentity.signingIdentifier != identity.signingIdentifier || oldIdentity.teamIdentifier != identity.teamIdentifier || oldIdentity.signatureValid != identity.signatureValid)
+        // Shared with the watcher, so both judge a change the same way.
+        let identityChanged = identity.hasChanged(from: apps[index].identity)
         if current == nil || (initial.canReset && current?.bundleID != initial.bundleID) { apps[index].functionalTest = nil }
         if identityChanged {
             apps[index].identityChangedAt = Date()
@@ -144,12 +196,12 @@ import UniformTypeIdentifiers
         Task {
             defer { isDiscovering = false }
             // Separate discovery from refresh: listing has no permission-changing side effects.
-            let help = await runner.run("/usr/bin/tccutil", [])
+            let help = await runner.run(SystemTool.tccutil, [])
             var clients = Set<String>()
             var serviceClients: [PermissionService: Set<String>] = [:]
             if TCCOutputParser.supportsListing(help: help.output) {
                 for service in PermissionService.allCases {
-                    let command = await runner.run("/usr/bin/tccutil", ["list", "-s", service.rawValue])
+                    let command = await runner.run(SystemTool.tccutil, ["list", "-s", service.rawValue])
                     if command.exitCode == 0 && !command.timedOut {
                         let records = Set(TCCOutputParser.parseClients(output: command.output))
                         serviceClients[service] = records
@@ -194,6 +246,7 @@ import UniformTypeIdentifiers
         apps.removeAll { $0.id == id }
         if selectedID == id { selectedID = apps.first?.id }
         save()
+        watchListChanged()
     }
 
     func setExpected(_ service: PermissionService, enabled: Bool, appID: UUID) {
@@ -203,6 +256,7 @@ import UniformTypeIdentifiers
         if enabled { selected.insert(service) } else { selected.remove(service) }
         apps[index].expectedServices = PermissionService.allCases.filter { selected.contains($0) }
         save()
+        watchListChanged()
     }
 
     func isRunning(_ app: WatchedApp) -> Bool { !matchingProcesses(app).isEmpty }
@@ -274,19 +328,19 @@ import UniformTypeIdentifiers
         }
         var succeeded: [String] = []
         var failures: [String] = []
-        for (service, arguments) in zip(plan.services, plan.arguments) {
-            let result = await runner.run("/usr/bin/tccutil", arguments)
-            if result.exitCode == 0 && !result.timedOut {
-                succeeded.append(service.title)
-                addEvent(app, "Reset \(service.title) for \(app.bundleID). User approval is required again.")
-            } else {
-                let detail = result.timedOut ? "The reset timed out; its outcome is uncertain. Check System Settings." : String(result.output.prefix(600))
+        for outcome in await PermissionReset(runner: runner).apply(plan) {
+            let service = outcome.service
+            if let detail = outcome.failure {
                 failures.append("\(service.title): \(detail)")
                 addEvent(app, "Reset did not report success for \(service.title). \(detail)")
+            } else {
+                succeeded.append(service.title)
+                addEvent(app, "Reset \(service.title) for \(app.bundleID). User approval is required again.")
             }
         }
         if let index = apps.firstIndex(where: { $0.id == appID }) { apps[index].functionalTest = nil }
         save()
+        watchListChanged()
         isRepairing = false
         if !succeeded.isEmpty {
             if reopen { openApp(app) }
@@ -306,14 +360,7 @@ import UniformTypeIdentifiers
         if outcome == .passed { apps[index].lastKnownWorking = Date() }
         addEvent(app, "User-confirmed functional test: \(outcome.rawValue). \(String(note.prefix(250)))")
         save()
-    }
-
-    func setLaunchAtLogin(_ enabled: Bool) {
-        do {
-            if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
-            launchAtLogin = SMAppService.mainApp.status == .enabled
-            if enabled && !launchAtLogin { notice = "Approve DeviceControlDoctor in System Settings → General → Login Items & Extensions." }
-        } catch { notice = "Could not change launch at login: \(error.localizedDescription)"; launchAtLogin = SMAppService.mainApp.status == .enabled }
+        watchListChanged()
     }
 
     func exportReport() {
@@ -325,7 +372,7 @@ import UniformTypeIdentifiers
         let report = DiagnosticReport(generatedAt: Date(), system: ProcessInfo.processInfo.operatingSystemVersionString,
             scope: "OS-reported authorization and user-confirmed functional tests. A recorded grant is not proof of functionality. App paths and notes may be personal.",
             capability: capabilityDetail, apps: apps, events: events)
-        do { try encoder().encode(report).write(to: url, options: .atomic) }
+        do { try WatchListFile.encoder().encode(report).write(to: url, options: .atomic) }
         catch { notice = "Could not export the report: \(error.localizedDescription)" }
     }
 
@@ -333,33 +380,26 @@ import UniformTypeIdentifiers
         events.insert(.init(appID: app.id, appName: app.name, message: message), at: 0)
         events = Array(events.prefix(200))
     }
-    private func encoder() -> JSONEncoder {
-        let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]; encoder.dateEncodingStrategy = .iso8601; return encoder
-    }
     private func load() {
-        guard FileManager.default.fileExists(atPath: storageURL.path) else { return }
-        do {
-            let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
-            let data = try decoder.decode(SavedState.self, from: Data(contentsOf: storageURL))
-            guard data.schemaVersion == 1 else { throw CocoaError(.fileReadCorruptFile) }
+        switch WatchListFile.read(at: storageURL) {
+        case .missing:
+            return
+        case .loaded(let data):
             apps = data.apps; events = Array(data.events.prefix(200))
             // Functional evidence belongs to a previous session; retain the baseline and history.
             for index in apps.indices { apps[index].functionalTest = nil }
-        } catch {
+        case .unreadable(let error):
             storageHealthy = false
             notice = "Could not read the saved watch list. The original file will not be overwritten. \(storageURL.path): \(error.localizedDescription)"
         }
     }
     private func save() {
         guard storageHealthy else { return }
-        do {
-            try FileManager.default.createDirectory(at: storageURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try encoder().encode(SavedState(schemaVersion: 1, apps: apps, events: events)).write(to: storageURL, options: .atomic)
-        } catch { notice = "Could not save the watch list: \(error.localizedDescription)" }
+        do { try WatchListFile.write(apps: apps, events: events, to: storageURL) }
+        catch { notice = "Could not save the watch list: \(error.localizedDescription)" }
     }
 }
 
-private struct SavedState: Codable { var schemaVersion: Int; var apps: [WatchedApp]; var events: [DoctorEvent] }
 private struct DiagnosticReport: Encodable {
     var generatedAt: Date; var system: String; var scope: String; var capability: String
     var apps: [WatchedApp]; var events: [DoctorEvent]

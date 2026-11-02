@@ -1,6 +1,6 @@
 import XCTest
 import DoctorCore
-@testable import DeviceControlDoctor
+@testable import DeviceControlDoctorModule
 
 final class IntegrationTests: XCTestCase {
     func testCommandRunnerDrainsOutputBeyondPipeCapacity() async {

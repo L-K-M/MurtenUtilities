@@ -1,6 +1,8 @@
 import SwiftUI
 import AppKit
 import DoctorCore
+import MurtenCore
+import MurtenModuleKit
 
 private enum DoctorStyle {
     static let accent = Color.teal
@@ -12,6 +14,12 @@ struct MainView: View {
     @EnvironmentObject private var doctor: DoctorStore
     @Environment(\.openWindow) private var openWindow
     @State private var showsAddApps = false
+    /// The suggestion or tile click that opened the pane.
+    let route: ModuleRoute?
+
+    init(route: ModuleRoute?) {
+        self.route = route
+    }
 
     var body: some View {
         NavigationSplitView {
@@ -64,7 +72,7 @@ struct MainView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 6) {
                         Circle().fill(doctor.monitorEnabled ? DoctorStyle.accent : .secondary).frame(width: 6, height: 6)
-                        Text(doctor.monitorEnabled ? "Background checks on" : "Manual checks")
+                        Text(doctor.monitorEnabled ? "Checking every minute" : "Manual checks")
                             .font(.caption)
                     }
                     if let checked = doctor.lastChecked {
@@ -102,7 +110,6 @@ struct MainView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: .windowBackgroundColor))
         }
-        .navigationTitle("DeviceControlDoctor")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button { showsAddApps = true } label: { Label("Add Apps", systemImage: "plus") }
@@ -117,7 +124,7 @@ struct MainView: View {
                 }
                 .keyboardShortcut("r", modifiers: .command)
                 .disabled(doctor.isChecking || doctor.isRepairing || doctor.apps.isEmpty)
-                Button { openWindow(id: "test-pad") } label: { Label("Test Pad", systemImage: "text.cursor") }
+                Button { openWindow(module: .testPad) } label: { Label("Test Pad", systemImage: "text.cursor") }
                     .help("Test an app against a controlled text field")
                 Button { doctor.exportReport() } label: { Label("Export Report", systemImage: "square.and.arrow.up") }
                     .disabled(doctor.apps.isEmpty || doctor.isRepairing)
@@ -126,6 +133,18 @@ struct MainView: View {
         .sheet(isPresented: $showsAddApps) { AddAppsView() }
         .tint(DoctorStyle.accent)
         .frame(minWidth: 980, minHeight: 650)
+        // The standalone app's File-menu commands, in the suite's Tool menu.
+        .moduleCommands([
+            ModuleCommand("Add Applications…", shortcut: KeyboardShortcut("o")) { doctor.chooseApps() },
+            ModuleCommand("Refresh Permissions", shortcut: KeyboardShortcut("r"),
+                          isEnabled: !(doctor.isChecking || doctor.isRepairing)) { doctor.refresh() },
+            ModuleCommand("Export Diagnostic Report…", shortcut: KeyboardShortcut("e", modifiers: [.command, .shift])) {
+                doctor.exportReport()
+            }
+        ])
+        .onAppear { doctor.apply(route) }
+        // Checks while the pane is visible; cancelled when it goes away.
+        .task { await doctor.monitorWhileVisible() }
     }
 
     private var welcomeView: some View {
@@ -283,7 +302,7 @@ private struct AppDetailView: View {
                 HStack {
                     Label("Functional evidence", systemImage: "text.badge.checkmark").font(.headline)
                     Spacer()
-                    Button("Open Test Pad") { doctor.selectedID = app.id; openWindow(id: "test-pad") }
+                    Button("Open Test Pad") { doctor.selectedID = app.id; openWindow(module: .testPad) }
                 }
                 if let test = app.functionalTest {
                     HStack(spacing: 9) {
@@ -728,14 +747,10 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("Monitoring") {
-                Toggle("Check permissions while DeviceControlDoctor is running", isOn: $doctor.monitorEnabled)
+                Toggle("Check permissions every minute while DeviceControlDoctor is open", isOn: $doctor.monitorEnabled)
                 Text("Checks read authorization records. DeviceControlDoctor never resets permissions, quits another app, or grants access automatically.")
                     .font(.caption).foregroundStyle(.secondary)
-                Toggle("Launch DeviceControlDoctor at login", isOn: Binding(
-                    get: { doctor.launchAtLogin },
-                    set: { doctor.setLaunchAtLogin($0) }
-                ))
-                Text("Keep the app installed at a stable location before enabling launch at login.")
+                Text("Checks while DeviceControlDoctor is closed are set in the Background Checks tab.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Privacy and scope") {
@@ -746,8 +761,6 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .padding(8)
-        .frame(width: 530, height: 370)
         .tint(DoctorStyle.accent)
     }
 }

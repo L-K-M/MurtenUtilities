@@ -46,9 +46,13 @@ let bootCaptainModule: [Target.Dependency] = []
 // prefix like the module's other targets.
 let deviceControlDoctorTargets: [Target] = [
     .target(name: "DoctorCore", dependencies: ["MurtenCore"], path: "Sources/DeviceControlDoctorCore"),
-    .testTarget(name: "DeviceControlDoctorCoreTests", dependencies: ["DoctorCore", "MurtenCore"])
+    .target(name: "DeviceControlDoctorModule", dependencies: ["DoctorCore", "MurtenCore", "MurtenModuleKit"]),
+    .testTarget(name: "DeviceControlDoctorCoreTests", dependencies: ["DoctorCore", "MurtenCore"]),
+    .testTarget(name: "DeviceControlDoctorIntegrationTests", dependencies: ["DeviceControlDoctorModule", "DoctorCore"]),
+    .testTarget(name: "DeviceControlDoctorModuleTests",
+                dependencies: ["DeviceControlDoctorModule", "DoctorCore", "MurtenCore", "MurtenModuleKit"])
 ]
-let deviceControlDoctorModule: [Target.Dependency] = []
+let deviceControlDoctorModule: [Target.Dependency] = ["DeviceControlDoctorModule"]
 
 // MARK: Shortking
 let shortkingTargets: [Target] = []
