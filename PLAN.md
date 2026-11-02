@@ -88,7 +88,14 @@ Per-module migration notes, satellites, and new-module ideas:
   stays the reference if a web surface is ever wanted. See
   docs/ui-direction.md.
 - **SwiftPM only** — no `.xcodeproj`; every tool contributes a pure
-  `*Core`-style target plus its pane.
+  `*Core`-style target plus its pane. SwiftPM has no app, extension or XPC
+  product type, so `scripts/build-app.sh` assembles every bundle part by hand,
+  as RunningMan's script already does for its widget extension and
+  Shortking's for its probe executable. Two things it cannot produce: App
+  Intents metadata, which only the Xcode build extracts
+  ([Apple DTS](https://developer.apple.com/forums/thread/759160)), and
+  compiled asset catalogs. Coreography's Shortcuts actions depend on the
+  first, so they stay out of the suite or this decision gains an exception.
 - **Migrate code in**, don't depend on the tool repos as packages. The suite
   becomes the home of each core; standalone apps keep working from their own
   history. Revisit if standalones stay alive long-term (docs/architecture.md
