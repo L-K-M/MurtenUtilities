@@ -82,7 +82,10 @@ package enum AutoTrash {
     /// Newest first, capped at `limit`, even if the wall clock moved backward.
     package static func appending(_ entries: [AutoTrashLogEntry], to log: [AutoTrashLogEntry],
                                   limit: Int = logLimit) -> [AutoTrashLogEntry] {
-        Array((entries + log).sorted { $0.date > $1.date }.prefix(limit))
+        let sorted = (entries + log).sorted {
+            $0.date == $1.date ? $0.path < $1.path : $0.date > $1.date
+        }
+        return Array(sorted.prefix(limit))
     }
 
     /// The run record a pass leaves for the menu section and Settings.

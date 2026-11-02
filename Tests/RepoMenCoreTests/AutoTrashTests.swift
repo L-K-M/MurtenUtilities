@@ -67,6 +67,15 @@ final class AutoTrashTests: XCTestCase {
         XCTAssertEqual(AutoTrash.appending([older], to: existing, limit: 2), existing)
     }
 
+    func testEqualTimestampLogEntriesSortByPath() {
+        let date = Date(timeIntervalSince1970: 100)
+        let entries = ["/z", "/a"].map {
+            AutoTrashLogEntry(date: date, path: $0, label: $0, bytes: 1, result: .trashed)
+        }
+
+        XCTAssertEqual(AutoTrash.appending(entries, to: []).map(\.path), ["/a", "/z"])
+    }
+
     func testRecordCountsOnlyWhatWasTrashed() {
         let candidates = [item("/a", bytes: 10), item("/b", bytes: 20)]
         let outcomes = [Reclaimer.Outcome(item: candidates[0], failure: nil),
