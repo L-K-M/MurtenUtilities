@@ -79,13 +79,14 @@ Merging tools into one binary must not union their privileges. The rules:
   HallPass module keeps its osascript write boundary; the DeviceControlDoctor
   module keeps its confirmed `tccutil reset`; DockVac keeps its Docker socket
   use scoped to the delete action.
-- Two confirmed modules already ship a privileged helper: BootCaptain's
-  code-signing-pinned XPC helper (Mach service `ch.lkmc.bootcaptain.helper`)
-  and Coreography's XPC daemon (`CoreographyHelper`, registered through
-  `SMAppService.daemon`). Each keeps its own helper and install path — SMJobBless
-  or a bundled daemon plist, not the login-item `SMAppService` above — and never
-  a suite-wide root daemon. Their code-signing requirements pin a real Team ID,
-  so they also settle the signing question (see PLAN.md).
+- Two confirmed modules already ship a privileged helper, both registered
+  through `SMAppService.daemon`: BootCaptain's code-signing-pinned XPC
+  helper (Mach service `ch.lkmc.bootcaptain.helper`; reversible vault
+  moves enabled, launchd/cron mutations gated off in the current build)
+  and Coreography's XPC daemon (`CoreographyHelper`). Each keeps its own
+  helper, install path and code-signing requirement — never a suite-wide
+  root daemon. Both requirements pin a real Team ID, which constrains the
+  open signing question (see PLAN.md) without settling it.
 
 ## Resident mode
 
