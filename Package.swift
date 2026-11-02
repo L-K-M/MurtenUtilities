@@ -77,8 +77,23 @@ let shortkingTargets: [Target] = []
 let shortkingModule: [Target.Dependency] = []
 
 // MARK: HallPass
-let hallPassTargets: [Target] = []
-let hallPassModule: [Target.Dependency] = []
+// The source package (tools 6.0, no explicit mode) builds in Swift 6.
+let hallPassSwiftSettings: [SwiftSetting] = [.swiftLanguageMode(.v6)]
+let hallPassTargets: [Target] = [
+    .target(name: "HallPassCore", swiftSettings: hallPassSwiftSettings),
+    .target(
+        name: "HallPassModule",
+        dependencies: ["HallPassCore", "MurtenCore", "MurtenModuleKit"],
+        swiftSettings: hallPassSwiftSettings
+    ),
+    .testTarget(name: "HallPassCoreTests", dependencies: ["HallPassCore"], swiftSettings: hallPassSwiftSettings),
+    .testTarget(
+        name: "HallPassModuleTests",
+        dependencies: ["HallPassModule", "HallPassCore", "MurtenCore", "MurtenModuleKit"],
+        swiftSettings: hallPassSwiftSettings
+    )
+]
+let hallPassModule: [Target.Dependency] = ["HallPassModule"]
 
 // MARK: ZenBackupManager
 // Ported from the standalone app's .xcodeproj (Swift 5, the package default).
