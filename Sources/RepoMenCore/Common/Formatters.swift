@@ -2,15 +2,15 @@ import Foundation
 
 /// Small, pure display formatters (unit-tested; no locale-dependent machinery for the
 /// age strings so tests are deterministic).
-enum Format {
+package enum Format {
 
-    static func bytes(_ count: Int64) -> String {
+    package static func bytes(_ count: Int64) -> String {
         count.formatted(.byteCount(style: .file))
     }
 
     /// Coarse "how stale is this" buckets — build artifacts don't need minutes-level
     /// precision, they need "worth keeping warm?" at a glance.
-    static func age(_ date: Date, now: Date = Date()) -> String {
+    package static func age(_ date: Date, now: Date = Date()) -> String {
         guard date > .distantPast else { return "—" }
         let seconds = now.timeIntervalSince(date)
         guard seconds >= 0 else { return "just now" }
@@ -27,7 +27,7 @@ enum Format {
     }
 
     /// Abbreviates the home directory to `~` for display.
-    static func abbreviatePath(_ path: String, home: String = NSHomeDirectory()) -> String {
+    package static func abbreviatePath(_ path: String, home: String = NSHomeDirectory()) -> String {
         if path == home { return "~" }
         if path.hasPrefix(home + "/") { return "~" + path.dropFirst(home.count) }
         return path

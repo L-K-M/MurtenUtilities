@@ -10,24 +10,29 @@ import Foundation
 /// - a known-cache item must live under a `KnownCaches.allowedRoots` root.
 /// Failures skip the item and are reported, never thrown — one vanished anchor must
 /// not abort the rest of the batch.
-enum Reclaimer {
+package enum Reclaimer {
 
-    enum Method: Sendable {
+    package enum Method: Sendable {
         case trash
         case delete
     }
 
-    struct Outcome: Sendable {
-        let item: CleanableItem
+    package struct Outcome: Sendable {
+        package let item: CleanableItem
         /// nil = reclaimed; otherwise why the item was skipped.
-        let failure: String?
+        package let failure: String?
+
+        package init(item: CleanableItem, failure: String?) {
+            self.item = item
+            self.failure = failure
+        }
     }
 
     /// `progress` is invoked on the calling thread before each item is processed,
     /// with the 1-based position, the batch total, and the item itself. Honors task
     /// cancellation *between* items: the item in flight always finishes (a
     /// half-trashed tree helps nobody), the rest are left untouched.
-    static func reclaim(_ items: [CleanableItem],
+    package static func reclaim(_ items: [CleanableItem],
                         method: Method,
                         home: URL = FileManager.default.homeDirectoryForCurrentUser,
                         fileManager: FileManager = .default,

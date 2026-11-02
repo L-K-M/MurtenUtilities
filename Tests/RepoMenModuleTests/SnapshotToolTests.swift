@@ -1,5 +1,6 @@
 import XCTest
-@testable import RepoMen
+@testable import RepoMenModule
+@testable import RepoMenCore
 
 /// tmutil never runs here — runners are injected. Covers the argument whitelist, the
 /// list parser, the privileged fallback scripts, and the per-snapshot verdicts of

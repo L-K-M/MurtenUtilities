@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import RepoMenCore
 
 /// The working surface: the item table with scan/reclaim toolbar, a status footer,
 /// and the confirmation + summary dialogs. Reclaiming always passes through the
@@ -7,15 +8,20 @@ import SwiftUI
 struct DetailView: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var snapshotModel: SnapshotModel
+    @EnvironmentObject private var managedStorage: ManagedStorageModel
 
     private var showingSnapshots: Bool { model.sidebarSelection == .snapshots }
     private var showingManagedStorage: Bool { model.sidebarSelection == .managedStorage }
+    private var showingAutoTrashLog: Bool { model.sidebarSelection == .autoTrashLog }
     private var showingSystemAreas: Bool { model.sidebarSelection == .category(.system) }
 
     var body: some View {
         Group {
             if showingManagedStorage {
-                ManagedStorageView()
+                // The provider owns the model, so measurements survive navigation.
+                ManagedStorageView(storage: managedStorage)
+            } else if showingAutoTrashLog {
+                AutoTrashLogView()
             } else if showingSnapshots {
                 // Snapshots are not paths: their own pane replaces the table, its
                 // footer, and the empty state while the sidebar row is selected.
@@ -103,7 +109,7 @@ struct DetailView: View {
         ToolbarItemGroup(placement: .primaryAction) {
             // Managed storage pane has its own controls; hide scan-related toolbar
             // items so the user does not confuse table actions with managed areas.
-            if !showingManagedStorage {
+            if !showingManagedStorage && !showingAutoTrashLog {
                 // A system scan is a scan too: show Stop rather than a Scan button that
                 // looks enabled but would no-op against the model's guard.
                 if model.isBusy || model.isSystemScanning {

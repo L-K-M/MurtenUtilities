@@ -1,4 +1,5 @@
 import Foundation
+import RepoMenCore
 
 /// One row of the Snapshots pane's table: either a Time Machine local snapshot
 /// (checkable, deletable) or a snapshot some other app made, shown greyed and

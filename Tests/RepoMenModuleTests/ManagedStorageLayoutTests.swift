@@ -1,7 +1,8 @@
 import AppKit
 import SwiftUI
 import XCTest
-@testable import RepoMen
+@testable import RepoMenModule
+@testable import RepoMenCore
 
 final class ManagedStorageLayoutTests: XCTestCase {
     @MainActor

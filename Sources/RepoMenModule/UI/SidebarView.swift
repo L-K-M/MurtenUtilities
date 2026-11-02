@@ -1,4 +1,5 @@
 import SwiftUI
+import RepoMenCore
 
 /// Category list with live per-category totals — the "where did my disk go" overview.
 struct SidebarView: View {
@@ -29,6 +30,16 @@ struct SidebarView: View {
                     }
                 }
                 .tag(SidebarEntry.managedStorage)
+            }
+
+            Section("Watch") {
+                Label {
+                    Text("Auto-trash log")
+                } icon: {
+                    Image(systemName: "list.bullet.rectangle")
+                        .foregroundStyle(.secondary)
+                }
+                .tag(SidebarEntry.autoTrashLog)
             }
         }
         .listStyle(.sidebar)

@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import RepoMenCore
 
 /// Outcome of a snapshot delete or thin run, presented as an alert.
 struct SnapshotReport: Identifiable, Sendable {
@@ -36,11 +37,6 @@ final class SnapshotModel: ObservableObject {
     /// The "release space" amount in decimal gigabytes, the unit macOS shows sizes in.
     @Published var thinGigabytes: Double = 10
     @Published var thinUrgency: Int = SnapshotTool.urgencyRange.upperBound
-
-    /// Terminate-safety bookkeeping consulted by the app delegate, like `AppModel`'s:
-    /// a delete or thin in flight finishes before the app quits.
-    private(set) static var activeOperationCount = 0
-    static var terminateAfterOperation = false
 
     private var loadTask: Task<Void, Never>?
     private var workTask: Task<Void, Never>?
@@ -133,7 +129,7 @@ final class SnapshotModel: ObservableObject {
             })
             let remaining = await Self.settleAndList()
             let freeAfter = SnapshotTool.volumeFreeBytes()
-            guard let self else { Self.operationFinished(); return }
+            guard let self else { return }
 
             let succeeded = outcomes.filter { $0.failure == nil }
             let deleted = succeeded.map(\.snapshot)
@@ -191,7 +187,7 @@ final class SnapshotModel: ObservableObject {
             }
             let remaining = await Self.settleAndList()
             let freeAfter = SnapshotTool.volumeFreeBytes()
-            guard let self else { Self.operationFinished(); return }
+            guard let self else { return }
 
             if let remaining { self.apply(remaining) }
             switch result {
@@ -231,22 +227,11 @@ final class SnapshotModel: ObservableObject {
     private func begin(status: String) {
         isWorking = true
         workStatus = status
-        Self.activeOperationCount += 1
     }
 
     private func end() {
         isWorking = false
         workStatus = ""
-        Self.operationFinished()
-    }
-
-    private static func operationFinished() {
-        activeOperationCount -= 1
-        // A quit requested mid-operation was deferred; release it now.
-        if terminateAfterOperation, activeOperationCount == 0 {
-            terminateAfterOperation = false
-            NSApplication.shared.reply(toApplicationShouldTerminate: true)
-        }
     }
 
     /// Re-lists after giving APFS a moment: snapshot removal completes in the

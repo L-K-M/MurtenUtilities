@@ -1,7 +1,7 @@
-import SwiftUI
+import Foundation
 
 /// Sidebar grouping for everything RepoMen can find.
-enum ArtifactCategory: String, CaseIterable, Identifiable, Sendable {
+package enum ArtifactCategory: String, CaseIterable, Identifiable, Sendable {
     case projects
     case developer
     case packageManagers
@@ -9,9 +9,9 @@ enum ArtifactCategory: String, CaseIterable, Identifiable, Sendable {
     case applications
     case system
 
-    var id: String { rawValue }
+    package var id: String { rawValue }
 
-    var label: String {
+    package var label: String {
         switch self {
         case .projects: return "Project artifacts"
         case .developer: return "Developer caches"
@@ -22,7 +22,7 @@ enum ArtifactCategory: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    var symbol: String {
+    package var symbol: String {
         switch self {
         case .projects: return "hammer"
         case .developer: return "wrench.and.screwdriver"
@@ -32,22 +32,11 @@ enum ArtifactCategory: String, CaseIterable, Identifiable, Sendable {
         case .system: return "lock.shield"
         }
     }
-
-    var tint: Color {
-        switch self {
-        case .projects: return .orange
-        case .developer: return .blue
-        case .packageManagers: return .brown
-        case .browsers: return .teal
-        case .applications: return .purple
-        case .system: return .red
-        }
-    }
 }
 
 /// Every reclaimable kind explains its regeneration or disposable diagnostic role.
 /// See PLAN.md's trust model.
-enum ArtifactKind: String, CaseIterable, Codable, Identifiable, Sendable {
+package enum ArtifactKind: String, CaseIterable, Codable, Identifiable, Sendable {
     // Project artifacts (anchor-based deep scan).
     case rustTarget
     case nodeModules
@@ -108,9 +97,9 @@ enum ArtifactKind: String, CaseIterable, Codable, Identifiable, Sendable {
     case systemLogs
     case systemCaches
 
-    var id: String { rawValue }
+    package var id: String { rawValue }
 
-    var category: ArtifactCategory {
+    package var category: ArtifactCategory {
         switch self {
         case .rustTarget, .nodeModules, .jsBuildOutput, .swiftPMBuild, .xcodeBuild,
              .cocoaPods, .gradleBuild, .mavenTarget, .flutterBuild, .pythonCache,
@@ -135,7 +124,7 @@ enum ArtifactKind: String, CaseIterable, Codable, Identifiable, Sendable {
         }
     }
 
-    var label: String {
+    package var label: String {
         switch self {
         case .rustTarget: return "Rust build"
         case .nodeModules: return "node_modules"
@@ -190,7 +179,7 @@ enum ArtifactKind: String, CaseIterable, Codable, Identifiable, Sendable {
         }
     }
 
-    var symbol: String {
+    package var symbol: String {
         switch self {
         case .rustTarget: return "gearshape.2"
         case .nodeModules, .jsBuildOutput: return "curlybraces"
@@ -235,7 +224,7 @@ enum ArtifactKind: String, CaseIterable, Codable, Identifiable, Sendable {
     }
 
     /// Explains regeneration or diagnostic loss before reclaiming.
-    var regenerationHint: String {
+    package var regenerationHint: String {
         switch self {
         case .rustTarget: return "Recreated by the next cargo build."
         case .nodeModules: return "Recreated by npm/yarn/pnpm install."
@@ -290,7 +279,7 @@ enum ArtifactKind: String, CaseIterable, Codable, Identifiable, Sendable {
 
     /// Safe but *expensive* to rebuild (big re-downloads / reinstalls / re-indexing) —
     /// the UI adds a visible note so these aren't reclaimed casually.
-    var isSlowToRegenerate: Bool {
+    package var isSlowToRegenerate: Bool {
         switch self {
         case .pythonVenv, .pnpmStore, .gradleUserCache, .mavenLocalRepo, .cocoaPods,
              .compilerCache, .ideCache, .pubCache:

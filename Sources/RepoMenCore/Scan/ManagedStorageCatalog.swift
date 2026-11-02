@@ -2,8 +2,8 @@ import Foundation
 
 /// Read-only discovery. Neither this catalog nor its instructions authorize path
 /// deletion; the owning applications coordinate their state and dependencies.
-enum ManagedStorageCatalog {
-    static func areas(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+package enum ManagedStorageCatalog {
+    package static func areas(home: URL = FileManager.default.homeDirectoryForCurrentUser,
                       systemApplicationSupport: URL = URL(fileURLWithPath: "/Library/Application Support"),
                       fileManager: FileManager = .default) -> [ManagedStorageArea] {
         func area(_ title: String, _ path: URL, _ instructions: String, _ documentation: String,
@@ -75,7 +75,7 @@ enum ManagedStorageCatalog {
             .sorted { $0.path < $1.path }
     }
 
-    static func measure(_ area: ManagedStorageArea,
+    package static func measure(_ area: ManagedStorageArea,
                         fileManager: FileManager = .default) -> ManagedStorageArea.State {
         let url = URL(fileURLWithPath: area.path)
         do {

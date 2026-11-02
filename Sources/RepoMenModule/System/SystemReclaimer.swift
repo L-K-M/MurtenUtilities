@@ -1,4 +1,5 @@
 import Foundation
+import RepoMenCore
 
 /// The privileged counterpart of `Reclaimer` for `SystemAreas` items. Deletion is
 /// permanent — `rm -rf` as root; the Trash is per-user and cannot take root-owned

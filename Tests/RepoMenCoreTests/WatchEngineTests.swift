@@ -1,5 +1,5 @@
 import XCTest
-@testable import RepoMen
+@testable import RepoMenCore
 
 /// Watch-mode eligibility: the pure decision of what a watched folder would
 /// auto-trash right now.

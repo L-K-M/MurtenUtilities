@@ -1,8 +1,9 @@
 import XCTest
-@testable import RepoMen
+@testable import RepoMenModule
+@testable import RepoMenCore
 
-/// Watch-mode persistence: watched folders, the master switch, and the last-run
-/// record round-trip through UserDefaults.
+/// Watch-mode persistence: watched folders, their auto-trash arming, and the
+/// last-run record round-trip through UserDefaults.
 final class WatchPreferencesTests: XCTestCase {
 
     private var suiteName: String!
@@ -20,21 +21,21 @@ final class WatchPreferencesTests: XCTestCase {
     func testWatchedFoldersRoundTrip() {
         let preferences = Preferences(defaults: defaults)
         XCTAssertEqual(preferences.watchedFolders, [])
-        XCTAssertFalse(preferences.watchAutoTrash,
-                       "auto-clean is opt-in: off until the user arms it")
 
         preferences.watchedFolders = [
             WatchedFolder(path: "/Users/x/dev", maxIdleDays: 14),
             WatchedFolder(path: "/Users/x/work", maxIdleDays: 45, isEnabled: false),
         ]
-        preferences.watchAutoTrash = true
+        XCTAssertFalse(preferences.watchedFolders.contains(where: \.autoTrashArmed),
+                       "auto-clean is opt-in: off until the user arms it")
+        preferences.watchedFolders[0].autoTrashArmed = true
 
         let reloaded = Preferences(defaults: defaults)
         XCTAssertEqual(reloaded.watchedFolders, preferences.watchedFolders)
-        XCTAssertTrue(reloaded.watchAutoTrash)
+        XCTAssertTrue(reloaded.watchedFolders[0].autoTrashArmed)
     }
 
-    func testWatchFolderDedupesAndArmsMenuBar() {
+    func testWatchFolderDedupesAndStartsUnarmed() {
         let preferences = Preferences(defaults: defaults)
         preferences.idleDays = 21
 
@@ -44,8 +45,8 @@ final class WatchPreferencesTests: XCTestCase {
         XCTAssertEqual(preferences.watchedFolders.count, 1, "watching is deduped by path")
         XCTAssertEqual(preferences.watchedFolders.first?.maxIdleDays, 21,
                        "a new watched folder inherits the current idle threshold")
-        XCTAssertTrue(preferences.showInMenuBar,
-                      "watching arms the menu-bar presence so checks actually run")
+        XCTAssertEqual(preferences.watchedFolders.first?.autoTrashArmed, false,
+                       "watching a folder never arms auto-trash")
     }
 
     func testLastWatchRunRoundTrips() {

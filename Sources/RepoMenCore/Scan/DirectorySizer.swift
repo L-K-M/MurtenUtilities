@@ -4,19 +4,19 @@ import Foundation
 /// which for a build directory is "when this was last built". Runs synchronously;
 /// callers parallelize with a bounded task group and may cancel (a cancelled
 /// measurement comes back with `isComplete == false` and must be discarded).
-enum DirectorySizer {
+package enum DirectorySizer {
 
-    struct Measurement: Sendable {
-        var bytes: Int64 = 0
-        var newestModification: Date = .distantPast
+    package struct Measurement: Sendable {
+        package var bytes: Int64 = 0
+        package var newestModification: Date = .distantPast
         /// False when the walk was aborted by cancellation — the counts are partial
         /// and must never be presented as a measured size.
-        var isComplete: Bool = true
+        package var isComplete: Bool = true
         /// Read failures make byte counts a lower bound rather than a full size.
-        var unreadableEntries = 0
+        package var unreadableEntries = 0
     }
 
-    static func measure(_ url: URL, fileManager: FileManager = .default) -> Measurement {
+    package static func measure(_ url: URL, fileManager: FileManager = .default) -> Measurement {
         var measurement = Measurement()
         let keys: Set<URLResourceKey> = [
             .isRegularFileKey, .totalFileAllocatedSizeKey, .fileAllocatedSizeKey,

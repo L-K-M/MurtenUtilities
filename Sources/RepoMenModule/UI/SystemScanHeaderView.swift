@@ -1,4 +1,5 @@
 import SwiftUI
+import RepoMenCore
 
 /// An explicit scan action outside the table's noninteractive empty overlay.
 struct SystemScanHeaderView: View {

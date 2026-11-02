@@ -1,4 +1,5 @@
 import SwiftUI
+import RepoMenCore
 
 /// The Snapshots pane (sidebar → Time Machine → Local snapshots): lists every
 /// snapshot on the boot volume — Time Machine's as checkable rows, other apps' greyed

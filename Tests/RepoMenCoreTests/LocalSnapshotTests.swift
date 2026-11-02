@@ -1,5 +1,5 @@
 import XCTest
-@testable import RepoMen
+@testable import RepoMenCore
 
 /// The one shape RepoMen will ever call a snapshot: `com.apple.TimeMachine.<date>.local`.
 /// Everything else — third-party, macOS-update, `.backup` — must fail to parse, so it

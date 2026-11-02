@@ -1,4 +1,5 @@
 import SwiftUI
+import RepoMenCore
 
 /// Sortable results table. Checkboxes (not row selection) decide what gets reclaimed —
 /// row selection only feeds the context menu, the Items menu, and the space-bar

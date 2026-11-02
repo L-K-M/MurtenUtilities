@@ -1,5 +1,5 @@
 import XCTest
-@testable import RepoMen
+@testable import RepoMenCore
 
 /// The last-line-of-defense guards. Every rule here is a thing RepoMen must never
 /// delete no matter what a scan rule claims.

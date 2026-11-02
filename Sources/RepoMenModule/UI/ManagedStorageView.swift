@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import RepoMenCore
 
 /// Read-only measurements and instructions for storage managed by its owning tool.
 struct ManagedStorageView: View {

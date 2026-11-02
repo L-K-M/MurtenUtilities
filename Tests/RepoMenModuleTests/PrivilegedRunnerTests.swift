@@ -1,5 +1,6 @@
 import XCTest
-@testable import RepoMen
+@testable import RepoMenModule
+@testable import RepoMenCore
 
 /// The pure halves of the privileged bridge: shell quoting, AppleScript escaping,
 /// and payload decoding. (Actually spawning osascript shows a password dialog and

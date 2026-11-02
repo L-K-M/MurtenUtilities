@@ -13,23 +13,23 @@ import Foundation
 /// purgeable. Deleting one costs the ability to restore files from it while the
 /// backup disk is away, and — if it was the snapshot of the last successful backup
 /// — a slower next backup. The backup disk itself is never touched.
-struct LocalSnapshot: Identifiable, Hashable, Sendable {
+package struct LocalSnapshot: Identifiable, Hashable, Sendable {
 
-    static let namePrefix = "com.apple.TimeMachine."
-    static let nameSuffix = ".local"
+    package static let namePrefix = "com.apple.TimeMachine."
+    package static let nameSuffix = ".local"
 
     /// `YYYY-MM-DD-HHMMSS` — the operand `tmutil deletelocalsnapshots` takes. ASCII
     /// digits and hyphens only, so it is trivially safe as a process argument.
-    let dateToken: String
+    package let dateToken: String
     /// The creation time the token spells out (tmutil names snapshots in local time).
-    let date: Date
+    package let date: Date
 
-    var id: String { dateToken }
-    var name: String { Self.namePrefix + dateToken + Self.nameSuffix }
+    package var id: String { dateToken }
+    package var name: String { Self.namePrefix + dateToken + Self.nameSuffix }
 
     /// Parses a name as printed by `tmutil listlocalsnapshots`; nil for anything that
     /// is not a Time Machine local snapshot.
-    init?(name: String) {
+    package init?(name: String) {
         guard name.hasPrefix(Self.namePrefix), name.hasSuffix(Self.nameSuffix),
               name.count > Self.namePrefix.count + Self.nameSuffix.count else { return nil }
         let token = String(name.dropFirst(Self.namePrefix.count).dropLast(Self.nameSuffix.count))
@@ -37,7 +37,7 @@ struct LocalSnapshot: Identifiable, Hashable, Sendable {
     }
 
     /// Parses a bare date token (the `tmutil listlocalsnapshotdates` format).
-    init?(dateToken: String) {
+    package init?(dateToken: String) {
         guard let components = Self.components(of: dateToken) else { return nil }
         self.dateToken = dateToken
         var calendar = Calendar(identifier: .gregorian)
@@ -48,7 +48,7 @@ struct LocalSnapshot: Identifiable, Hashable, Sendable {
     }
 
     /// Shape check only: 17 characters, `dddd-dd-dd-dddddd`, ASCII digits.
-    static func isWellFormed(_ token: String) -> Bool {
+    package static func isWellFormed(_ token: String) -> Bool {
         let scalars = Array(token.unicodeScalars)
         guard scalars.count == 17 else { return false }
         for (index, scalar) in scalars.enumerated() {
@@ -63,7 +63,7 @@ struct LocalSnapshot: Identifiable, Hashable, Sendable {
 
     /// Shape plus field ranges (month 1–12, day 1–31, hour 0–23, minute/second
     /// 0–59); nil when the token is not a plausible snapshot date.
-    static func components(of token: String) -> DateComponents? {
+    package static func components(of token: String) -> DateComponents? {
         guard isWellFormed(token) else { return nil }
         let parts = token.split(separator: "-").map { Int($0) ?? -1 }
         guard parts.count == 4 else { return nil }

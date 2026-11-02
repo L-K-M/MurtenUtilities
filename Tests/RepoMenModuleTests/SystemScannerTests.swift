@@ -1,5 +1,6 @@
 import XCTest
-@testable import RepoMen
+@testable import RepoMenModule
+@testable import RepoMenCore
 
 /// The privileged probe's script and its pure record parser. The parser must treat
 /// every record as untrusted: only validated, catalog-covered paths become items.

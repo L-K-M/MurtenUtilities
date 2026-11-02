@@ -1,6 +1,8 @@
 import SwiftUI
+import RepoMenCore
 
-/// Window layout: category sidebar + item table.
+/// Pane layout: category sidebar + item table. The suite's window supplies the
+/// title and the way back to all tools.
 struct ContentView: View {
     @EnvironmentObject private var model: AppModel
 
@@ -11,6 +13,5 @@ struct ContentView: View {
         } detail: {
             DetailView()
         }
-        .navigationTitle("RepoMen")
     }
 }

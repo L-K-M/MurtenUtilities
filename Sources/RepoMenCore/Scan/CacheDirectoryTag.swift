@@ -4,12 +4,12 @@ import Darwin
 /// The owning tool declares that the entire directory is regenerable using the
 /// cache directory tagging specification: https://bford.info/cachedir/.
 /// Checking just the filename would turn an unrelated file into permission to delete.
-enum CacheDirectoryTag {
-    static let fileName = "CACHEDIR.TAG"
-    static let signature = Data("Signature: 8a477f597d28d172789f06886806bc55".utf8)
+package enum CacheDirectoryTag {
+    package static let fileName = "CACHEDIR.TAG"
+    package static let signature = Data("Signature: 8a477f597d28d172789f06886806bc55".utf8)
     private static let metadataNames: Set<String> = [".git", ".svn", ".hg", ".trash"]
 
-    static func isValid(in directory: URL) -> Bool {
+    package static func isValid(in directory: URL) -> Bool {
         guard !directory.pathComponents.contains(where: { metadataNames.contains($0.lowercased()) }),
               (try? directory.resourceValues(forKeys: [.isPackageKey]))?.isPackage != true else {
             return false

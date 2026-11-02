@@ -1,5 +1,5 @@
 import XCTest
-@testable import RepoMen
+@testable import RepoMenCore
 
 /// Sizing against a synthetic tree — in particular the hardlink dedup, which keeps
 /// pnpm-style link farms from being counted once per link.

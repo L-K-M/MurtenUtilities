@@ -1,4 +1,5 @@
 import Foundation
+import RepoMenCore
 
 /// Everything RepoMen does with Time Machine local snapshots, on top of `tmutil`:
 /// pure argument builders, a pure parser for `listlocalsnapshots` output, the

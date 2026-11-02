@@ -13,19 +13,19 @@ import Foundation
 /// only thing the privileged probe reports on and the only thing the privileged
 /// reclaimer will delete — direct children of these roots, never the roots
 /// themselves, never anything deeper, never an arbitrary path.
-enum SystemAreas {
+package enum SystemAreas {
 
-    struct Root: Sendable {
+    package struct Root: Sendable {
         /// Absolute physical path (no trailing slash). `/var` is a symlink to
         /// `/private/var`; storing the physical spelling keeps the prefix checks
         /// below judging physical locations, like `PathGuards` does.
-        let path: String
-        let kind: ArtifactKind
+        package let path: String
+        package let kind: ArtifactKind
         /// Item labels read "<prefix> · <child name>".
-        let labelPrefix: String
+        package let labelPrefix: String
     }
 
-    static let roots: [Root] = [
+    package static let roots: [Root] = [
         Root(path: "/private/var/root/Library/Logs", kind: .systemLogs,
              labelPrefix: "Root logs"),
         Root(path: "/private/var/root/Library/Caches", kind: .systemCaches,
@@ -33,7 +33,7 @@ enum SystemAreas {
     ]
 
     /// The catalog root a path lives strictly under, if any.
-    static func root(containing path: String) -> Root? {
+    package static func root(containing path: String) -> Root? {
         roots.first { path.hasPrefix($0.path + "/") }
     }
 
@@ -45,7 +45,7 @@ enum SystemAreas {
     /// and is refused. Both the scanner and the reclaimer run every path through
     /// this; the reclaim script additionally re-checks each path as root (still a
     /// directory, not a symlink) immediately before deleting.
-    static func validate(path: String) -> PathGuards.Violation? {
+    package static func validate(path: String) -> PathGuards.Violation? {
         guard path.hasPrefix("/") else {
             return PathGuards.Violation(reason: "not an absolute path")
         }
@@ -74,13 +74,13 @@ enum SystemAreas {
     /// the canonical case: Dropbox keeps `rtcreportingd` (and `fileproviderd`)
     /// busy, so the log folder regrows immediately after cleaning — and files the
     /// daemon still holds open free no space until it lets go.
-    struct Culprit: Sendable {
-        let appName: String
-        let bundleIDs: [String]
+    package struct Culprit: Sendable {
+        package let appName: String
+        package let bundleIDs: [String]
     }
 
     /// Keyed by the child directory's lowercased name.
-    static let culprits: [String: Culprit] = [
+    package static let culprits: [String: Culprit] = [
         "rtcreporting": Culprit(appName: "Dropbox",
                                 bundleIDs: ["com.getdropbox.dropbox"]),
         "com.apple.rtcreporting": Culprit(appName: "Dropbox",
@@ -90,7 +90,7 @@ enum SystemAreas {
     /// A warning badge for the item while its known culprit app is running — the
     /// same mechanism as the browser-cache warnings. `isRunning` answers whether an
     /// app with the given bundle id is open (injected so tests need no AppKit).
-    static func culpritWarning(childName: String,
+    package static func culpritWarning(childName: String,
                                isRunning: (String) -> Bool) -> String? {
         guard let culprit = culprits[childName.lowercased()],
               culprit.bundleIDs.contains(where: isRunning) else { return nil }

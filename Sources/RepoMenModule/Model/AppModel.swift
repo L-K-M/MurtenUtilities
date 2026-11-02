@@ -1,6 +1,8 @@
 import AppKit
 import Combine
 import Foundation
+import RepoMenCore
+import MurtenCore
 
 /// What the sidebar can show.
 enum SidebarEntry: Hashable {
@@ -11,6 +13,8 @@ enum SidebarEntry: Hashable {
     case snapshots
     /// Read-only footprints and cleanup instructions for owner-managed storage.
     case managedStorage
+    /// What armed auto-trash moved to the Trash or left alone.
+    case autoTrashLog
 }
 
 /// Result of a reclaim run, presented as an alert.
@@ -118,7 +122,7 @@ final class AppModel: ObservableObject {
     private var cachedStats: [SidebarEntry: (count: Int, bytes: Int64)] = [:]
     private var cancellables: Set<AnyCancellable> = []
 
-    init(preferences: Preferences = .shared) {
+    init(preferences: Preferences) {
         self.preferences = preferences
         // An explicit sink + retained cancellable: with `assign(to:)` the debounced
         // value silently never landed (no didSet, no invalidation) and the filter
@@ -156,7 +160,7 @@ final class AppModel: ObservableObject {
         switch sidebarSelection {
         case .category(let category)?:
             filtered = filtered.filter { $0.category == category }
-        case .snapshots?, .managedStorage?:
+        case .snapshots?, .managedStorage?, .autoTrashLog?:
             filtered = []   // the snapshots pane replaces the table entirely
         default:
             break
@@ -207,9 +211,37 @@ final class AppModel: ObservableObject {
             .max { $0.sizeBytes < $1.sizeBytes }
     }
 
+    // MARK: Opening
+
+    /// What the suite asked for when it opened the pane. A plain open scans only
+    /// when the user chose "scan when RepoMen opens" and nothing was scanned yet;
+    /// a suggestion's review route re-scans now, adding the watched folder it
+    /// names. Neither checks anything: the user picks and confirms, as always.
+    func handleOpen(_ route: ModuleRoute?) {
+        switch route?.action {
+        case RepoMenRoutes.reviewAction?:
+            sidebarSelection = .all
+            startScan(including: reviewFolder(in: route))
+        case RepoMenRoutes.logAction?:
+            sidebarSelection = .autoTrashLog
+        default:
+            if preferences.scanAtLaunch, phase == .idle { startScan() }
+        }
+    }
+
+    /// The route's folder when it is one the user watches; anything else in a
+    /// route is ignored rather than scanned.
+    private func reviewFolder(in route: ModuleRoute?) -> [String] {
+        guard let folder = route?.context[RepoMenRoutes.folderKey],
+              preferences.watchedFolders.contains(where: { $0.path == folder && $0.isEnabled }) else { return [] }
+        return [folder]
+    }
+
     // MARK: Scanning
 
-    func startScan() {
+    /// Scans the configured folders, plus `extraRoots` (a watched folder a
+    /// suggestion named) for this run only.
+    func startScan(including extraRoots: [String] = []) {
         // Never walk the tree mid-deletion, and never race the privileged probe.
         guard !isReclaiming, !isSystemScanning else { return }
         scanTask?.cancel()
@@ -217,7 +249,7 @@ final class AppModel: ObservableObject {
         let generation = scanGeneration
         pendingMeasurements = [:]
         let config = ScanConfiguration(
-            roots: preferences.scanRoots.map { URL(fileURLWithPath: $0) },
+            roots: (preferences.scanRoots + extraRoots).map { URL(fileURLWithPath: $0) },
             excludedPaths: Set(preferences.excludedPaths),
             enabledKinds: preferences.enabledKinds)
         // Snapshot the open apps on the main thread; the walk runs detached.
@@ -235,7 +267,8 @@ final class AppModel: ObservableObject {
 
         scanTask = Task.detached(priority: .userInitiated) { [weak self] in
             var lastStatus = Date.distantPast
-            let found = Scanner.scan(config) { path in
+            // Qualified: Foundation has a `Scanner` too.
+            let found = RepoMenCore.Scanner.scan(config) { path in
                 let now = Date()
                 guard now.timeIntervalSince(lastStatus) > 0.1 else { return }
                 lastStatus = now
@@ -456,12 +489,6 @@ final class AppModel: ObservableObject {
     /// Non-nil while a reclaim batch runs; drives the footer's progress line.
     @Published private(set) var reclaimProgress: ReclaimProgress?
 
-    /// Terminate-safety bookkeeping consulted by the app delegate: the app must never
-    /// die in the middle of a deletion batch. When termination is requested mid-run,
-    /// the delegate defers it and the finishing reclaim replies.
-    private(set) static var activeReclaimCount = 0
-    static var terminateAfterReclaim = false
-
     private var reclaimTask: Task<Void, Never>?
 
     /// Stops the batch after the item currently being processed finishes — items
@@ -480,7 +507,6 @@ final class AppModel: ObservableObject {
         let normalTargets = targets.filter { !$0.isSystemArea }
         let method: Reclaimer.Method = preferences.moveToTrash ? .trash : .delete
         isReclaiming = true
-        Self.activeReclaimCount += 1
         reclaimProgress = ReclaimProgress(current: 0, total: targets.count, label: "")
         let freeBefore = Self.volumeFreeBytes()
 
@@ -514,14 +540,6 @@ final class AppModel: ObservableObject {
             let listing = outcomes.contains { $0.failure == nil }
                 ? ((try? await SnapshotTool.listAll()) ?? .empty) : .empty
             await MainActor.run { [weak self] in
-                AppModel.activeReclaimCount -= 1
-                defer {
-                    // A quit requested mid-reclaim was deferred; release it now.
-                    if AppModel.terminateAfterReclaim, AppModel.activeReclaimCount == 0 {
-                        AppModel.terminateAfterReclaim = false
-                        NSApplication.shared.reply(toApplicationShouldTerminate: true)
-                    }
-                }
                 guard let self else { return }
                 self.isReclaiming = false
                 self.reclaimProgress = nil

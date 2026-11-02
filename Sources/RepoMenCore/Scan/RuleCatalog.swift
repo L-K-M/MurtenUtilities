@@ -1,7 +1,7 @@
 import Foundation
 
 /// How a directory proves it is a regenerable build artifact.
-enum Anchor: Hashable, Sendable {
+package enum Anchor: Hashable, Sendable {
     /// A sibling entry with exactly this name (e.g. `Cargo.toml`).
     case sibling(String)
     /// A sibling entry whose name ends in this suffix (e.g. `.xcodeproj`).
@@ -11,23 +11,23 @@ enum Anchor: Hashable, Sendable {
 /// One anchor-based detection rule. A directory is reported only when its name matches
 /// AND at least one anchor holds — that's what keeps a random folder called `build`
 /// safe from us (see PLAN.md's trust model).
-struct ProjectArtifactRule: Sendable {
-    let kind: ArtifactKind
+package struct ProjectArtifactRule: Sendable {
+    package let kind: ArtifactKind
     /// Exact directory names this rule applies to.
-    let directoryNames: Set<String>
+    package let directoryNames: Set<String>
     /// Prefix-matched directory names (CLion's `cmake-build-<profile>`).
-    let directoryNamePrefixes: [String]
+    package let directoryNamePrefixes: [String]
     /// Any-of anchors that must exist NEXT TO the directory. Empty means the name
     /// alone is unambiguous (`__pycache__`) or an inner anchor decides.
-    let anchors: [Anchor]
+    package let anchors: [Anchor]
     /// Any-of entry names that must exist INSIDE the directory (`pyvenv.cfg`,
     /// `CMakeCache.txt`). Empty means no content check.
-    let innerAnchors: [String]
+    package let innerAnchors: [String]
     /// A valid CACHEDIR.TAG is sufficient for any directory name. Its signature and
     /// regular-file type must be checked, both here and again at reclaim time.
-    let requiresCacheDirectoryTag: Bool
+    package let requiresCacheDirectoryTag: Bool
 
-    init(kind: ArtifactKind,
+    package init(kind: ArtifactKind,
          directoryNames: Set<String>,
          directoryNamePrefixes: [String] = [],
          anchors: [Anchor] = [],
@@ -41,7 +41,7 @@ struct ProjectArtifactRule: Sendable {
         self.requiresCacheDirectoryTag = requiresCacheDirectoryTag
     }
 
-    func appliesTo(directoryName: String) -> Bool {
+    package func appliesTo(directoryName: String) -> Bool {
         requiresCacheDirectoryTag || directoryNames.contains(directoryName)
             || directoryNamePrefixes.contains { directoryName.hasPrefix($0) }
     }
@@ -49,9 +49,9 @@ struct ProjectArtifactRule: Sendable {
 
 /// The data-driven catalog of project-artifact rules, plus the pure matching logic
 /// (unit-tested; the `Scanner` only walks and feeds it directory listings).
-enum RuleCatalog {
+package enum RuleCatalog {
 
-    static let rules: [ProjectArtifactRule] = [
+    package static let rules: [ProjectArtifactRule] = [
         .init(kind: .rustTarget, directoryNames: ["target"],
               anchors: [.sibling("Cargo.toml")]),
         .init(kind: .nodeModules, directoryNames: ["node_modules"],
@@ -112,7 +112,7 @@ enum RuleCatalog {
     /// even when no anchor matched (an orphan `node_modules` is still not interesting
     /// to walk). Generic names (`build`, `target`) are deliberately NOT here — without
     /// an anchor they might be ordinary folders holding real projects.
-    static let neverDescend: Set<String> = [
+    package static let neverDescend: Set<String> = [
         "node_modules", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache",
         ".tox", ".build", ".dart_tool", ".stack-work", "dist-newstyle", ".next",
         ".nuxt", ".turbo", ".parcel-cache", ".svelte-kit", ".angular", ".astro",
@@ -122,7 +122,7 @@ enum RuleCatalog {
 
     /// Names that match on the name alone (no anchors at all) — the reclaimer's
     /// fallback verification for items without anchor paths.
-    static func isUnambiguousArtifactName(_ name: String) -> Bool {
+    package static func isUnambiguousArtifactName(_ name: String) -> Bool {
         rules.contains {
             $0.anchors.isEmpty && $0.innerAnchors.isEmpty && !$0.requiresCacheDirectoryTag
                 && $0.appliesTo(directoryName: name)
@@ -131,15 +131,15 @@ enum RuleCatalog {
 
     /// A successful match: the rule plus the concrete anchor paths that proved it
     /// (re-verified by `Reclaimer` before anything is deleted).
-    struct Match: Sendable {
-        let rule: ProjectArtifactRule
-        let anchorPaths: [String]
+    package struct Match: Sendable {
+        package let rule: ProjectArtifactRule
+        package let anchorPaths: [String]
     }
 
     /// Pure matching for one directory. `siblingNames` are the names in the parent
     /// directory (including the directory itself); `contents` lazily lists the names
     /// inside the directory, only consulted when a candidate rule has inner anchors.
-    static func match(directoryName: String,
+    package static func match(directoryName: String,
                       parentPath: String,
                       siblingNames: Set<String>,
                       contents: () -> Set<String>,

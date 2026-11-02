@@ -1,11 +1,11 @@
 import AppKit
 import SwiftUI
+import RepoMenCore
 
-/// Settings window (⌘,): General / Folders / Rules / Updates. The tab views are
-/// implementation details of this scene and live here with it.
+/// RepoMen's tab in the suite's Settings: General / Folders / Watch / Rules. The
+/// suite owns updates, the login item and the menu bar, so their tabs and
+/// toggles are gone. The tab views are implementation details and live here.
 struct SettingsView: View {
-    @ObservedObject var updateChecker: UpdateChecker
-
     var body: some View {
         TabView {
             GeneralSettingsView()
@@ -16,8 +16,6 @@ struct SettingsView: View {
                 .tabItem { Label("Watch", systemImage: "eye") }
             RulesSettingsView()
                 .tabItem { Label("Rules", systemImage: "checklist") }
-            UpdatesSettingsView(updateChecker: updateChecker)
-                .tabItem { Label("Updates", systemImage: "arrow.triangle.2.circlepath") }
         }
         .frame(width: 520)
     }
@@ -38,18 +36,13 @@ private struct GeneralSettingsView: View {
             Stepper(value: $preferences.idleDays, in: 1...365) {
                 Text("Consider artifacts idle after \(preferences.idleDays) days")
             }
-            Text("Used by the “Select idle” quick action in the main window.")
+            Text("Used by the “Select idle” quick action in the pane, and as the threshold for newly watched folders.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             Divider()
 
             Toggle("Scan automatically when RepoMen opens", isOn: $preferences.scanAtLaunch)
-            Toggle("Open RepoMen automatically when you log in", isOn: $preferences.launchAtLogin)
-            Toggle("Show RepoMen in the menu bar", isOn: $preferences.showInMenuBar)
-            Text("The menu bar extra shows watch status and quick actions. With watch folders armed and login launch on, RepoMen keeps them clean whenever your Mac is on.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
         .padding(20)
     }
@@ -182,29 +175,5 @@ private struct RulesSettingsView: View {
         Binding(
             get: { preferences.isEnabled(kind) },
             set: { preferences.setEnabled($0, kind: kind) })
-    }
-}
-
-private struct UpdatesSettingsView: View {
-    @ObservedObject var updateChecker: UpdateChecker
-
-    var body: some View {
-        Form {
-            Toggle("Check for updates automatically", isOn: $updateChecker.automaticChecksEnabled)
-            HStack(spacing: 8) {
-                Button("Check Now") { updateChecker.checkNow() }
-                    .disabled(updateChecker.isChecking)
-                if updateChecker.isChecking {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-            }
-            if let last = updateChecker.lastCheckDate {
-                Text("Last checked \(Format.age(last))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(20)
     }
 }

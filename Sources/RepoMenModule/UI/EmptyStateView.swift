@@ -1,4 +1,5 @@
 import SwiftUI
+import RepoMenCore
 
 /// The empty detail surface wears two hats: before the first scan it is the welcome
 /// pitch (what RepoMen will and won't do); after a scan that found nothing it must say
@@ -52,7 +53,8 @@ struct EmptyStateView: View {
                 Text("""
                     Expected results? macOS may have denied folder access — check \
                     System Settings › Privacy & Security › Files and Folders — or add \
-                    more folders in Settings.
+                    more folders in Settings. This build is not signed with a stable \
+                    identity, so macOS may ask for folder access again after an update.
                     """)
                     .font(.caption)
                     .multilineTextAlignment(.center)
@@ -86,7 +88,8 @@ struct EmptyStateView: View {
                 Button(scanCameUpEmpty ? "Scan Again" : "Scan Now") { model.startScan() }
                     .keyboardShortcut(.defaultAction)
                     .disabled(preferences.scanRoots.isEmpty)
-                Button("Choose Folders…") { SettingsOpener.open() }
+                // Opens the suite's Settings; RepoMen's folders are in its tab.
+                SettingsLink { Text("Choose Folders…") }
             }
 
             // "Nothing found" is exactly where the user who *knows* their disk is

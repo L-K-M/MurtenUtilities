@@ -1,5 +1,5 @@
 import XCTest
-@testable import RepoMen
+@testable import RepoMenCore
 
 final class ManagedStorageCatalogTests: XCTestCase {
     private var root: URL!

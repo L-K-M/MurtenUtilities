@@ -1,5 +1,5 @@
 import XCTest
-@testable import RepoMen
+@testable import RepoMenCore
 
 /// The root-owned catalog and its guards. Everything the privileged scripts touch
 /// passes `SystemAreas.validate` first — these rules are what keeps "clean up

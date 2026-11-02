@@ -6,22 +6,22 @@ import Foundation
 ///
 /// Docker/OrbStack/VM disk images are deliberately absent (and hard-blocked in
 /// `PathGuards`): stopped containers look like debris and aren't. See PLAN.md.
-enum KnownCaches {
+package enum KnownCaches {
 
-    struct Spec: Sendable {
-        let kind: ArtifactKind
-        let label: String
+    package struct Spec: Sendable {
+        package let kind: ArtifactKind
+        package let label: String
         /// Relative to the home directory.
-        let relativePath: String
+        package let relativePath: String
         /// Report one item per child directory (DerivedData per project, DeviceSupport
         /// per OS version) instead of one item for the whole location.
-        let expandChildren: Bool
+        package let expandChildren: Bool
         /// When one of these apps is running, items get a warning badge (same
         /// mechanism as browsers). `appName` is the human name for that warning.
-        let appName: String?
-        let bundleIDs: [String]
+        package let appName: String?
+        package let bundleIDs: [String]
 
-        init(_ kind: ArtifactKind, _ label: String, _ relativePath: String,
+        package init(_ kind: ArtifactKind, _ label: String, _ relativePath: String,
              expandChildren: Bool = false,
              appName: String? = nil, bundleIDs: [String] = []) {
             self.kind = kind
@@ -33,7 +33,7 @@ enum KnownCaches {
         }
     }
 
-    static let specs: [Spec] = [
+    package static let specs: [Spec] = [
         Spec(.derivedData, "Xcode DerivedData", "Library/Developer/Xcode/DerivedData", expandChildren: true),
         Spec(.deviceSupport, "iOS DeviceSupport", "Library/Developer/Xcode/iOS DeviceSupport", expandChildren: true),
         Spec(.deviceSupport, "watchOS DeviceSupport", "Library/Developer/Xcode/watchOS DeviceSupport", expandChildren: true),
@@ -110,16 +110,16 @@ enum KnownCaches {
 
     /// Chromium-family (+ Firefox) per-profile caches. Only the `Cache`/`Code Cache`
     /// subdirectories are offered — never profile data (bookmarks, cookies, sessions).
-    struct BrowserSpec: Sendable {
-        let name: String
+    package struct BrowserSpec: Sendable {
+        package let name: String
         /// Vendor directory, relative to `~/Library/Caches`.
-        let cachesSubpath: String
+        package let cachesSubpath: String
         /// Cache directory names looked for in the vendor dir and each profile dir.
-        let cacheDirNames: [String]
-        let bundleIDs: [String]
+        package let cacheDirNames: [String]
+        package let bundleIDs: [String]
     }
 
-    static let browsers: [BrowserSpec] = [
+    package static let browsers: [BrowserSpec] = [
         BrowserSpec(name: "Chrome", cachesSubpath: "Google/Chrome",
                     cacheDirNames: ["Cache", "Code Cache"], bundleIDs: ["com.google.Chrome"]),
         BrowserSpec(name: "Chrome Canary", cachesSubpath: "Google/Chrome Canary",
@@ -151,7 +151,7 @@ enum KnownCaches {
     /// Enumerates every known-cache item that currently exists. `isRunning` answers
     /// whether an app with the given bundle id is open (injected so tests need no
     /// AppKit); browser cache items get a warning while their browser runs.
-    static func items(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    package static func items(home: URL = FileManager.default.homeDirectoryForCurrentUser,
                       excludedPaths: Set<String>,
                       enabledKinds: Set<ArtifactKind>,
                       fileManager: FileManager = .default,
@@ -239,7 +239,7 @@ enum KnownCaches {
     /// and the existing, allowlisted JetBrains cache leaves),
     /// NOT the ~/Library/Caches umbrella: the guards must never vouch for an
     /// arbitrary app's cache directory — or the umbrella itself.
-    static func allowedRoots(home: URL) -> [String] {
+    package static func allowedRoots(home: URL) -> [String] {
         var roots = specs.map(\.relativePath)
         roots += browsers.map { "Library/Caches/" + $0.cachesSubpath }
         return roots.map { home.appendingPathComponent($0).path }

@@ -2,14 +2,18 @@ import Foundation
 
 /// Reads Git's worktree registrations without running Git or walking hidden trees.
 /// Both sides of each registration must agree before the scanner may visit it.
-enum GitWorktrees {
+package enum GitWorktrees {
 
     // MARK: - Discovery
 
-    static func registeredWorktrees(in repository: URL,
-                                    fileManager: FileManager = .default) -> [URL] {
+    /// `isAllowed` vets every path read from Git's metadata before anything is
+    /// looked up there: background scans pass one that refuses privacy-protected
+    /// folders, so a registration cannot lead them into ~/Documents.
+    package static func registeredWorktrees(in repository: URL,
+                                    fileManager: FileManager = .default,
+                                    isAllowed: (String) -> Bool = { _ in true }) -> [URL] {
         let gitFile = repository.appendingPathComponent(".git")
-        guard let common = commonDirectory(for: gitFile) else { return [] }
+        guard let common = commonDirectory(for: gitFile, isAllowed: isAllowed) else { return [] }
         let registrations = common.appendingPathComponent("worktrees")
         guard isDirectoryWithoutSymlinks(registrations),
               let entries = try? fileManager.contentsOfDirectory(
@@ -17,10 +21,10 @@ enum GitWorktrees {
 
         return entries.compactMap { registration in
             guard isDirectoryWithoutSymlinks(registration),
-                  registrationCommonDirectory(registration)?.path == common.path,
-                  let gitFile = registeredGitFile(registration),
+                  registrationCommonDirectory(registration, isAllowed: isAllowed)?.path == common.path,
+                  let gitFile = registeredGitFile(registration, isAllowed: isAllowed),
                   gitFile.lastPathComponent == ".git",
-                  pointer(in: gitFile)?.path == canonical(registration).path else { return nil }
+                  pointer(in: gitFile, isAllowed: isAllowed)?.path == canonical(registration).path else { return nil }
             let worktree = gitFile.deletingLastPathComponent()
             guard isDirectoryWithoutSymlinks(worktree) else { return nil }
             return canonical(worktree)
@@ -29,7 +33,7 @@ enum GitWorktrees {
 
     /// Checking every component prevents a registration from bypassing the walk's
     /// no-symlink rule through a hidden parent directory or a metadata file.
-    static func hasNoSymlinkComponents(_ url: URL) -> Bool {
+    package static func hasNoSymlinkComponents(_ url: URL) -> Bool {
         var current = URL(fileURLWithPath: "/")
         // standardizedFileURL rewrites /private/var to /var on macOS, introducing
         // a symlink into an already canonical path. Inspect the given spelling.
@@ -43,40 +47,41 @@ enum GitWorktrees {
 
     // MARK: - Reciprocal metadata
 
-    private static func commonDirectory(for gitFile: URL) -> URL? {
+    private static func commonDirectory(for gitFile: URL, isAllowed: (String) -> Bool) -> URL? {
         if isDirectoryWithoutSymlinks(gitFile) { return canonical(gitFile) }
 
         // A linked worktree's .git file points at common/worktrees/<id>. Its
         // commondir and gitdir must lead back to the same common directory and file.
-        guard let registration = pointer(in: gitFile),
-              let common = registrationCommonDirectory(registration),
-              registeredGitFile(registration)?.path == canonical(gitFile).path else { return nil }
+        guard let registration = pointer(in: gitFile, isAllowed: isAllowed),
+              let common = registrationCommonDirectory(registration, isAllowed: isAllowed),
+              registeredGitFile(registration, isAllowed: isAllowed)?.path == canonical(gitFile).path else { return nil }
         return common
     }
 
-    private static func registrationCommonDirectory(_ registration: URL) -> URL? {
+    private static func registrationCommonDirectory(_ registration: URL, isAllowed: (String) -> Bool) -> URL? {
         guard isDirectoryWithoutSymlinks(registration),
               registration.deletingLastPathComponent().lastPathComponent == "worktrees",
               let value = line(in: registration.appendingPathComponent("commondir")),
-              let common = resolve(value, relativeTo: registration),
+              let common = resolve(value, relativeTo: registration, isAllowed: isAllowed),
               isDirectoryWithoutSymlinks(common),
               canonical(common).path == canonical(registration.deletingLastPathComponent()
                 .deletingLastPathComponent()).path else { return nil }
         return canonical(common)
     }
 
-    private static func registeredGitFile(_ registration: URL) -> URL? {
+    private static func registeredGitFile(_ registration: URL, isAllowed: (String) -> Bool) -> URL? {
         guard let value = line(in: registration.appendingPathComponent("gitdir")),
-              let gitFile = resolve(value, relativeTo: registration),
+              let gitFile = resolve(value, relativeTo: registration, isAllowed: isAllowed),
               isRegularFileWithoutSymlinks(gitFile) else { return nil }
         return canonical(gitFile)
     }
 
-    private static func pointer(in gitFile: URL) -> URL? {
+    private static func pointer(in gitFile: URL, isAllowed: (String) -> Bool) -> URL? {
         guard let value = line(in: gitFile), value.hasPrefix("gitdir: ") else { return nil }
         let path = String(value.dropFirst("gitdir: ".count))
         guard !path.isEmpty else { return nil }
-        guard let registration = resolve(path, relativeTo: gitFile.deletingLastPathComponent()),
+        guard let registration = resolve(path, relativeTo: gitFile.deletingLastPathComponent(),
+                                         isAllowed: isAllowed),
               isDirectoryWithoutSymlinks(registration) else { return nil }
         return canonical(registration)
     }
@@ -98,10 +103,13 @@ enum GitWorktrees {
         return value
     }
 
-    private static func resolve(_ path: String, relativeTo directory: URL) -> URL? {
+    private static func resolve(_ path: String, relativeTo directory: URL,
+                                isAllowed: (String) -> Bool) -> URL? {
         let absolutePath = path.hasPrefix("/") ? path : directory.path + "/" + path
         let url = URL(fileURLWithPath: absolutePath)
-        guard hasNoSymlinkComponents(url) else { return nil }
+        // Lexical, before the first lstat: `..` segments are folded so they cannot
+        // walk a refused path past the filter.
+        guard isAllowed(url.standardizedFileURL.path), hasNoSymlinkComponents(url) else { return nil }
         return canonical(url)
     }
 

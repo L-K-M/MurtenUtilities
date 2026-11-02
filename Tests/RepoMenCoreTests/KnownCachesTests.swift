@@ -1,5 +1,5 @@
 import XCTest
-@testable import RepoMen
+@testable import RepoMenCore
 
 /// The fixed-location catalog, exercised against a synthetic home directory.
 final class KnownCachesTests: XCTestCase {

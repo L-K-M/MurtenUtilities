@@ -1,5 +1,5 @@
 import XCTest
-@testable import RepoMen
+@testable import RepoMenCore
 
 /// Integration tests for the walk itself, against a synthetic project tree in a temp
 /// directory — the pruning/descend policy is where deep-scan bugs would live.

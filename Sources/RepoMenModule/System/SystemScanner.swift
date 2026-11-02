@@ -1,4 +1,5 @@
 import Foundation
+import RepoMenCore
 
 /// Detection for `SystemAreas`: one privileged probe (one admin-password prompt)
 /// lists each catalog root's direct child directories with their allocated size and

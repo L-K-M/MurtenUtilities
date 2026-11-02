@@ -1,4 +1,5 @@
 import Foundation
+import RepoMenCore
 
 /// Runs a short POSIX-sh script as root via AppleScript's
 /// `do shell script … with administrator privileges` — macOS shows its standard

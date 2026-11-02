@@ -1,10 +1,11 @@
 import Foundation
 import Combine
+import RepoMenCore
 
-/// App-wide settings, persisted to `UserDefaults` and observable by SwiftUI.
+/// RepoMen's settings, persisted to the module's `UserDefaults` (the suite gives each
+/// module its own domain, so the keys keep their standalone names) and observable
+/// by SwiftUI. The provider owns the one instance.
 final class Preferences: ObservableObject {
-    static let shared = Preferences()
-
     private let defaults: UserDefaults
 
     private enum Key {
@@ -16,13 +17,15 @@ final class Preferences: ObservableObject {
         static let lifetimeReclaimedBytes = "lifetimeReclaimedBytes"
         static let lifetimeReclaimedCount = "lifetimeReclaimedCount"
         static let watchedFolders = "watchedFolders"
-        static let watchAutoTrash = "watchAutoTrash"
-        static let showInMenuBar = "showInMenuBar"
         static let scanAtLaunch = "scanAtLaunch"
         static let lastWatchRun = "lastWatchRun"
-        static let lastWatchDryRunSignature = "lastWatchDryRunSignature"
-        static let launchAtLogin = "launchAtLogin"
+        static let retiredWatchFolders = "retiredWatchFolders"
+        static let autoTrashLog = "autoTrashLog"
     }
+
+    /// Removed folders remembered so the background check can resolve their
+    /// suggestions; bounded, oldest dropped first.
+    static let retiredWatchFolderLimit = 64
 
     /// Folders whose trees are deep-scanned for project artifacts (absolute paths).
     @Published var scanRoots: [String] {
@@ -57,61 +60,59 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(lifetimeReclaimedCount, forKey: Key.lifetimeReclaimedCount) }
     }
 
-    /// Directories RepoMen keeps clean on its own (Settings → Watch), JSON-encoded.
+    /// Directories RepoMen watches (Settings → Watch), JSON-encoded. The suite's
+    /// background check reports on them; auto-trash runs only in folders the user
+    /// armed one by one.
     @Published var watchedFolders: [WatchedFolder] {
-        didSet { defaults.set(try? JSONEncoder().encode(watchedFolders), forKey: Key.watchedFolders) }
+        didSet {
+            defaults.set(try? JSONEncoder().encode(watchedFolders), forKey: Key.watchedFolders)
+            retire(removedFrom: oldValue)
+        }
     }
 
-    /// The watch-mode master switch: while off, watch checks only *report* what
-    /// could be repossessed; nothing is trashed. Automation is opt-in, exactly
-    /// like selection is in the window.
-    @Published var watchAutoTrash: Bool {
-        didSet { defaults.set(watchAutoTrash, forKey: Key.watchAutoTrash) }
-    }
-
-    /// Whether the menu-bar extra (watch status + quick actions) is shown. Off until
-    /// watch mode is actually armed (adding the first watched folder turns it on) —
-    /// an always-on menu-bar presence for users who never watch would be clutter.
-    @Published var showInMenuBar: Bool {
-        didSet { defaults.set(showInMenuBar, forKey: Key.showInMenuBar) }
-    }
-
-    /// Run one scan automatically when the app opens.
+    /// Run one scan automatically when the pane first opens.
     @Published var scanAtLaunch: Bool {
         didSet { defaults.set(scanAtLaunch, forKey: Key.scanAtLaunch) }
     }
 
-    /// Whether the app registers as a login item (Settings → General). A plain
-    /// persisted preference driving the toggle — with a SMAppService-backed binding
-    /// the checkbox never re-rendered on click (nothing published the change).
-    /// Registration is applied on change.
-    @Published var launchAtLogin: Bool {
-        didSet {
-            defaults.set(launchAtLogin, forKey: Key.launchAtLogin)
-            LaunchAtLogin.set(launchAtLogin)
-        }
-    }
-
-    /// The most recent watch check's outcome, for the menu bar and Settings.
+    /// The most recent auto-trash pass, for the menu section and Settings.
     @Published var lastWatchRun: WatchRunRecord? {
         didSet { defaults.set(try? JSONEncoder().encode(lastWatchRun), forKey: Key.lastWatchRun) }
     }
 
-    /// Fingerprint of the last dry-run candidate set a notification went out for,
-    /// so an unchanged finding isn't re-notified every cycle.
-    @Published var lastWatchDryRunSignature: String {
-        didSet { defaults.set(lastWatchDryRunSignature, forKey: Key.lastWatchDryRunSignature) }
+    /// Paths of watched folders the user removed, newest last. The background
+    /// check reports them as checked so their suggestions resolve.
+    @Published private(set) var retiredWatchFolders: [String] {
+        didSet { defaults.set(retiredWatchFolders, forKey: Key.retiredWatchFolders) }
+    }
+
+    /// What armed auto-trash moved to the Trash or left alone, newest first.
+    @Published var autoTrashLog: [AutoTrashLogEntry] {
+        didSet { defaults.set(try? JSONEncoder().encode(autoTrashLog), forKey: Key.autoTrashLog) }
     }
 
     /// Adds a folder to the watched set (deduped, inheriting the current idle
-    /// threshold) and surfaces the menu-bar presence, so watch mode actually runs.
+    /// threshold, auto-trash unarmed).
     func watchFolder(path: String) {
         guard !watchedFolders.contains(where: { $0.path == path }) else { return }
         watchedFolders.append(WatchedFolder(path: path, maxIdleDays: idleDays))
-        showInMenuBar = true
     }
 
-    init(defaults: UserDefaults = .standard) {
+    /// The settings the background check reads, snapshotted for one poll.
+    var watchSettings: StaleWatchSettings {
+        StaleWatchSettings(folders: watchedFolders, retiredPaths: retiredWatchFolders,
+                           excludedPaths: Set(excludedPaths), enabledKinds: enabledKinds)
+    }
+
+    private func retire(removedFrom previous: [WatchedFolder]) {
+        let current = Set(watchedFolders.map(\.path))
+        let removed = previous.map(\.path).filter { !current.contains($0) }
+        let kept = retiredWatchFolders.filter { !current.contains($0) && !removed.contains($0) }
+        let updated = Array((kept + removed).suffix(Self.retiredWatchFolderLimit))
+        if updated != retiredWatchFolders { retiredWatchFolders = updated }
+    }
+
+    init(defaults: UserDefaults) {
         self.defaults = defaults
         self.scanRoots = defaults.stringArray(forKey: Key.scanRoots)
             ?? Self.defaultScanRoots()
@@ -123,14 +124,12 @@ final class Preferences: ObservableObject {
         self.lifetimeReclaimedCount = defaults.integer(forKey: Key.lifetimeReclaimedCount)
         self.watchedFolders = (defaults.data(forKey: Key.watchedFolders)
             .flatMap { try? JSONDecoder().decode([WatchedFolder].self, from: $0) }) ?? []
-        // Off until the user arms it: watch mode reports before it ever trashes.
-        self.watchAutoTrash = defaults.object(forKey: Key.watchAutoTrash) as? Bool ?? false
-        self.showInMenuBar = defaults.object(forKey: Key.showInMenuBar) as? Bool ?? false
         self.scanAtLaunch = defaults.object(forKey: Key.scanAtLaunch) as? Bool ?? false
-        self.launchAtLogin = defaults.object(forKey: Key.launchAtLogin) as? Bool ?? false
         self.lastWatchRun = defaults.data(forKey: Key.lastWatchRun)
             .flatMap { try? JSONDecoder().decode(WatchRunRecord.self, from: $0) }
-        self.lastWatchDryRunSignature = defaults.string(forKey: Key.lastWatchDryRunSignature) ?? ""
+        self.retiredWatchFolders = defaults.stringArray(forKey: Key.retiredWatchFolders) ?? []
+        self.autoTrashLog = defaults.data(forKey: Key.autoTrashLog)
+            .flatMap { try? JSONDecoder().decode([AutoTrashLogEntry].self, from: $0) } ?? []
     }
 
     var enabledKinds: Set<ArtifactKind> {

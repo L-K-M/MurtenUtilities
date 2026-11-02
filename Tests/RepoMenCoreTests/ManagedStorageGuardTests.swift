@@ -1,5 +1,5 @@
 import XCTest
-@testable import RepoMen
+@testable import RepoMenCore
 
 final class ManagedStorageGuardTests: XCTestCase {
     private let home = "/Users/test"

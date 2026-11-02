@@ -2,8 +2,8 @@ import Foundation
 
 /// Storage whose owner must decide what to remove. Never a CleanableItem: these
 /// measurements cannot enter reclaim totals, checkboxes or watch automation.
-struct ManagedStorageArea: Identifiable, Sendable {
-    enum State: Equatable, Sendable {
+package struct ManagedStorageArea: Identifiable, Sendable {
+    package enum State: Equatable, Sendable {
         case unmeasured
         case missing
         case measured(Int64)
@@ -11,12 +11,12 @@ struct ManagedStorageArea: Identifiable, Sendable {
         case failed(String)
     }
 
-    let id: String
-    let title: String
-    let path: String
-    let instructions: String
-    let documentationURL: URL
-    let applicationBundleIDs: [String]
-    var command: String? = nil
-    var state: State = .unmeasured
+    package let id: String
+    package let title: String
+    package let path: String
+    package let instructions: String
+    package let documentationURL: URL
+    package let applicationBundleIDs: [String]
+    package var command: String? = nil
+    package var state: State = .unmeasured
 }

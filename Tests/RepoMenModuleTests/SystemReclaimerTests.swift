@@ -1,5 +1,6 @@
 import XCTest
-@testable import RepoMen
+@testable import RepoMenModule
+@testable import RepoMenCore
 
 /// The privileged deletion path: what goes into the batch script, and how its
 /// per-path verdicts come back out. The runner is injected — no test ever spawns

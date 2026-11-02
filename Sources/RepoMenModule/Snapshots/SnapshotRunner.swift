@@ -1,4 +1,5 @@
 import Foundation
+import RepoMenCore
 
 /// Runs Apple's `tmutil` (`/usr/bin/tmutil`) directly — no shell, arguments as an
 /// array — as the current user. The local-snapshot verbs are not among those the

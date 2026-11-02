@@ -1,5 +1,5 @@
 import XCTest
-@testable import RepoMen
+@testable import RepoMenCore
 
 /// Reclaim-time re-verification: what actually gets deleted, and what refuses to.
 /// Uses `.delete` against a synthetic home so tests don't fill the real Trash.

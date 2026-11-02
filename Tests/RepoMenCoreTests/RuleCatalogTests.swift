@@ -1,5 +1,5 @@
 import XCTest
-@testable import RepoMen
+@testable import RepoMenCore
 
 /// Pure matching tests — the whole "is this really a build artifact" contract.
 final class RuleCatalogTests: XCTestCase {

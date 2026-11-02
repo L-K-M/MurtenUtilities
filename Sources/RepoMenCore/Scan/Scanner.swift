@@ -1,13 +1,29 @@
 import Foundation
 
 /// Everything a scan needs, snapshotted up front so the walk runs detached from the UI.
-struct ScanConfiguration: Sendable {
-    var roots: [URL]
-    var excludedPaths: Set<String>
-    var enabledKinds: Set<ArtifactKind>
+package struct ScanConfiguration: Sendable {
+    package var roots: [URL]
+    package var excludedPaths: Set<String>
+    package var enabledKinds: Set<ArtifactKind>
     /// Levels below each root; deep enough for monorepos, a stop for pathological trees.
-    var maxDepth: Int = 16
-    var home: URL = FileManager.default.homeDirectoryForCurrentUser
+    package var maxDepth: Int = 16
+    package var home: URL = FileManager.default.homeDirectoryForCurrentUser
+    /// Folders the walk must never read inside, not even through a Git worktree
+    /// registration: privacy-protected locations, for scans nobody is watching
+    /// (`ProtectedLocations`). Empty for the pane's own scans, which may prompt.
+    package var protectedRoots: [String] = []
+
+    package init(roots: [URL], excludedPaths: Set<String>, enabledKinds: Set<ArtifactKind>,
+                 maxDepth: Int = 16,
+                 home: URL = FileManager.default.homeDirectoryForCurrentUser,
+                 protectedRoots: [String] = []) {
+        self.roots = roots
+        self.excludedPaths = excludedPaths
+        self.enabledKinds = enabledKinds
+        self.maxDepth = maxDepth
+        self.home = home
+        self.protectedRoots = protectedRoots
+    }
 }
 
 /// Walks the configured dev roots and reports every directory the `RuleCatalog`
@@ -22,7 +38,7 @@ struct ScanConfiguration: Sendable {
 ///   verified through Git's reciprocal registration metadata,
 /// - unambiguous artifact names that failed to anchor are skipped, generic ones
 ///   (`build`, `target`) are descended — they might be ordinary folders.
-enum Scanner {
+package enum Scanner {
 
     /// Directories never worth entering regardless of rules.
     private static let alwaysSkip: Set<String> = [".git", ".svn", ".hg", ".trash"]
@@ -37,13 +53,20 @@ enum Scanner {
 
     /// Synchronous walk — call from a background task; honors `Task` cancellation.
     /// `progress` is invoked on the walking thread with the directory being visited.
-    static func scan(_ config: ScanConfiguration,
+    package static func scan(_ config: ScanConfiguration,
                      fileManager: FileManager = .default,
                      progress: ((String) -> Void)? = nil) -> [CleanableItem] {
         var items: [CleanableItem] = []
         var visited = Set<String>()
         var effectiveConfig = config
-        effectiveConfig.excludedPaths = Set(config.excludedPaths.map {
+        // Protected roots join the exclusions, so the walk skips them like any
+        // excluded folder: listed as a child, never entered. Exclusions that lead
+        // into one are dropped before canonicalizing would look inside.
+        let exclusions = config.excludedPaths.filter {
+            config.protectedRoots.isEmpty
+                || ProtectedLocations.classify($0, roots: config.protectedRoots) == .allowed
+        }
+        effectiveConfig.excludedPaths = Set((Array(exclusions) + config.protectedRoots).map {
             canonicalRoot(URL(fileURLWithPath: $0)).path
         })
         let scopeRoots = config.roots.map(canonicalRoot)
@@ -62,7 +85,7 @@ enum Scanner {
     /// Existing paths are canonicalized to their true on-disk
     /// spelling first, so case-variant duplicates on (default, case-insensitive) APFS
     /// collapse too — item ids are paths, and one physical folder must yield one id.
-    static func normalizedRoots(_ roots: [URL]) -> [URL] {
+    package static func normalizedRoots(_ roots: [URL]) -> [URL] {
         let canonical = roots.map(canonicalRoot)
         var seen = Set<String>()
         return canonical.filter { candidate in
@@ -97,7 +120,11 @@ enum Scanner {
         let parentName = directory.lastPathComponent
 
         if siblingNames.contains(".git") {
-            for worktree in GitWorktrees.registeredWorktrees(in: directory, fileManager: fileManager) {
+            let isAllowed = { (path: String) in
+                !ProtectedLocations.contains(path, roots: config.protectedRoots)
+            }
+            for worktree in GitWorktrees.registeredWorktrees(in: directory, fileManager: fileManager,
+                                                             isAllowed: isAllowed) {
                 guard !visited.contains(worktree.path),
                       let worktreeDepth = scanRootDepth(worktree, scopeRoots: scopeRoots,
                                                        config: config, fileManager: fileManager) else { continue }
