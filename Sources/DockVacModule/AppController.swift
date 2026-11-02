@@ -1,13 +1,24 @@
 import AppKit
 import DockVacCore
 import DockVacDocker
+import MurtenCore
 
 /// Application state and every user action. Views render what it hands them and call
 /// back through `ReportActions`; Docker work goes through `DockerService`.
+///
+/// In the suite the controller outlives its views: the provider keeps one for the app's
+/// lifetime, and every time the suite builds the pane it attaches a fresh
+/// `PaneViewController`. With no pane attached, actions still update state and the next
+/// pane renders it.
 @MainActor
-final class AppController: NSObject, ReportActions, DockerServiceDelegate, NSMenuItemValidation {
-  let windowController = MainWindowController()
-  private let service = DockerService()
+final class AppController: NSObject, ReportActions, DockerServiceDelegate {
+  /// The pane on screen, if any.
+  private(set) weak var pane: PaneViewController?
+  /// What the pane's bar and the suite's Tool menu offer right now.
+  let chrome = PaneChrome()
+  /// Called when a cleanup run ends, so the suite re-checks Docker sooner.
+  var onCleanupFinished: (@MainActor () -> Void)?
+  private let service: DockerService
 
   private(set) var phase: AppPhase = .idle
   private(set) var report: UsageReport = .empty {
@@ -29,7 +40,16 @@ final class AppController: NSObject, ReportActions, DockerServiceDelegate, NSMen
   private var confirmationSheet: ConfirmationSheetController?
   private var progressSheet: CleanupProgressSheetController?
   private var lastRunState: CleanupRunState?
-  private var smokeScriptStarted = false
+  /// The suite window the confirmation sheet was attached to. The progress sheet uses
+  /// it too, so a confirmed cleanup still shows its progress after the user navigated
+  /// to another tool while the confirmation was up.
+  private weak var sheetHost: NSWindow?
+  /// Whether the first scan has started; the pane scans on first open, not at launch.
+  private var started = false
+  /// The endpoint a suggestion asked to reclaim, until the scan it started finishes.
+  private var pendingPreselection: String?
+  /// What opening a suggestion did, shown above the report until dismissed.
+  private(set) var notice: String?
 
   var isCleaning: Bool { service.isCleaning }
 
@@ -43,18 +63,89 @@ final class AppController: NSObject, ReportActions, DockerServiceDelegate, NSMen
     phase.isScanning ? scanningConnection : connection
   }
 
-  override init() {
+  init(service: DockerService = DockerService()) {
+    self.service = service
     super.init()
     service.delegate = self
-    windowController.controller = self
-    windowController.reportView.actions = self
-    windowController.scanningView.onCancel = { [weak self] in self?.cancelScan() }
-    windowController.messageView.onAction = { [weak self] in self?.rescan(nil) }
   }
 
-  func start() {
-    windowController.showWindow(nil)
+  // MARK: - Pane
+
+  func attach(_ pane: PaneViewController) {
+    self.pane = pane
+    pane.controller = self
+    pane.reportView.actions = self
+    pane.scanningView.onCancel = { [weak self] in self?.cancelScan() }
+    pane.messageView.onAction = { [weak self] in self?.rescan(nil) }
+    pane.onDismissNotice = { [weak self] in self?.dismissNotice() }
+    render()
+  }
+
+  func detach(_ pane: PaneViewController) {
+    guard self.pane === pane else { return }
+    self.pane = nil
+  }
+
+  /// The pane appeared, opened by `route`: nil or a bare route for a tile click. The
+  /// first opening scans. A reclaim route re-scans its endpoint and, once that scan
+  /// completes, selects what Docker can rebuild there. It never starts a removal.
+  func open(_ route: ModuleRoute?) {
+    if let route, route.action == DockVacSuite.reclaimAction,
+      let endpoint = route.context[DockVacSuite.endpointContext]
+    {
+      reclaim(endpoint: endpoint)
+      return
+    }
+    guard !started else { return }
     rescan(nil)
+  }
+
+  private func reclaim(endpoint: String) {
+    guard !service.isCleaning, !isSheetPresented else {
+      notice =
+        "Finish the cleanup or close the open sheet, then open the suggestion again. Nothing was selected."
+      render()
+      return
+    }
+
+    let target: DockerConnectionTarget
+    if endpoint.lowercased().hasPrefix("\(DockerSSHHost.scheme)://") {
+      guard let host = try? DockerSSHHost(endpoint) else {
+        notice =
+          "The suggestion names an endpoint DockVac cannot use (\(endpoint)). Nothing was selected."
+        render()
+        return
+      }
+      target = .ssh(host)
+    } else {
+      // The watcher found this socket through the automatic search; the same search
+      // finds it again, and the scan below checks that it did.
+      target = .automatic
+    }
+    selectConnection(target, preselectingFor: endpoint)
+  }
+
+  /// Selects the safe level, and only it, when the scan reached the suggestion's endpoint.
+  /// The basket is replaced so the selection is exactly what the suggestion counted:
+  /// containers, volumes and re-pullable images are never part of it.
+  private func applyPreselection(for endpoint: String) {
+    guard let connection, connection.endpoint.address == endpoint else {
+      let reached = connection?.endpoint.address ?? "no daemon"
+      notice =
+        "The suggestion was for Docker at \(endpoint), but DockVac reached \(reached). Nothing was selected."
+      return
+    }
+    let plan = automaticPlans[.safe] ?? .empty
+    basket = Set(plan.operations.map(\.id))
+    notice =
+      plan.isEmpty
+      ? "Nothing Docker can rebuild is left at \(endpoint)."
+      : "Selected what Docker can rebuild: \(plan.summary), about \(ByteFormat.string(plan.estimatedReclaimableBytes)). Nothing is removed until you review and confirm."
+  }
+
+  func dismissNotice() {
+    notice = nil
+    render()
   }
 
   // MARK: - Derived state
@@ -102,6 +193,14 @@ final class AppController: NSObject, ReportActions, DockerServiceDelegate, NSMen
 
   @objc func rescan(_ sender: Any?) {
     guard !service.isCleaning, !isSheetPresented else { return }
+    pendingPreselection = nil
+    notice = nil
+    startScan()
+  }
+
+  private func startScan() {
+    guard !service.isCleaning, !isSheetPresented else { return }
+    started = true
     phase = .connecting
     scanningConnection = nil
     scanStartedAt = Date()
@@ -113,6 +212,10 @@ final class AppController: NSObject, ReportActions, DockerServiceDelegate, NSMen
   func cancelScan() {
     service.cancelScan()
     stopScanTimer()
+    if pendingPreselection != nil {
+      pendingPreselection = nil
+      notice = "The scan was cancelled, so the suggestion selected nothing."
+    }
     phase = report.itemCount > 0 && report.capturedAt.timeIntervalSince1970 > 0 ? .report : .idle
     render()
   }
@@ -122,7 +225,7 @@ final class AppController: NSObject, ReportActions, DockerServiceDelegate, NSMen
     scanTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
       Task { @MainActor [weak self] in
         guard let self, self.phase.isScanning else { return }
-        self.windowController.scanningView.apply(
+        self.pane?.scanningView.apply(
           phase: self.phase, connection: self.displayedConnection, target: self.service.target,
           startedAt: self.scanStartedAt)
       }
@@ -167,8 +270,15 @@ final class AppController: NSObject, ReportActions, DockerServiceDelegate, NSMen
         self.focus = nil
       }
       phase = .report
-      runSmokeScriptIfRequested()
+      if let endpoint = pendingPreselection {
+        pendingPreselection = nil
+        applyPreselection(for: endpoint)
+      }
     case .failure(let error):
+      if pendingPreselection != nil {
+        pendingPreselection = nil
+        notice = "The scan did not finish, so the suggestion selected nothing."
+      }
       if error is CancellationError {
         phase = report.capturedAt.timeIntervalSince1970 > 0 ? .report : .idle
       } else {
@@ -187,7 +297,7 @@ final class AppController: NSObject, ReportActions, DockerServiceDelegate, NSMen
   // MARK: - Connections
 
   @objc func connectViaSSH(_ sender: Any?) {
-    guard !isSheetPresented, !service.isCleaning, let window = windowController.window else {
+    guard !isSheetPresented, !service.isCleaning, let window = pane?.view.window else {
       return
     }
     cancelScan()
@@ -218,7 +328,9 @@ final class AppController: NSObject, ReportActions, DockerServiceDelegate, NSMen
     selectConnection(.local)
   }
 
-  private func selectConnection(_ target: DockerConnectionTarget) {
+  private func selectConnection(
+    _ target: DockerConnectionTarget, preselectingFor endpoint: String? = nil
+  ) {
     service.selectTarget(target)
     connection = nil
     scanningConnection = nil
@@ -227,7 +339,9 @@ final class AppController: NSObject, ReportActions, DockerServiceDelegate, NSMen
     selectedItem = nil
     selectedCategory = nil
     focus = nil
-    rescan(nil)
+    pendingPreselection = endpoint
+    notice = nil
+    startScan()
   }
 
   // MARK: - ReportActions
@@ -325,7 +439,7 @@ final class AppController: NSObject, ReportActions, DockerServiceDelegate, NSMen
 
   private func confirm(_ plan: CleanupPlan) {
     guard phase == .report, !service.isCleaning, !isSheetPresented,
-      let window = windowController.window, let connection
+      let window = pane?.view.window, let connection
     else { return }
     guard !plan.isEmpty || !plan.exclusions.isEmpty else { return }
     let sheet = ConfirmationSheetController(
@@ -336,16 +450,23 @@ final class AppController: NSObject, ReportActions, DockerServiceDelegate, NSMen
       self.confirmationSheet = nil
       if confirmed, !plan.isEmpty {
         self.runCleanup(plan)
+      } else {
+        self.refreshChrome()
       }
     }
     confirmationSheet = sheet
+    sheetHost = window
     if let sheetWindow = sheet.window {
       window.beginSheet(sheetWindow) { _ in }
     }
+    refreshChrome()
   }
 
   private func runCleanup(_ plan: CleanupPlan) {
-    guard let window = windowController.window else { return }
+    guard let window = sheetHost ?? pane?.view.window else {
+      refreshChrome()
+      return
+    }
     let initial = CleanupRunState(plan: plan)
     lastRunState = initial
     let sheet = CleanupProgressSheetController(
@@ -368,7 +489,7 @@ final class AppController: NSObject, ReportActions, DockerServiceDelegate, NSMen
       window.beginSheet(sheetWindow) { _ in }
     }
     service.runCleanup(plan)
-    windowController.updateChrome(connection: connection, filter: filter, phase: phase)
+    refreshChrome()
   }
 
   func serviceDidReportCleanupProgress(_ state: CleanupRunState) {
@@ -379,7 +500,8 @@ final class AppController: NSObject, ReportActions, DockerServiceDelegate, NSMen
   func serviceDidFinishCleanup(_ state: CleanupRunState) {
     lastRunState = state
     progressSheet?.apply(state)
-    windowController.updateChrome(connection: connection, filter: filter, phase: phase)
+    refreshChrome()
+    onCleanupFinished?()
   }
 
   // MARK: - Menu actions
@@ -427,109 +549,65 @@ final class AppController: NSObject, ReportActions, DockerServiceDelegate, NSMen
     }
   }
 
-  func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-    guard let action = menuItem.action, !isSheetPresented else { return false }
-    let inReport = phase == .report && !service.isCleaning
-    switch action {
-    case #selector(connectViaSSH(_:)), #selector(useLocalDocker(_:)):
-      return !service.isCleaning
-    case #selector(rescan(_:)):
-      return !phase.isScanning && !service.isCleaning
-    case #selector(goBack(_:)):
-      return inReport && focus != nil
-    case #selector(showEverything(_:)):
-      menuItem.state = filter == .everything ? .on : .off
-      return inReport
-    case #selector(showReclaimable(_:)):
-      menuItem.state = filter == .reclaimable ? .on : .off
-      return inReport
-    case #selector(toggleSelectedInBasket(_:)):
-      guard inReport, let selectedItem, let item = report.item(for: selectedItem) else {
-        menuItem.title = "Add Selected Item to Cleanup"
-        return false
-      }
-      menuItem.title =
-        basket.contains(selectedItem)
-        ? "Remove Selected Item from Cleanup" : "Add Selected Item to Cleanup"
-      return !item.removability.isBlocked
-    case #selector(addSafeItems(_:)):
-      return inReport && automaticPlans[.safe]?.isEmpty == false
-    case #selector(automaticCleanupSafe(_:)):
-      return inReport && automaticPlans[.safe]?.isEmpty == false
-    case #selector(automaticCleanupThorough(_:)):
-      return inReport && automaticPlans[.thorough]?.isEmpty == false
-    case #selector(clearBasketAction(_:)):
-      return inReport && !basket.isEmpty
-    case #selector(reviewAndRemoveAction(_:)):
-      return inReport && !basket.isEmpty
-    default:
-      return true
-    }
+  /// What the pane's bar and the Tool menu may offer: the rules the standalone app's
+  /// toolbar and menu validation applied.
+  private func makeChromeState() -> ChromeState {
+    let idle = !isSheetPresented
+    let inReport = idle && phase == .report && !service.isCleaning
+    let selected = selectedItem.flatMap { report.item(for: $0) }
+    return ChromeState(
+      connectionSummary: displayedConnection?.summary ?? "",
+      filter: filter,
+      canFilter: idle && phase == .report,
+      canGoBack: inReport && focus != nil,
+      canRescan: idle && !phase.isScanning && !service.isCleaning,
+      canChangeConnection: idle && !service.isCleaning,
+      canToggleSelected: inReport && selected?.removability.isBlocked == false,
+      selectedIsInBasket: selectedItem.map { basket.contains($0) } ?? false,
+      canAddSafe: inReport && automaticPlans[.safe]?.isEmpty == false,
+      canCleanUpSafe: inReport && automaticPlans[.safe]?.isEmpty == false,
+      canCleanUpThorough: inReport && automaticPlans[.thorough]?.isEmpty == false,
+      canClearBasket: inReport && !basket.isEmpty,
+      canReview: inReport && !basket.isEmpty,
+      notice: notice)
   }
 
-  // MARK: - Smoke script
-
-  /// `DOCKVAC_SMOKE_SCRIPT=focus-images,select-first,add-safe,review` walks through the UI
-  /// three seconds per step after the first scan, so CI can screenshot each screen. Steps only
-  /// change what is shown; nothing is ever confirmed or removed.
-  private func runSmokeScriptIfRequested() {
-    guard !smokeScriptStarted,
-      let script = ProcessInfo.processInfo.environment["DOCKVAC_SMOKE_SCRIPT"], !script.isEmpty
-    else { return }
-    smokeScriptStarted = true
-    let steps = script.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-    for (index, step) in steps.enumerated() {
-      Task { @MainActor [weak self] in
-        try? await Task.sleep(nanoseconds: UInt64(index + 1) * 3_000_000_000)
-        self?.performSmokeStep(step)
-      }
-    }
-  }
-
-  private func performSmokeStep(_ step: String) {
-    switch step {
-    case "focus-images": focus(on: .images)
-    case "focus-containers": focus(on: .containers)
-    case "focus-volumes": focus(on: .localVolumes)
-    case "focus-build-cache": focus(on: .buildCache)
-    case "back": focus(on: nil)
-    case "select-first":
-      let items =
-        focus.flatMap { displayedReport.category(for: $0)?.items } ?? displayedReport.items
-      select(item: items.first?.id)
-    case "add-safe": addSafeItems(nil)
-    case "auto-safe": runAutomaticCleanup(.safe)
-    case "auto-thorough": runAutomaticCleanup(.thorough)
-    case "filter-reclaimable": setFilter(.reclaimable)
-    case "review": reviewAndRemove()
-    default: break
+  private func refreshChrome() {
+    let state = makeChromeState()
+    pane?.apply(state)
+    // Observation notifies on every assignment; only a real change should rebuild the
+    // Tool menu.
+    if chrome.state != state {
+      chrome.state = state
     }
   }
 
   // MARK: - Rendering
 
   private func render() {
+    defer { refreshChrome() }
+    guard let pane else { return }
     switch phase {
     case .idle:
-      windowController.messageView.apply(
-        icon: NSApp.applicationIconImage,
+      pane.messageView.apply(
+        icon: Theme.dockVacIcon,
         headline: "Ready to scan Docker",
         message:
           "DockVac shows what Docker keeps on disk and lets you remove exactly the pieces you choose. Nothing is deleted without your confirmation.",
         details: "",
         action: "Scan Docker")
-      windowController.show(windowController.messageView)
+      pane.show(pane.messageView)
     case .connecting, .scanning:
-      windowController.scanningView.apply(
+      pane.scanningView.apply(
         phase: phase, connection: displayedConnection, target: service.target,
         startedAt: scanStartedAt)
-      windowController.show(windowController.scanningView)
+      pane.show(pane.scanningView)
     case .report:
-      windowController.reportView.apply(viewState)
-      windowController.show(windowController.reportView)
+      pane.reportView.apply(viewState)
+      pane.show(pane.reportView)
     case .failed(let title, let message):
       let (body, details) = splitErrorMessage(message)
-      windowController.messageView.apply(
+      pane.messageView.apply(
         icon: Theme.symbol(
           "exclamationmark.triangle", pointSize: 72, weight: .light, color: .systemOrange),
         headline: title,
@@ -537,9 +615,8 @@ final class AppController: NSObject, ReportActions, DockerServiceDelegate, NSMen
           ? "Start Docker Desktop (or OrbStack, Colima, Rancher Desktop) and try again." : body,
         details: details,
         action: "Try Again")
-      windowController.show(windowController.messageView)
+      pane.show(pane.messageView)
     }
-    windowController.updateChrome(connection: displayedConnection, filter: filter, phase: phase)
   }
 
   /// The first line is the headline explanation; the rest are the technical details.

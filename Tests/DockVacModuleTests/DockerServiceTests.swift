@@ -2,7 +2,7 @@ import DockVacCore
 import DockVacDocker
 import XCTest
 
-@testable import DockVac
+@testable import DockVacModule
 
 final class DockerServiceTests: XCTestCase {
   @MainActor

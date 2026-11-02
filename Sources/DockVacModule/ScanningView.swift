@@ -17,7 +17,7 @@ final class ScanningView: NSView {
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
     ring.translatesAutoresizingMaskIntoConstraints = false
-    ring.icon = NSApp.applicationIconImage
+    ring.icon = Theme.dockVacIcon
     ring.fraction = nil
 
     cancelButton.target = self

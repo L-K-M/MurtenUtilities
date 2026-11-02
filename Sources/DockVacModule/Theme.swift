@@ -43,6 +43,9 @@ enum Theme {
     return image.withSymbolConfiguration(configuration)
   }
 
+  /// DockVac's own icon. Inside the suite `NSApp.applicationIconImage` is the suite's.
+  static let dockVacIcon: NSImage? = Bundle.dockVacModule.image(forResource: "DockVacIcon")
+
   static var treemapBackground: NSColor { .underPageBackgroundColor }
   static var panelBackground: NSColor { .controlBackgroundColor }
 
