@@ -60,6 +60,23 @@ final class ScannerTests: XCTestCase {
         try Data("../..\n".utf8).write(to: registration.appendingPathComponent("commondir"))
     }
 
+    func testConfiguredHomeLibraryIsNeverWalked() throws {
+        try make(dirs: ["Library/Application Support/App/node_modules", "dev/app/target"],
+                 files: ["Library/Application Support/App/package.json", "dev/app/Cargo.toml"])
+        let library = root.appendingPathComponent("Library")
+        for scanRoot in [root!, library, library.appendingPathComponent("Application Support")] {
+            let found = Scanner.scan(ScanConfiguration(
+                roots: [scanRoot], excludedPaths: [], enabledKinds: Set(ArtifactKind.allCases),
+                home: root))
+
+            XCTAssertFalse(found.contains { PathGuards.isUnder($0.path, root: library.path) },
+                           scanRoot.path)
+            if scanRoot == root {
+                XCTAssertEqual(found.map(\.path), [root.appendingPathComponent("dev/app/target").path])
+            }
+        }
+    }
+
     func testFindsRegisteredHiddenWorktreesWithoutEnteringOtherHiddenTrees() throws {
         try registerWorktree("project/.claude/worktrees/editor")
         try make(dirs: ["project/.claude/worktrees/editor/.build",

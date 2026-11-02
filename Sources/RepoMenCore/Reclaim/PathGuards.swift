@@ -68,7 +68,9 @@ package enum PathGuards {
         guard !components.contains("..") && !components.contains(".") else {
             return Violation(reason: "path contains relative components")
         }
-        let home = home.hasSuffix("/") ? String(home.dropLast()) : home
+        // Compare one spelling so repeated separators cannot bypass safety checks.
+        let path = "/" + components.joined(separator: "/")
+        let home = "/" + home.split(separator: "/").joined(separator: "/")
         guard path != home, path.hasPrefix(home + "/") else {
             return Violation(reason: "outside the home folder")
         }

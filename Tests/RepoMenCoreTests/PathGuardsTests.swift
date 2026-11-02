@@ -64,6 +64,14 @@ final class PathGuardsTests: XCTestCase {
         XCTAssertNil(violation("/Users/test/Library/Developer/Xcode/DerivedData/App-abc"))
     }
 
+    func testRepeatedSeparatorsCannotBypassProtectedPaths() {
+        for path in ["/Users/test//Library/Caches", "/Users/test/Library//Application Support",
+                     "/Users/test//.cache/uv/archive"] {
+            XCTAssertNotNil(violation(path), path)
+        }
+        XCTAssertNil(violation("/Users/test//dev/app/target"))
+    }
+
     func testIsUnder() {
         XCTAssertTrue(PathGuards.isUnder("/a/b/c", root: "/a/b"))
         XCTAssertTrue(PathGuards.isUnder("/a/b", root: "/a/b"))

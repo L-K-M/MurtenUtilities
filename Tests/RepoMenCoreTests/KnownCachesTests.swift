@@ -43,6 +43,16 @@ final class KnownCachesTests: XCTestCase {
                           isRunning: isRunning)
     }
 
+    func testSymlinkedCatalogRootsAreNotOffered() throws {
+        try make(["elsewhere/cache", "elsewhere/derived/App-abc", "Library/Developer/Xcode"])
+        try fileManager.createSymbolicLink(at: home.appendingPathComponent(".ccache"),
+                                           withDestinationURL: home.appendingPathComponent("elsewhere/cache"))
+        try fileManager.createSymbolicLink(at: home.appendingPathComponent("Library/Developer/Xcode/DerivedData"),
+                                           withDestinationURL: home.appendingPathComponent("elsewhere/derived"))
+
+        XCTAssertTrue(items(enabled: [.compilerCache, .derivedData]).isEmpty)
+    }
+
     func testOnlyExistingLocationsAppear() throws {
         try make(["Library/Caches/Homebrew/downloads"])
         let found = items()

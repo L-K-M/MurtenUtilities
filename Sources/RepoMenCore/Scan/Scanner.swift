@@ -48,9 +48,9 @@ package enum Scanner {
     /// else there (Containers, Mail, Application Support) is app data that can look
     /// exactly like a build artifact (an app-shipped node_modules with its
     /// package.json). PLAN.md's "never enters ~/Library/Containers", enforced.
-    private static let userLibraryPath = canonicalRoot(
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library")
-    ).path
+    private static func userLibraryPath(home: URL) -> String {
+        canonicalRoot(home.appendingPathComponent("Library")).path
+    }
 
     /// Synchronous walk — call from a background task; honors `Task` cancellation.
     /// `progress` is invoked on the walking thread with the directory being visited.
@@ -134,6 +134,7 @@ package enum Scanner {
             }
         }
 
+        let libraryPath = userLibraryPath(home: config.home)
         for child in children {
             guard !Task.isCancelled else { return }
             let values = try? child.resourceValues(forKeys: Set(keys))
@@ -144,7 +145,7 @@ package enum Scanner {
             guard !alwaysSkip.contains(name.lowercased()), values?.isPackage != true,
                   !isExcluded(childPath, config: config),
                   !PathGuards.requiresOwnerCleanup(path: childPath, home: config.home.path),
-                  childPath != userLibraryPath else { continue }
+                  childPath != libraryPath else { continue }
 
             if let match = RuleCatalog.match(
                 directoryName: name,
@@ -186,7 +187,7 @@ package enum Scanner {
     /// package/artifact/protected ancestor that the ordinary walk would prune.
     private static func scanRootDepth(_ directory: URL, scopeRoots: [URL],
                                       config: ScanConfiguration, fileManager: FileManager) -> Int? {
-        guard !PathGuards.isUnder(directory.path, root: userLibraryPath),
+        guard !PathGuards.isUnder(directory.path, root: userLibraryPath(home: config.home)),
               !PathGuards.requiresOwnerCleanup(path: directory.path, home: config.home.path),
               !isExcluded(directory.path, config: config),
               GitWorktrees.hasNoSymlinkComponents(directory) else { return nil }

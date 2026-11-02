@@ -160,7 +160,7 @@ package enum KnownCaches {
 
         for spec in specs where enabledKinds.contains(spec.kind) {
             let root = home.appendingPathComponent(spec.relativePath)
-            guard directoryExists(root, fileManager) else { continue }
+            guard isNonSymlinkDirectory(root) else { continue }
             let warning: String? = {
                 guard let appName = spec.appName,
                       spec.bundleIDs.contains(where: isRunning) else { return nil }
