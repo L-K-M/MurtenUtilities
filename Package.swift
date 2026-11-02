@@ -30,8 +30,33 @@ let suiteTargets: [Target] = [
 // conflicting.
 
 // MARK: DockVac
-let dockVacTargets: [Target] = []
-let dockVacModule: [Target.Dependency] = []
+// DockVac's own targets kept Swift 6 language mode; the fake daemon and SSH
+// bridge its driver tests spawn live in Tests/DockVacDockerTests/Scripts.
+let dockVacSwift6: [SwiftSetting] = [.swiftLanguageMode(.v6)]
+let dockVacTargets: [Target] = [
+    // MurtenCore only for the suggestion rule, which stays pure.
+    .target(name: "DockVacCore", dependencies: ["MurtenCore"], swiftSettings: dockVacSwift6),
+    .target(name: "DockVacDocker", dependencies: ["DockVacCore"], swiftSettings: dockVacSwift6),
+    // The pane, the watcher and the provider; the standalone app's AppKit views.
+    .target(
+        name: "DockVacModule",
+        dependencies: [
+            "DockVacCore", "DockVacDocker", "MurtenCore", "MurtenModuleKit",
+            .product(name: "RigiUI", package: "Rigi")
+        ],
+        resources: [.copy("Resources/DockVacIcon.png")], swiftSettings: dockVacSwift6),
+    .testTarget(
+        name: "DockVacCoreTests", dependencies: ["DockVacCore", "MurtenCore"],
+        resources: [.copy("Fixtures")], swiftSettings: dockVacSwift6),
+    .testTarget(
+        name: "DockVacDockerTests", dependencies: ["DockVacDocker", "DockVacCore"],
+        exclude: ["Scripts"], swiftSettings: dockVacSwift6),
+    .testTarget(
+        name: "DockVacModuleTests",
+        dependencies: ["DockVacModule", "DockVacCore", "DockVacDocker", "MurtenCore", "MurtenModuleKit"],
+        swiftSettings: dockVacSwift6)
+]
+let dockVacModule: [Target.Dependency] = ["DockVacModule"]
 
 // MARK: RepoMen
 let repoMenTargets: [Target] = []
@@ -131,8 +156,30 @@ let zenBackupManagerTargets: [Target] = [
 let zenBackupManagerModule: [Target.Dependency] = ["ZenBackupManagerModule"]
 
 // MARK: Obtainintosh
-let obtainintoshTargets: [Target] = []
-let obtainintoshModule: [Target.Dependency] = []
+// A native port of the Tauri app (docs/modules.md, Obtainintosh).
+let obtainintoshTargets: [Target] = [
+    .target(name: "ObtainintoshCore", dependencies: ["MurtenCore"]),
+    .target(name: "ObtainintoshServices", dependencies: ["ObtainintoshCore", "MurtenCore"]),
+    .target(
+        name: "ObtainintoshModule",
+        dependencies: ["ObtainintoshCore", "ObtainintoshServices", "MurtenCore", "MurtenModuleKit"]
+    ),
+    .testTarget(
+        name: "ObtainintoshCoreTests",
+        dependencies: ["ObtainintoshCore", "MurtenCore"],
+        resources: [.copy("Fixtures")]
+    ),
+    .testTarget(
+        name: "ObtainintoshServicesTests",
+        dependencies: ["ObtainintoshServices", "ObtainintoshCore", "MurtenCore"]
+    ),
+    .testTarget(
+        name: "ObtainintoshModuleTests",
+        dependencies: ["ObtainintoshModule", "ObtainintoshServices", "ObtainintoshCore", "MurtenCore",
+                       "MurtenModuleKit"]
+    )
+]
+let obtainintoshModule: [Target.Dependency] = ["ObtainintoshModule"]
 
 // MARK: RunningMan
 let runningManTargets: [Target] = []

@@ -38,8 +38,8 @@ public enum ModuleRegistry {
     public static let all: [SuiteModule] = [
         SuiteModule(
             id: "dockvac", name: "DockVac",
-            summary: "Reclaim space held by Docker images, volumes and build cache.",
-            systemImage: "shippingbox", sourceRepository: "DockVac"),
+            summary: "See what Docker keeps on disk and reclaim exactly what you choose.",
+            systemImage: "shippingbox", status: .available, sourceRepository: "DockVac"),
         SuiteModule(
             id: "repomen", name: "RepoMen",
             summary: "Hunt down build artifacts and caches that eat your disk.",
@@ -67,7 +67,7 @@ public enum ModuleRegistry {
         SuiteModule(
             id: "obtainintosh", name: "Obtainintosh",
             summary: "Track updates for apps and fonts installed from releases.",
-            systemImage: "arrow.down.circle", sourceRepository: "Obtainintosh"),
+            systemImage: "arrow.down.circle", status: .available, sourceRepository: "Obtainintosh"),
         SuiteModule(
             id: "runningman", name: "RunningMan",
             summary: "Keep self-hosted CI runners alive and signed in.",

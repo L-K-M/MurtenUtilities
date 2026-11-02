@@ -35,20 +35,46 @@ tests the only supported release.
 ### DockVac — effort: cheap — phase 1 (first module)
 
 Docker disk-usage treemap with selective reclaim — deliberately not a broad
-`docker system prune`. Pure SwiftPM today.
+`docker system prune`.
 
-- **Migrates:** `DockVacCore` (usage analysis, treemap model, reclaim set)
-  plus the `DockVacDocker` Engine API transport the scan service wraps; the
-  treemap pane as its first real suite pane.
-- **Watcher:** a slow-cadence scan through an observation-only Docker Engine
-  service → "Docker is holding ~X GB" at a configurable threshold. An endpoint
-  requiring interactive authentication is unavailable to background polls.
-  The proof-of-concept for the whole pipeline.
+- **Status:** available. `DockVacCore` and `DockVacDocker` moved in unchanged
+  with their tests and fixtures (Swift 6 mode); the AppKit app is
+  `DockVacModule`. The driver tests' fake daemon and SSH bridge live in
+  `Tests/DockVacDockerTests/Scripts`.
+- **Provenance:** DockVac@a8fed1d880c5a16faba197fd741fc5f83cc9b328 (release
+  1.5.0, the source repository's `main`)
+- **Pane:** the standalone views, hosted through
+  `NSViewControllerRepresentable`. The window toolbar and subtitle became a
+  Rigi bar in the pane, the menu bar became Tool menu commands with the same
+  shortcuts, sheets attach to the suite window, and the quit alert became
+  `interruptionWarning`. The first scan runs when the pane first opens.
+- **Watcher:** hourly, three minutes per poll. It reads containers, images
+  and build cache (not volumes: no cleanup level removes one, and sizing them
+  is the slowest read) from the endpoint DockVac's automatic search finds,
+  through a reader with no removal. One finding per endpoint address,
+  `reclaimable`, whose bytes are the safe level's plan. The rule opens at
+  4 GB and holds until below 3 GB: "Docker is holding ~8 GB you can
+  rebuild". An SSH endpoint (`DOCKER_HOST` or the active context) is skipped
+  by default and reported unavailable, so its suggestion turns stale: an SSH
+  agent such as 1Password or Secretive can prompt even under `BatchMode`.
+  DockVac's Settings tab has "Check SSH endpoints in the background", off by
+  default; with it on, the watcher connects with `BatchMode` and declares
+  network use.
+- **Route:** `murten://dockvac/reclaim?endpoint=<address>` re-scans that
+  endpoint and, only if the scan reached it, replaces the selection with the
+  safe level. The confirmation sheet is unchanged, its acknowledgement box
+  off.
+- **Applicability:** a socket in a known location, `DOCKER_HOST` or a Docker
+  context; otherwise "No Docker endpoint found".
 - **Capability:** scans and deletion both use the Docker Engine connection
-  (Unix socket or SSH). A watcher gets a scan-only service interface, not the
-  mutation client; the daemon connection itself is not a read-only grant.
-- **UI:** AppKit throughout (`NSView`s, `NSToolbar`), no SwiftUI. The treemap
-  pane needs an `NSViewRepresentable` host or a rewrite.
+  (Unix socket or SSH). The watcher's reader is a guardrail against
+  accidental writes, not a read-only grant.
+- **Coexistence:** DockVac keeps no files, so nothing is shared but the
+  daemon. The standalone app and the module can both remove from it; every
+  removal is non-forcing, and the other copy's next scan shows the result.
+- **Left out:** `DOCKVAC_SMOKE_SCRIPT`, the window's saved frame, and the
+  menu's checkmarks on Show Everything / Show Reclaimable Only (the bar's
+  segmented control shows the filter).
 
 ### RepoMen — effort: medium — phase 3
 
@@ -289,36 +315,44 @@ with a verified safety copy and undo.
 
 Tracks applications and fonts distributed through GitHub or Forgejo
 releases, compares them with what is installed, downloads a matching asset
-and reveals it in the file manager. It does not install or replace
-anything. Tauri 2 and SvelteKit, shipped for macOS and Linux.
+and reveals it in Finder. It does not install or replace anything.
 
-- **Size:** about 10,400 lines of Rust, 186 tests included, and 2,500 lines
-  of TypeScript/Svelte. A native port re-implements all of it.
-- **Scope is already generic:** users add any GitHub or Forgejo repository.
-  The repo's `GENERIC_SOURCES.md` designs arbitrary vendor download pages
-  behind an identity and SSRF contract. PLAN.md's open question is whether
-  the suite keeps, narrows or extends that.
-- **Installed-app identity** on macOS is the user-typed name matched
-  against `<name>.app` in `/Applications` and `~/Applications`
-  (`src-tauri/src/installer.rs`), not a bundle id. A count like "3 app
-  updates available" inherits that guess; the repo's `ANALYSIS.md` already
-  specifies bundle-id matching.
-- **State:** `~/Library/Application Support/Obtainintosh/apps.json` holds
-  the tracked list and GitHub and Forgejo tokens in plain text
-  (`src-tauri/src/models.rs`). A migration imports the tokens into the
-  Keychain instead of copying the file, and leaves the standalone app's copy
-  alone while that app still runs.
-- **Platforms:** a Swift port is macOS-only. Linux users (deb, AppImage,
-  Flatpak) keep the Tauri app, so it stays maintained whatever the suite
-  does.
-- **Shapes, decide at phase 4:** (a) a pane that ports today's
-  download-and-reveal flow; (b) the suite's updater, which also needs the
-  verified install `ANALYSIS.md` specifies and does not exist yet (mount,
-  bundle id, signature, signer continuity) before "update" means more than
-  "download".
-- **Watcher:** checks run at launch and on demand; nothing polls today. The
-  suite's scheduler would supply the cadence. Checks use GitHub's REST API:
-  60 requests an hour unauthenticated, 5,000 with a token.
+- **Status:** migrated as a native port of the Tauri 2 and SvelteKit app:
+  `ObtainintoshCore` (models, the `apps.json` and `.obtainintosh` formats,
+  asset filters and the macOS asset picker, release selection, font version
+  reading, version comparison, the Add Program form, the watcher's rule),
+  `ObtainintoshServices` (GitHub and Forgejo REST clients behind an
+  injectable transport, installed-version detection for apps and fonts, the
+  tracked list, the Keychain vault, downloads, the watcher) and
+  `ObtainintoshModule` (the pane and provider). The Rust and Svelte tests
+  moved along as XCTest cases; the Linux-only parts (dpkg and AppImage
+  detection, the Linux asset picker) stayed behind with their tests.
+- **Provenance:** Obtainintosh@108a6c3e6bacb5485c87f490b1f3cc1d95651878
+- **Scope stays generic:** any GitHub or Forgejo repository the user adds.
+- **Installed-app identity:** the typed name matched against `<name>.app`
+  in `/Applications` and `~/Applications`, as before; an entry may also
+  record a bundle identifier, which is preferred when set.
+- **State:** the suite keeps its own list at
+  `~/Library/Application Support/MurtenUtilities/Obtainintosh/apps.json`
+  (the standalone shape, without secrets). Tokens live in the Keychain
+  (service `ch.lkmc.MurtenUtilities.obtainintosh`). When the standalone
+  app's `~/Library/Application Support/Obtainintosh/apps.json` exists, the
+  pane offers a one-click import, never automatic; that file is only read.
+  Downloads share the standalone app's `$TMPDIR/obtainintosh-downloads`.
+- **Watcher:** every 6 hours (`.network`), for each installed tracked
+  program, is a newer release out? One finding per program, scoped by its
+  entry id; the rule suggests when the latest version is newer, with the
+  pane's comparison. Programs that are not installed cost no request.
+  A poll spends at most 20 GitHub API requests without a token and keeps
+  10 of GitHub's hourly 60 in reserve. Tokens come only from memory the
+  pane already filled, so the check never reads the Keychain; a private
+  Forgejo program whose key is not in memory is reported as not checked.
+  Removed programs are reported as checked, so their suggestions resolve.
+  A check in the pane, or removing a program, asks the suite to poll soon.
+- **Preselection:** none. The suggestion's route `updates` opens the pane,
+  which checks again; downloading stays a click.
+- **Platforms:** macOS only. Linux users (deb, AppImage, Flatpak) keep the
+  Tauri app.
 
 ### RunningMan — effort: cheap — phase 2
 

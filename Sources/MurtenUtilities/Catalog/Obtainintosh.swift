@@ -1,6 +1,9 @@
 import MurtenModuleKit
+import ObtainintoshModule
 
 extension ModuleCatalog {
-    /// Obtainintosh's provider; nil until it migrates (docs/migrating-a-module.md).
-    static let obtainintosh: ModuleFactory? = nil
+    /// Obtainintosh's provider (docs/modules.md, Obtainintosh).
+    static let obtainintosh: ModuleFactory? = ModuleFactory(moduleID: "obtainintosh") { context in
+        ObtainintoshProvider(context: context)
+    }
 }
