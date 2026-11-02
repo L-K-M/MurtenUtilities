@@ -13,9 +13,9 @@ one suggestion pipeline that connects "something is worth your attention" to
 the tool that fixes it.
 
 The confirmed roster — and what each tool is for — lives in
-[docs/modules.md](modules.md). The contracts and data flow live in
-[docs/architecture.md](architecture.md). The look lives in
-[docs/ui-direction.md](ui-direction.md).
+[docs/modules.md](docs/modules.md). The contracts and data flow live in
+[docs/architecture.md](docs/architecture.md). The look lives in
+[docs/ui-direction.md](docs/ui-direction.md).
 
 ## Product shape
 
@@ -60,7 +60,7 @@ The confirmed roster — and what each tool is for — lives in
 | Coreography | `Coreography` (SwiftPM+.xcodeproj) | system monitor | sustained pressure → "X has pinned a core for an hour" |
 
 Per-module migration notes, satellites, and new-module ideas:
-[docs/modules.md](modules.md).
+[docs/modules.md](docs/modules.md).
 
 ## Phases
 
