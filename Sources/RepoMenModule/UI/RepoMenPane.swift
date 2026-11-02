@@ -56,6 +56,7 @@ struct RepoMenPane: View {
             // takes an explicit click there.
             ModuleCommand("Reclaim Checked…", shortcut: KeyboardShortcut(.delete, modifiers: .command),
                           isEnabled: !model.checkedItems.isEmpty && !model.isReclaiming && !model.isSystemScanning
+                              && !model.isBusy
                               && model.sidebarSelection != .managedStorage
                               && model.sidebarSelection != .autoTrashLog) {
                 model.confirmingReclaim = true

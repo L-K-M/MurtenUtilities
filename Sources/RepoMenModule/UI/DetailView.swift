@@ -246,7 +246,10 @@ struct DetailView: View {
                     .help("Stop the system scan (dismisses the password prompt)")
             } else {
                 let visible = model.visibleItems
-                Text("\(visible.count) item\(visible.count == 1 ? "" : "s") · \(Format.bytes(visible.reduce(0) { $0 + $1.sizeBytes })) reclaimable")
+                let visibleBytes = Format.bytes(visible.reduce(0) { $0 + $1.sizeBytes })
+                // Same "at least" honesty as checkedSizeText: unmeasured rows hold unknown bytes.
+                let totalText = visible.contains { !$0.isMeasured } ? "at least \(visibleBytes)" : visibleBytes
+                Text("\(visible.count) item\(visible.count == 1 ? "" : "s") · \(totalText) reclaimable")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()

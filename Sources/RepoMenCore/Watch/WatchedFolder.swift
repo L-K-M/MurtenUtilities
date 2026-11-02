@@ -32,8 +32,8 @@ package struct WatchedFolder: Identifiable, Hashable, Codable, Sendable {
     package init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         path = try container.decode(String.self, forKey: .path)
-        maxIdleDays = try container.decode(Int.self, forKey: .maxIdleDays)
-        isEnabled = try container.decode(Bool.self, forKey: .isEnabled)
+        maxIdleDays = try container.decodeIfPresent(Int.self, forKey: .maxIdleDays) ?? 30
+        isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
         autoTrashArmed = try container.decodeIfPresent(Bool.self, forKey: .autoTrashArmed) ?? false
     }
 }

@@ -152,7 +152,6 @@ package enum RuleCatalog {
             var anchorPaths: [String] = []
             if rule.requiresCacheDirectoryTag {
                 guard cacheTagIsValid() else { continue }
-                anchorPaths.append(parentPath + "/" + directoryName + "/" + CacheDirectoryTag.fileName)
             }
             if !rule.anchors.isEmpty {
                 for anchor in rule.anchors {
@@ -168,6 +167,9 @@ package enum RuleCatalog {
                     }
                 }
                 guard !anchorPaths.isEmpty else { continue }
+            }
+            if rule.requiresCacheDirectoryTag {
+                anchorPaths.append(parentPath + "/" + directoryName + "/" + CacheDirectoryTag.fileName)
             }
 
             if !rule.innerAnchors.isEmpty {

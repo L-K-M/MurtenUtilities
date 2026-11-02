@@ -54,7 +54,10 @@ final class SnapshotModel: ObservableObject {
     }
 
     var thinBytes: Int64 {
-        Int64((max(0, thinGigabytes) * 1_000_000_000).rounded())
+        let scaled = max(0, thinGigabytes) * 1_000_000_000
+        guard scaled.isFinite else { return 0 }
+        guard scaled < Double(Int64.max) else { return Int64.max }
+        return Int64(scaled.rounded())
     }
 
     // MARK: Listing
@@ -192,19 +195,23 @@ final class SnapshotModel: ObservableObject {
             if let remaining { self.apply(remaining) }
             switch result {
             case .success(let thin):
-                let removed = max(0, before.count - (remaining?.snapshots.count ?? before.count))
+                let removed = remaining.map { max(0, before.count - $0.snapshots.count) }
                 var text: String
-                if removed > 0 {
+                if let removed, removed > 0 {
                     text = "Time Machine removed \(removed) local snapshot\(removed == 1 ? "" : "s") to release about \(Format.bytes(bytes))."
+                } else if remaining == nil {
+                    text = "Time Machine was asked to release about \(Format.bytes(bytes)), but the snapshot list could not be refreshed to confirm what was removed."
                 } else {
                     text = "Time Machine kept every snapshot — it decided none had to go for \(Format.bytes(bytes)). Try a larger amount or a higher urgency, or delete specific snapshots from the list."
                 }
                 if thin.usedAdministratorPrivileges {
                     text += "\nThis needed administrator privileges."
                 }
-                text += Self.freeSpaceLine(before: freeBefore, after: freeAfter, expectGrowth: removed > 0)
-                self.report = SnapshotReport(title: removed > 0 ? "Space released" : "Nothing released",
-                                             message: text)
+                text += Self.freeSpaceLine(before: freeBefore, after: freeAfter, expectGrowth: removed != 0)
+                self.report = SnapshotReport(
+                    title: removed == nil ? "Space release requested"
+                        : ((removed ?? 0) > 0 ? "Space released" : "Nothing released"),
+                    message: text)
             case .failure(let error):
                 // A dismissed password dialog is the user's choice, not an alert.
                 if (error as? SnapshotTool.Failure) != .cancelled {

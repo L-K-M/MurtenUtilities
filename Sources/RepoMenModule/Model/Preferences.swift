@@ -59,7 +59,12 @@ final class Preferences: ObservableObject {
     /// background check reports on them; auto-trash runs only in folders the user
     /// armed one by one.
     @Published var watchedFolders: [WatchedFolder] {
-        didSet { defaults.set(try? JSONEncoder().encode(watchedFolders), forKey: Key.watchedFolders) }
+        didSet {
+            // set(nil) would silently delete the persisted value on an encode failure.
+            if let data = try? JSONEncoder().encode(watchedFolders) {
+                defaults.set(data, forKey: Key.watchedFolders)
+            }
+        }
     }
 
     /// Run one scan automatically when the pane first opens.
@@ -69,12 +74,20 @@ final class Preferences: ObservableObject {
 
     /// The most recent auto-trash pass, for the menu section and Settings.
     @Published var lastWatchRun: WatchRunRecord? {
-        didSet { defaults.set(try? JSONEncoder().encode(lastWatchRun), forKey: Key.lastWatchRun) }
+        didSet {
+            if let data = try? JSONEncoder().encode(lastWatchRun) {
+                defaults.set(data, forKey: Key.lastWatchRun)
+            }
+        }
     }
 
     /// What armed auto-trash moved to the Trash or left alone, newest first.
     @Published var autoTrashLog: [AutoTrashLogEntry] {
-        didSet { defaults.set(try? JSONEncoder().encode(autoTrashLog), forKey: Key.autoTrashLog) }
+        didSet {
+            if let data = try? JSONEncoder().encode(autoTrashLog) {
+                defaults.set(data, forKey: Key.autoTrashLog)
+            }
+        }
     }
 
     /// Adds a folder to the watched set (deduped, inheriting the current idle

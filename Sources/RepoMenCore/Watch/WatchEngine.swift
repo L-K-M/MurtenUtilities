@@ -31,6 +31,6 @@ package enum WatchEngine {
     /// A stable fingerprint of a candidate set. Dry-run reports compare it against
     /// the last notified set so an unchanged finding doesn't re-notify every cycle.
     package static func signature(for items: [CleanableItem]) -> String {
-        items.map { "\($0.path)#\($0.sizeBytes)" }.sorted().joined(separator: "|")
+        items.map { "\($0.path)\0\($0.sizeBytes)" }.sorted().joined(separator: "\0")
     }
 }

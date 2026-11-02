@@ -500,7 +500,7 @@ final class AppModel: ObservableObject {
 
     func reclaimChecked() {
         let targets = checkedItems
-        guard !targets.isEmpty, !isReclaiming, !isSystemScanning else { return }
+        guard !targets.isEmpty, !isReclaiming, !isSystemScanning, !isBusy else { return }
         // Root-owned system items take the privileged path (one admin prompt for
         // the lot, permanent delete); everything else goes through Reclaimer.
         let systemTargets = targets.filter(\.isSystemArea)

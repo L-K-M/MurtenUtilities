@@ -414,6 +414,47 @@ final class KnownCachesTests: XCTestCase {
         })
     }
 
+    // MARK: - Symlinked children are never offered
+
+    func testExpandChildrenRejectsSymlinkedChild() throws {
+        let elsewhere = fileManager.temporaryDirectory
+            .appendingPathComponent("RepoMenSymlinkedChild-\(UUID().uuidString)")
+        try fileManager.createDirectory(at: elsewhere, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: elsewhere) }
+
+        try make(["Library/Developer/Xcode/DerivedData/MyApp-abc123"])
+        try fileManager.createSymbolicLink(
+            at: home.appendingPathComponent("Library/Developer/Xcode/DerivedData/Linked-elsewhere"),
+            withDestinationURL: elsewhere)
+
+        let found = items(enabled: [.derivedData])
+        XCTAssertEqual(found.map(\.path),
+                       [home.appendingPathComponent("Library/Developer/Xcode/DerivedData/MyApp-abc123").path],
+                       "a symlink planted inside an expanded cache must not become a reclaimable item")
+    }
+
+    func testBrowserEnumerationRejectsSymlinks() throws {
+        let elsewhere = fileManager.temporaryDirectory
+            .appendingPathComponent("RepoMenSymlinkedProfile-\(UUID().uuidString)")
+        try fileManager.createDirectory(at: elsewhere.appendingPathComponent("Cache"),
+                                        withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: elsewhere) }
+
+        try make(["Library/Caches/Google/Chrome/Default/Cache"])
+        // A symlinked profile…
+        try fileManager.createSymbolicLink(
+            at: home.appendingPathComponent("Library/Caches/Google/Chrome/Linked"),
+            withDestinationURL: elsewhere)
+        // …and a symlinked cache dir directly in the vendor dir.
+        try fileManager.createSymbolicLink(
+            at: home.appendingPathComponent("Library/Caches/Google/Chrome/Code Cache"),
+            withDestinationURL: elsewhere.appendingPathComponent("Cache"))
+
+        let found = items(enabled: [.browserCache])
+        XCTAssertEqual(found.map(\.label), ["Chrome · Default · Cache"],
+                       "symlinked profiles and cache dirs must not be offered")
+    }
+
     // MARK: - uv cache removal
 
     func testUvCacheNotOffered() throws {
@@ -453,6 +494,7 @@ final class KnownCachesTests: XCTestCase {
 
         // Only browserCache enabled — only Zen should appear.
         let browserOnly = items(enabled: [.browserCache])
+        XCTAssertFalse(browserOnly.isEmpty, "the Zen profile cache should appear")
         XCTAssertTrue(browserOnly.allSatisfy { $0.kind == .browserCache })
     }
 

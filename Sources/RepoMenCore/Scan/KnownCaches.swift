@@ -169,7 +169,7 @@ package enum KnownCaches {
             if spec.expandChildren {
                 let children = (try? fileManager.contentsOfDirectory(
                     at: root, includingPropertiesForKeys: [.isDirectoryKey], options: [])) ?? []
-                for child in children where directoryExists(child, fileManager) {
+                for child in children where isNonSymlinkDirectory(child) {
                     append(&items, label: "\(spec.label) · \(child.lastPathComponent)",
                            kind: spec.kind, path: child.path, excludedPaths: excludedPaths,
                            warning: warning)
@@ -202,7 +202,7 @@ package enum KnownCaches {
             // Cache dirs directly in the vendor dir (single-profile setups)…
             for cacheName in browser.cacheDirNames {
                 let cache = vendor.appendingPathComponent(cacheName)
-                if directoryExists(cache, fileManager) {
+                if isNonSymlinkDirectory(cache) {
                     append(&items, label: "\(browser.name) · \(cacheName)",
                            kind: .browserCache, path: cache.path,
                            excludedPaths: excludedPaths, warning: warning)
@@ -211,10 +211,10 @@ package enum KnownCaches {
             // …and per profile ("Default", "Profile 14", Firefox profile hashes).
             let profiles = (try? fileManager.contentsOfDirectory(
                 at: vendor, includingPropertiesForKeys: [.isDirectoryKey], options: [])) ?? []
-            for profile in profiles where directoryExists(profile, fileManager) {
+            for profile in profiles where isNonSymlinkDirectory(profile) {
                 for cacheName in browser.cacheDirNames {
                     let cache = profile.appendingPathComponent(cacheName)
-                    if directoryExists(cache, fileManager) {
+                    if isNonSymlinkDirectory(cache) {
                         append(&items, label: "\(browser.name) · \(profile.lastPathComponent) · \(cacheName)",
                                kind: .browserCache, path: cache.path,
                                excludedPaths: excludedPaths, warning: warning)
@@ -250,18 +250,22 @@ package enum KnownCaches {
     /// these exact leaves when reclaiming rather than trusting the version parent.
     private static func jetBrainsCacheDirectories(home: URL, fileManager: FileManager) -> [URL] {
         let root = home.appendingPathComponent(jetBrainsRelativePath)
-        guard isNonSymlinkDirectory(root, fileManager) else { return [] }
+        guard isNonSymlinkDirectory(root) else { return [] }
         let versions = (try? fileManager.contentsOfDirectory(
             at: root, includingPropertiesForKeys: nil, options: [])) ?? []
-        return versions.filter { isNonSymlinkDirectory($0, fileManager) }.flatMap { version in
+        return versions.filter { isNonSymlinkDirectory($0) }.flatMap { version in
             jetBrainsCacheNames.map { version.appendingPathComponent($0) }
-                .filter { isNonSymlinkDirectory($0, fileManager) }
+                .filter { isNonSymlinkDirectory($0) }
         }
     }
 
-    private static func isNonSymlinkDirectory(_ url: URL, _ fileManager: FileManager) -> Bool {
-        guard let attributes = try? fileManager.attributesOfItem(atPath: url.path) else { return false }
-        return attributes[.type] as? FileAttributeType == .typeDirectory
+    private static func isNonSymlinkDirectory(_ url: URL) -> Bool {
+        // URL resource values describe the item itself; fileExists/attributesOfItem
+        // follow symlinks and would report a symlinked directory as a real directory.
+        guard let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]) else {
+            return false
+        }
+        return (values.isDirectory ?? false) && !(values.isSymbolicLink ?? false)
     }
 
     private static func append(_ items: inout [CleanableItem], label: String,

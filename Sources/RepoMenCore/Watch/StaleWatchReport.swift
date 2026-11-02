@@ -30,9 +30,18 @@ package struct StaleWatchSettings: Equatable, Sendable {
         let watched = Set(folders.map(\.path))
         var seen = Set<String>()
         let scanned = scanRoots
-            .filter { !watched.contains($0) && seen.insert($0).inserted }
+            .filter { root in
+                !watched.contains(root)
+                    && !folders.contains { $0.isEnabled && PathGuards.isUnder(root, root: $0.path) }
+                    && seen.insert(root).inserted
+            }
             .map { WatchedFolder(path: $0, maxIdleDays: scanRootIdleDays) }
-        return folders.filter(\.isEnabled) + scanned
+        var unique: [WatchedFolder] = []
+        var seenFolders = Set<String>()
+        for folder in folders where folder.isEnabled && seenFolders.insert(folder.path).inserted {
+            unique.append(folder)
+        }
+        return unique + scanned
     }
 }
 

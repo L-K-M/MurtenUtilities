@@ -305,6 +305,20 @@ final class SnapshotToolTests: XCTestCase {
         XCTAssertNil(privileged.first?.failure)
     }
 
+    func testACancelledDeleteNeverShowsAnAdminPrompt() async {
+        let outcomes = await SnapshotTool.delete([older, newer], runner: { _, _ in
+            // Stop lands while the unprivileged run is in flight.
+            withUnsafeCurrentTask { $0?.cancel() }
+            return self.output(1, stderr: "requires root")
+        }, adminRunner: { _ in
+            XCTFail("a cancelled delete must not escalate to an admin prompt")
+            return ""
+        })
+        XCTAssertEqual(outcomes.map(\.failure),
+                       Array(repeating: "stopped before this snapshot was reached", count: 2),
+                       "the rest of the batch reports stopped; nothing reaches the privileged path")
+    }
+
     func testFreedIsNeverNegativeAndNeedsBothSamples() {
         XCTAssertEqual(SnapshotTool.freed(before: 100, after: 130), 30)
         XCTAssertEqual(SnapshotTool.freed(before: 100, after: 90), 0, "another writer can shrink free space meanwhile")
@@ -370,6 +384,20 @@ final class SnapshotToolTests: XCTestCase {
             XCTFail("expected a throw")
         } catch {
             XCTAssertEqual(error as? SnapshotTool.Failure, .cancelled)
+        }
+    }
+
+    func testThinMapsOtherPrivilegedErrorsToToolFailed() async {
+        do {
+            _ = try await SnapshotTool.thin(bytes: 1, urgency: 4, runner: { _, _ in
+                self.output(1, stderr: "requires root")
+            }, adminRunner: { _ in
+                throw PrivilegedRunner.Failure.failed("helper exploded")
+            })
+            XCTFail("expected a throw")
+        } catch {
+            XCTAssertEqual(error as? SnapshotTool.Failure, .toolFailed("helper exploded"),
+                           "a non-cancelled privileged failure must not escape as an unknown error")
         }
     }
 

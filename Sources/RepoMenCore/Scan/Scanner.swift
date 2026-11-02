@@ -48,8 +48,9 @@ package enum Scanner {
     /// else there (Containers, Mail, Application Support) is app data that can look
     /// exactly like a build artifact (an app-shipped node_modules with its
     /// package.json). PLAN.md's "never enters ~/Library/Containers", enforced.
-    private static let userLibraryPath = FileManager.default
-        .homeDirectoryForCurrentUser.appendingPathComponent("Library").path
+    private static let userLibraryPath = canonicalRoot(
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library")
+    ).path
 
     /// Synchronous walk — call from a background task; honors `Task` cancellation.
     /// `progress` is invoked on the walking thread with the directory being visited.

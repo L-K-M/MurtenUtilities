@@ -71,6 +71,32 @@ final class StaleWatchReportTests: XCTestCase {
         XCTAssertEqual(observation.completedScopes.count, 2, "the paused folder is not surveyed")
     }
 
+    func testDuplicateWatchedFoldersAreSurveyedOnce() {
+        let settings = StaleWatchSettings(folders: [
+            WatchedFolder(path: "/Users/test/dev", maxIdleDays: 7),
+            WatchedFolder(path: "/Users/test/dev", maxIdleDays: 45),
+        ])
+        XCTAssertEqual(settings.surveyedFolders, [WatchedFolder(path: "/Users/test/dev", maxIdleDays: 7)],
+                       "one path, one scope — the first entry wins")
+    }
+
+    func testScanRootNestedUnderAnEnabledWatchIsNotDoubleCounted() {
+        let settings = StaleWatchSettings(
+            folders: [WatchedFolder(path: "/Users/test/dev", maxIdleDays: 7)],
+            scanRoots: ["/Users/test/dev/nested"], scanRootIdleDays: 45)
+        XCTAssertEqual(settings.surveyedFolders.map(\.path), ["/Users/test/dev"],
+                       "the watched folder's scan already covers the nested root")
+    }
+
+    func testScanRootNestedUnderADisabledWatchIsStillScanned() {
+        let settings = StaleWatchSettings(
+            folders: [WatchedFolder(path: "/Users/test/dev", isEnabled: false)],
+            scanRoots: ["/Users/test/dev/nested"], scanRootIdleDays: 45)
+        XCTAssertEqual(settings.surveyedFolders,
+                       [WatchedFolder(path: "/Users/test/dev/nested", maxIdleDays: 45)],
+                       "a paused watch must not shadow the pane's own scan folder")
+    }
+
     func testRemovedOrPausedFoldersSuggestionsResolve() {
         let rule = StaleArtifactRule(home: home)
         var ledger = SuggestionLedger()

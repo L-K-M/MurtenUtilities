@@ -42,9 +42,29 @@ final class DirectorySizerTests: XCTestCase {
     }
 
     func testNewestModificationTracked() throws {
-        try patternData(1).write(to: root.appendingPathComponent("recent.txt"))
+        let url = root.appendingPathComponent("pinned.txt")
+        try patternData(1).write(to: url)
+        let pinned = Date().addingTimeInterval(-3_600)
+        try fileManager.setAttributes([.modificationDate: pinned], ofItemAtPath: url.path)
         let measurement = DirectorySizer.measure(root)
-        XCTAssertGreaterThan(measurement.newestModification,
-                             Date().addingTimeInterval(-60))
+        XCTAssertEqual(measurement.newestModification.timeIntervalSince1970,
+                       pinned.timeIntervalSince1970, accuracy: 1.0,
+                       "newestModification should mirror the newest file mtime")
+    }
+
+    func testFutureRootModificationDoesNotWin() throws {
+        let url = root.appendingPathComponent("real.txt")
+        try patternData(1).write(to: url)
+        let real = Date().addingTimeInterval(-3_600)
+        try fileManager.setAttributes([.modificationDate: real], ofItemAtPath: url.path)
+        // A skewed or hand-set future mtime on the root must not poison the result.
+        try fileManager.setAttributes([.modificationDate: Date().addingTimeInterval(86_400)],
+                                      ofItemAtPath: root.path)
+
+        let measurement = DirectorySizer.measure(root)
+        XCTAssertLessThanOrEqual(measurement.newestModification, Date(),
+                                 "newestModification must never report a future date")
+        XCTAssertEqual(measurement.newestModification.timeIntervalSince1970,
+                       real.timeIntervalSince1970, accuracy: 1.0)
     }
 }

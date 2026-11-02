@@ -305,6 +305,12 @@ enum SnapshotTool {
                     Log.snapshots.info("deleted \(snapshot.name, privacy: .public), freed \(freedBytes ?? -1) bytes")
                     outcomes.append(Outcome(snapshot: snapshot, failure: nil, freedBytes: freedBytes))
                 } else if output.looksLikePrivilegeFailure {
+                    if Task.isCancelled {
+                        outcomes += snapshots[index...].map {
+                            Outcome(snapshot: $0, failure: "stopped before this snapshot was reached")
+                        }
+                        break
+                    }
                     Log.snapshots.info("tmutil refused an unprivileged delete — retrying as administrator")
                     outcomes += await deletePrivileged(Array(snapshots[index...]), adminRunner: adminRunner)
                     break
@@ -378,6 +384,8 @@ enum SnapshotTool {
                               usedAdministratorPrivileges: true)
         } catch let failure as PrivilegedRunner.Failure where failure == .cancelled {
             throw Failure.cancelled
+        } catch {
+            throw Failure.toolFailed(error.localizedDescription)
         }
     }
 }

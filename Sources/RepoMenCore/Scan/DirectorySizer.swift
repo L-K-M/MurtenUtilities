@@ -22,7 +22,8 @@ package enum DirectorySizer {
             .isRegularFileKey, .totalFileAllocatedSizeKey, .fileAllocatedSizeKey,
             .contentModificationDateKey, .linkCountKey, .fileResourceIdentifierKey,
         ]
-        if let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate {
+        if let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate,
+           date <= Date() {
             measurement.newestModification = date
         }
         guard let enumerator = fileManager.enumerator(

@@ -87,6 +87,7 @@ package enum StaleArtifactSurvey {
                                    now: Date = Date(),
                                    sizerWidth: Int = 4) async -> [String: [CleanableItem]]? {
         guard !roots.isEmpty else { return [:] }
+        guard !Task.isCancelled else { return nil }
         let config = ScanConfiguration(
             roots: roots.map { URL(fileURLWithPath: $0.path) },
             excludedPaths: excludedPaths,
@@ -128,7 +129,7 @@ package enum StaleArtifactSurvey {
             for _ in 0..<max(1, width) { addNext() }
             var measurements: [String: DirectorySizer.Measurement] = [:]
             for await (id, measurement) in group {
-                if Task.isCancelled { break }
+                if Task.isCancelled { group.cancelAll(); break }
                 if measurement.isComplete { measurements[id] = measurement }
                 addNext()
             }

@@ -172,6 +172,9 @@ private struct RulesSettingsView: View {
     }
 
     private func kinds(in category: ArtifactCategory) -> [ArtifactKind] {
+        // uv is owner-managed (PathGuards.requiresOwnerCleanup): nothing reclaimable
+        // carries .uvCache, so a toggle would promise control it does not have —
+        // its cleanup lives in Managed Storage.
         ArtifactKind.allCases.filter { $0.category == category && $0 != .uvCache }
     }
 

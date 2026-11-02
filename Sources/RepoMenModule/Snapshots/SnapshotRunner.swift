@@ -106,7 +106,7 @@ enum SnapshotRunner {
                     continuation.resume(throwing: Failure.launchFailed(error.localizedDescription))
                     return
                 }
-                watchdog.arm(after: timeout) {
+                watchdog.arm(after: timeout, isRunning: { process.isRunning }) {
                     if process.isRunning { process.terminate() }
                 }
             }
@@ -127,9 +127,11 @@ enum SnapshotRunner {
             return didFire
         }
 
-        func arm(after seconds: TimeInterval, terminate: @escaping () -> Void) {
+        func arm(after seconds: TimeInterval, isRunning: @escaping () -> Bool,
+                 terminate: @escaping () -> Void) {
             let item = DispatchWorkItem { [weak self] in
-                guard let self else { return }
+                // A process that already exited must not be reported as timed out.
+                guard let self, isRunning() else { return }
                 self.lock.lock(); self.didFire = true; self.lock.unlock()
                 terminate()
             }
