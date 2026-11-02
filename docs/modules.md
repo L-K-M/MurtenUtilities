@@ -103,21 +103,45 @@ app + CLI; **GitHub-only, not yet cloned**.
 ### DeviceControlDoctor — effort: cheap — phase 2
 
 Diagnoses Device Control / Data Access (TCC) permission records that look
-granted but fail functionally. Already fleet-standard: `DoctorCore` is pure,
-`ProcessRunner` is the only subprocess boundary, `tccutil`/`codesign` run via
-fixed paths, repair is user-confirmed per service.
+granted but fail functionally. `DoctorCore` is pure, `ProcessRunning` is the
+only subprocess boundary, `tccutil`/`codesign` run via fixed paths, repair is
+user-confirmed per service.
 
-- **Migrates:** `DoctorCore` + the pane nearly unchanged — it is the model
-  every other module's boundary copies.
-- **Watcher:** periodic grant-vs-function drift checks where a cheap signal
-  exists → "X lost its working permission after the update". No
-  watcher-triggered resets, ever.
+- **Status:** available. `DoctorCore` (in `Sources/DeviceControlDoctorCore`)
+  and `DeviceControlDoctorModule`; the source's tests run as
+  `DeviceControlDoctorCoreTests` and `DeviceControlDoctorIntegrationTests`.
+- **Provenance:** DeviceControlDoctor@09accf844d6118bf0eea927ef4f6a8dd52fd033b
+- **Pane:** the standalone main window. It checks when it appears and, while
+  *Check every minute* is on (the default), every minute and after app
+  launches and wake, only while visible. The Test Pad is a module window
+  (`test-pad`); the File-menu commands are Tool-menu commands with the same
+  shortcuts (⌘O, ⌘R, ⇧⌘E); the menu-bar extra is a companion section
+  (watched apps, apps needing review, Refresh, Test Pad). Launch at login
+  is the suite's.
+- **Watcher:** every 30 minutes (120 s timeout, local), per watched app:
+  `tccutil list` for its expected permissions and `codesign` against the
+  identity the pane saved. One finding per app (scope: its watch-list id)
+  when an expected permission reads denied or limited, the signing identity
+  changed, or an earlier change has no passing test since → "Verify <App>'s
+  permissions again", route `review` with context `app`. Unclear answers,
+  timeouts and a missing `tccutil list` (macOS 26) are failures, never
+  healthy. Apps in privacy-guarded places (Desktop, Documents, Downloads,
+  iCloud Drive and file providers, other apps' containers, other volumes,
+  any home folder but `~/Applications` and `~/Library`) are left to the
+  pane. It never resets, writes or prompts.
+- **Preselection:** the route selects the named app in the watch list and
+  nothing else. The repair sheet opens only on the user's click, with the
+  app's expected permissions checked, as in the standalone app.
+- **State:** the watch list stays at
+  `~/Library/Application Support/DeviceControlDoctor/watchlist.json`, read
+  and written in place; `monitorEnabled` is in the module's defaults.
+- **Coexistence:** the standalone app writes the same file, so the last save
+  wins; the pane says so while the standalone app runs. App discovery skips
+  the suite and the standalone app.
 - **Source facts:** the cheap signal detects identity and record changes, not
   functional failure, so a suggestion can only say "verify again". Reads use
   `tccutil list`, which its AGENTS.md records as verified only on macOS 27.2;
-  elsewhere they degrade to unavailable. `ProcessRunner` is a concrete struct,
-  so the reset path has no fake seam. The app inserts its `MenuBarExtra`
-  unconditionally and monitors by default (`monitorEnabled = true`).
+  elsewhere they degrade to unavailable.
 
 ### Shortking — effort: medium — phase 3
 
