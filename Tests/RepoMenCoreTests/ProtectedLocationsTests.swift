@@ -55,8 +55,27 @@ final class ProtectedLocationsTests: XCTestCase {
             asked.append(path)
             return nil
         }
-        XCTAssertEqual(asked, ["/Users", "/Users/test"],
-                       "classification stops at the protected prefix, before looking inside")
+        XCTAssertEqual(asked, [], "a path written inside a protected folder is refused as written")
+
+        let links = ["/Users/test/code": "/Users/test/Documents/code"]
+        let result = ProtectedLocations.classify("/Users/test/code/a/b", roots: roots) { path in
+            asked.append(path)
+            return links[path]
+        }
+        XCTAssertEqual(result, .protected(root: "/Users/test/Documents"))
+        XCTAssertTrue(asked.contains("/Users/test/code"))
+        XCTAssertFalse(asked.contains { ProtectedLocations.contains($0, roots: roots) },
+                       "resolution stops at the protected prefix, before looking inside: \(asked)")
+    }
+
+    func testRootsSpelledThroughALinkStillMatchAsWritten() {
+        // /var is a link to /private/var on macOS; a path written like its root
+        // is protected before any link is followed.
+        let links = ["/var": "private/var"]
+        XCTAssertEqual(ProtectedLocations.classify("/var/folders/x/Guarded/code", roots: ["/var/folders/x/Guarded"],
+                                                   readLink: { links[$0] }),
+                       .protected(root: "/var/folders/x/Guarded"))
+        XCTAssertEqual(ProtectedLocations.lexicallyNormalized("/a/./b/../c//d"), "/a/c/d")
     }
 
     func testLinkLoopsAreUnresolvable() {
@@ -67,9 +86,11 @@ final class ProtectedLocationsTests: XCTestCase {
 
     func testLiveLinksResolveOnDisk() throws {
         let fm = FileManager.default
-        let base = fm.temporaryDirectory.resolvingSymlinksInPath()
-            .appendingPathComponent("ProtectedLocations-\(UUID().uuidString)")
+        var base = fm.temporaryDirectory.appendingPathComponent("ProtectedLocations-\(UUID().uuidString)")
+        try fm.createDirectory(at: base, withIntermediateDirectories: true)
         defer { try? fm.removeItem(at: base) }
+        // The on-disk spelling (/private/var/… on macOS), as the live roots are.
+        base = URL(fileURLWithPath: try base.resourceValues(forKeys: [.canonicalPathKey]).canonicalPath ?? base.path)
         let guarded = base.appendingPathComponent("Guarded")
         try fm.createDirectory(at: guarded.appendingPathComponent("code"), withIntermediateDirectories: true)
         try fm.createSymbolicLink(at: base.appendingPathComponent("code"),

@@ -108,8 +108,10 @@ package enum GitWorktrees {
         let absolutePath = path.hasPrefix("/") ? path : directory.path + "/" + path
         let url = URL(fileURLWithPath: absolutePath)
         // Lexical, before the first lstat: `..` segments are folded so they cannot
-        // walk a refused path past the filter.
-        guard isAllowed(url.standardizedFileURL.path), hasNoSymlinkComponents(url) else { return nil }
+        // walk a refused path past the filter. (standardizedFileURL would also
+        // drop /private and miss roots spelled with it.)
+        guard isAllowed(ProtectedLocations.lexicallyNormalized(absolutePath)),
+              hasNoSymlinkComponents(url) else { return nil }
         return canonical(url)
     }
 

@@ -50,6 +50,12 @@ package enum ProtectedLocations {
     /// prefixes already known to be outside the protected roots are passed to it.
     package static func classify(_ path: String, roots: [String],
                                  readLink: (String) -> String? = liveReadLink) -> Classification {
+        // As written first: a path spelled inside a root is protected whatever
+        // its links would resolve to.
+        if let root = protectedRoot(of: lexicallyNormalized(path), roots: roots) {
+            return .protected(root: root)
+        }
+
         var pending = components(of: path)
         var resolved: [String] = []
         var hops = 0
@@ -84,6 +90,21 @@ package enum ProtectedLocations {
 
     /// The same limit as the kernel's MAXSYMLINKS.
     private static let maximumLinkHops = 32
+
+    /// Folds `.` and `..` without touching the file system. Unlike
+    /// `standardizedFileURL`, it keeps a `/private` prefix, so the result can be
+    /// compared with the roots as given.
+    package static func lexicallyNormalized(_ path: String) -> String {
+        var result: [String] = []
+        for component in components(of: path) {
+            switch component {
+            case ".": continue
+            case "..": _ = result.popLast()
+            default: result.append(component)
+            }
+        }
+        return "/" + result.joined(separator: "/")
+    }
 
     package static func liveReadLink(_ path: String) -> String? {
         try? FileManager.default.destinationOfSymbolicLink(atPath: path)
