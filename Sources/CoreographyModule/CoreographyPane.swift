@@ -44,7 +44,10 @@ struct CoreographyPane: View {
             ModuleCommand("Open Recording…", shortcut: KeyboardShortcut("o", modifiers: .command)) {
                 RecordingOpener.choose(into: model)
             },
-            ModuleCommand("Return to Now", shortcut: KeyboardShortcut("0", modifiers: .command)) { model.returnToNow() },
+            ModuleCommand("Return to Now", shortcut: KeyboardShortcut("0", modifiers: .command)) {
+                model.returnToNow()
+                model.navigate(to: .timeline)
+            },
             ModuleCommand("Command Palette…", shortcut: KeyboardShortcut("p", modifiers: [.command, .shift])) {
                 model.paletteShown = true
             }
@@ -52,9 +55,10 @@ struct CoreographyPane: View {
     }
 }
 
-/// What a route does to the pane: navigation only. It may filter or sort
-/// the process table or switch the detail pane; it never selects a row,
-/// arms an action or signals a process (docs/modules.md, preselection).
+/// What a route does to the pane: navigation only. It may open a section
+/// and filter or sort its process table; it never selects a row, arms an
+/// action, starts a space survey or signals a process (docs/modules.md,
+/// preselection).
 @MainActor
 enum CoreographyNavigation {
     static func apply(_ route: ModuleRoute?, to model: DashboardModel) {
@@ -62,16 +66,20 @@ enum CoreographyNavigation {
 
         switch action {
         case CoreographyWatch.Action.process:
-            model.detailPane = .processes
+            model.navigate(to: .processes)
             model.processSort = .cpu
             model.processFilter = route.context[CoreographyWatch.nameContextKey] ?? ""
         case CoreographyWatch.Action.memory:
-            model.detailPane = .processes
+            // The memory lane above the process table, biggest first.
+            model.navigate(to: .memory)
             model.processSort = .memory
         case CoreographyWatch.Action.thermal:
-            model.detailPane = .sensors
+            // Power and thermal lanes above the sensors.
+            model.navigate(to: .power)
         case CoreographyWatch.Action.storage:
-            model.detailPane = .processes
+            // The disk lane, whose startup volume opens into where its
+            // space goes, above the process table by disk writes.
+            model.navigate(to: .storage)
             model.processSort = .diskWrite
         default:
             break

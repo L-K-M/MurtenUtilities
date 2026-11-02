@@ -77,6 +77,7 @@ final class CoreographyProviderTests: XCTestCase {
         model.detailPane = .sensors
         CoreographyNavigation.apply(
             CoreographyWatch.route(CoreographyWatch.Action.process, context: [CoreographyWatch.nameContextKey: "Xcode"]), to: model)
+        XCTAssertEqual(model.section, .processes)
         XCTAssertEqual(model.detailPane, .processes)
         XCTAssertEqual(model.processSort, .cpu)
         XCTAssertEqual(model.processFilter, "Xcode")
@@ -86,16 +87,20 @@ final class CoreographyProviderTests: XCTestCase {
     func testOtherRoutesOnlyChangeTheView() throws {
         let model = try fixtureModel()
         CoreographyNavigation.apply(CoreographyWatch.route(CoreographyWatch.Action.memory), to: model)
+        XCTAssertEqual(model.section, .memory)
         XCTAssertEqual(model.processSort, .memory)
         CoreographyNavigation.apply(CoreographyWatch.route(CoreographyWatch.Action.storage), to: model)
+        XCTAssertEqual(model.section, .storage)
         XCTAssertEqual(model.processSort, .diskWrite)
         CoreographyNavigation.apply(CoreographyWatch.route(CoreographyWatch.Action.thermal), to: model)
+        XCTAssertEqual(model.section, .power)
         XCTAssertEqual(model.detailPane, .sensors)
 
         model.processFilter = "mine"
         CoreographyNavigation.apply(ModuleRoute(moduleID: "coreography"), to: model)
         CoreographyNavigation.apply(ModuleRoute(moduleID: "dockvac", action: "process", context: ["name": "x"]), to: model)
         XCTAssertEqual(model.processFilter, "mine", "a bare or foreign route leaves the pane as it was")
+        XCTAssertEqual(model.section, .power)
     }
 }
 

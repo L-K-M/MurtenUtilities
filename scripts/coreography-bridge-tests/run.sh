@@ -1,6 +1,6 @@
 #!/bin/bash
 # Coreography's C bridge contract tests, moved with CoreographySystem from
-# Coreography@664a49f (tools/tests). `swift test` does not run them; run
+# Coreography@f9820e6 (tools/tests). `swift test` does not run them; run
 # this on macOS (native contracts) or Linux (unsupported-platform
 # contracts). The process test also exercises a raise when run with sudo.
 #

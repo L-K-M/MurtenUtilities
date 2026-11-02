@@ -14,6 +14,7 @@ struct DashboardView: View {
     /// A palette process action, confirmed once the palette has closed.
     @State private var queuedPaletteAction: ProcessActionRequest?
     @State private var markerName = ""
+    @State private var askQuestion = ""
     @State private var paletteAction: ProcessActionRequest?
     /// The CPU braid's lens (plan: the CPU lane opens into its apps).
     @State private var inspection: BraidInspection
@@ -30,173 +31,12 @@ struct DashboardView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                if let inventory = model.latest?.inventory {
-                    HStack {
-                        Text("\(inventory.logicalCPUCount) logical CPUs")
-                        if model.samplingCadence == .lowPower {
-                            Text("Low Power Mode: sampling every \(model.samplingSeconds.formatted()) s")
-                                .help("Coreography halves its sampling rate while Low Power Mode is on")
-                        }
-                        Spacer()
-                        SelfCostLine(model: model)
-                        Spacer()
-                        Text(inventory.operatingSystem)
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-                if helperUnavailable != nil {
-                    Text(HelperAvailability.explanation)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                // The person's order, sizes and hidden lanes (plan: each lane's menu).
-                ForEach(model.laneLayout.visible) { kind in
-                    laneView(kind)
-                        .environment(\.laneGraphHeight, Layout.graphHeight(model.laneLayout.size(of: kind)))
-                        .overlay(alignment: .topTrailing) { LaneMenu(model: model, lane: kind) }
-                        // The open braid's card reaches over the lanes below.
-                        .zIndex(kind == .cpu && inspection.isOpen ? 1 : 0)
-                }
-
-                AskPanel(model: model)
-
-                if let report = model.rangeReport {
-                    RangePanel(model: model, report: report)
-                }
-
-                Picker("Detail", selection: $model.detailPane) {
-                    Text("Processes").tag(DetailPane.processes)
-                    Text("Connections").tag(DetailPane.connections)
-                    Text("Startup").tag(DetailPane.startup)
-                    Text("Sensors").tag(DetailPane.sensors)
-                    Text("Sessions").tag(DetailPane.sessions)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 520)
-
-                switch model.detailPane {
-                case .processes: ProcessPane(model: model, filterFocused: $processFilterFocused)
-                case .connections: ConnectionsPane(model: model)
-                case .startup: StartupPane(model: model)
-                case .sensors: SensorsPane(model: model)
-                case .sessions: SessionsPane(model: model)
-                }
-
-                DisclosureGroup("Numeric readings") {
-                    Table(Array(model.frames.suffix(10))) {
-                        TableColumn("Time") { frame in
-                            Text(frame.stamp.wallTime, format: .dateTime.hour().minute().second())
-                        }
-                        TableColumn("CPU, whole machine") { frame in
-                            Text(MetricText.percent(frame.cpuPercentOfMachine.numericValue))
-                        }
-                        TableColumn("Used memory, estimated") { frame in
-                            Text(MetricText.bytes(frame.memoryUsedBytes.numericValue))
-                        }
-                        TableColumn("Thermal pressure") { frame in
-                            Text(ThermalText.level(frame.thermalPressure))
-                        }
-                    }
-                    .frame(height: 150)
-                }
-
-                DisclosureGroup("Memory numeric readings") {
-                    Table(Array(model.frames.suffix(10))) {
-                        TableColumn("Time") { Text($0.stamp.wallTime, format: .dateTime.hour().minute().second()) }
-                        TableColumn("Used") { ProcessMetricCell(reading: $0.memoryUsedBytes, format: .bytes) }
-                        TableColumn("App") { ProcessMetricCell(reading: $0.memory.appBytes, format: .bytes) }
-                        TableColumn("Wired") { ProcessMetricCell(reading: $0.memory.wiredBytes, format: .bytes) }
-                        TableColumn("Compressed") { ProcessMetricCell(reading: $0.memory.compressedBytes, format: .bytes) }
-                        TableColumn("Cached files") { ProcessMetricCell(reading: $0.memory.cachedBytes, format: .bytes) }
-                        TableColumn("Swap used") { ProcessMetricCell(reading: $0.memory.swapUsedBytes, format: .bytes) }
-                        TableColumn("Swap in/s") { ProcessMetricCell(reading: $0.memory.swapInBytesPerSecond, format: .rate) }
-                        TableColumn("Swap out/s") { ProcessMetricCell(reading: $0.memory.swapOutBytesPerSecond, format: .rate) }
-                        TableColumn("Pressure") { Text(MemoryText.pressure($0.memory.pressure)) }
-                    }
-                    .frame(height: 150)
-                }
-
-                DisclosureGroup("GPU numeric readings") {
-                    Table(model.gpuReadings) {
-                        TableColumn("Time") { Text($0.time, format: .dateTime.hour().minute().second()) }
-                        TableColumn("GPU", value: \.name)
-                        TableColumn("Busy") { ProcessMetricCell(reading: $0.device.utilizationPercent, format: .percent) }
-                        TableColumn("Renderer") { ProcessMetricCell(reading: $0.device.rendererPercent, format: .percent) }
-                        TableColumn("Tiler") { ProcessMetricCell(reading: $0.device.tilerPercent, format: .percent) }
-                        TableColumn("Memory in use") { ProcessMetricCell(reading: $0.device.inUseMemoryBytes, format: .bytes) }
-                    }
-                    .frame(height: 150)
-                }
-
-                DisclosureGroup("Sensor numeric readings") {
-                    Table(Array(model.sensorFrames.suffix(10))) {
-                        TableColumn("Time") { Text($0.stamp.wallTime, format: .dateTime.hour().minute().second()) }
-                        TableColumn("Hottest sensor") { Text($0.hottest?.key ?? "–") }
-                        TableColumn("Temperature") { Text(ThermalText.celsius($0.hottest?.celsius.numericValue)) }
-                        TableColumn("SMC system power") { ProcessMetricCell(reading: $0.systemPowerWatts, format: .watts) }
-                        TableColumn("Fans") { Text($0.fans.map { ThermalText.rpm($0.rpm.numericValue) }.joined(separator: ", ")) }
-                    }
-                    .frame(height: 150)
-                }
-
-                DisclosureGroup("Power numeric readings") {
-                    Table(Array(model.powerFrames.suffix(10))) {
-                        TableColumn("Time") { Text($0.stamp.wallTime, format: .dateTime.hour().minute().second()) }
-                        TableColumn("Source") { Text(PowerText.source($0)) }
-                        TableColumn("System draw") { ProcessMetricCell(reading: $0.systemPowerWatts, format: .watts) }
-                        TableColumn("Battery") { ProcessMetricCell(reading: $0.batteryChargePercent, format: .percent) }
-                        TableColumn("Battery power") { ProcessMetricCell(reading: $0.batteryPowerWatts, format: .watts) }
-                        TableColumn("Adapter rating") { ProcessMetricCell(reading: $0.adapterRatingWatts, format: .watts) }
-                    }
-                    .frame(height: 150)
-                }
-
-                DisclosureGroup("Network numeric readings") {
-                    Table(model.networkReadings) {
-                        TableColumn("Time") { Text($0.time, format: .dateTime.hour().minute().second()) }
-                        TableColumn("Interface") { Text($0.interfaceName ?? "–") }
-                        TableColumn("Received/s") { ProcessMetricCell(reading: $0.received, format: .rate) }
-                        TableColumn("Sent/s") { ProcessMetricCell(reading: $0.sent, format: .rate) }
-                    }
-                    .frame(height: 150)
-                }
-
-                DisclosureGroup("Disk numeric readings") {
-                    Table(model.diskReadings) {
-                        TableColumn("Time") { Text($0.time, format: .dateTime.hour().minute().second()) }
-                        TableColumn("Device") { Text($0.deviceName ?? $0.status ?? "–") }
-                        TableColumn("Read/s") { row in
-                            if let reading = row.read { ProcessMetricCell(reading: reading, format: .rate) }
-                            else { Text("–") }
-                        }
-                        TableColumn("Written/s") { row in
-                            if let reading = row.written { ProcessMetricCell(reading: reading, format: .rate) }
-                            else { Text("–") }
-                        }
-                    }
-                    .frame(height: 150)
-                }
-
-                if let error = model.collectionError {
-                    Text(error).foregroundStyle(.red)
-                    Button("Retry collection") {
-                        model.stop()
-                        model.start()
-                    }
-                }
-
-                Text("Used memory is app, wired and compressed memory, estimated from VM page counts. Missing readings leave gaps.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(Layout.padding)
+        NavigationSplitView {
+            sidebar
+        } detail: {
+            detailContent
         }
-        .frame(minWidth: 900, minHeight: 600)
+        .frame(minWidth: 1000, minHeight: 650)
         .sheet(isPresented: Binding(
             get: { if case .idle = model.sampleState { false } else { true } },
             set: { if !$0 { model.dismissSample() } }
@@ -311,6 +151,272 @@ struct DashboardView: View {
                 .help("Hold the display while collection continues")
             }
         }
+        // The session starts and stops sampling with the pane.
+        .onAppear { braidKeys.install(braidKey) }
+        .onDisappear { braidKeys.remove() }
+    }
+
+    private var sidebar: some View {
+        List(selection: Binding<DashboardSection?>(
+            get: { model.section },
+            set: { if let section = $0 { model.navigate(to: section) } }
+        )) {
+            Section {
+                navigationRow(.overview)
+            }
+            Section("Resources") {
+                ForEach(DashboardSection.allCases.filter { !$0.lanes.isEmpty }) { navigationRow($0) }
+            }
+            Section("Investigate") {
+                navigationRow(.processes)
+                navigationRow(.timeline)
+            }
+            Section("Manage") {
+                navigationRow(.startup)
+                navigationRow(.recordings)
+            }
+        }
+        .listStyle(.sidebar)
+        .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 260)
+        .safeAreaInset(edge: .bottom) {
+            VStack(alignment: .leading, spacing: 6) {
+                Label(model.displayMode == .live ? "Live samples" : "Held display",
+                      systemImage: model.displayMode == .live ? "waveform.path" : "pause.circle")
+                if model.samplingCadence == .lowPower {
+                    Text("Low Power Mode: \(model.samplingSeconds.formatted()) s samples")
+                }
+                SelfCostLine(model: model)
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+        }
+    }
+
+    private func navigationRow(_ section: DashboardSection) -> some View {
+        Label(LocalizedStringKey(section.title), systemImage: section.symbol)
+            .tag(section)
+            .accessibilityIdentifier("section-\(section.rawValue)")
+    }
+
+    private var detailContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Layout.padding) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(LocalizedStringKey(model.section.title)).font(.largeTitle.bold())
+                            .accessibilityIdentifier("section-heading-\(model.section.rawValue)")
+                        if let inventory = model.latest?.inventory {
+                            Text("\(inventory.logicalCPUCount) logical CPUs · \(inventory.operatingSystem)")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                    if !model.section.lanes.isEmpty {
+                        Button("Compare in Timeline", systemImage: "chart.xyaxis.line") {
+                            model.navigate(to: .timeline)
+                        }
+                    }
+                }
+
+                if let error = model.collectionError {
+                    Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.red)
+                    Button("Retry collection") {
+                        model.stop()
+                        model.start()
+                    }
+                }
+                if let message = model.actionMessage {
+                    Text(message).font(.callout).foregroundStyle(.secondary)
+                }
+                if helperUnavailable != nil {
+                    Text(HelperAvailability.explanation)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                pageContent
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(Layout.padding)
+        }
+        // Each destination starts at its heading, not the previous page's scroll offset.
+        .id(model.section)
+        .navigationTitle(LocalizedStringKey(model.section.title))
+    }
+
+    @ViewBuilder private var pageContent: some View {
+        switch model.section {
+        case .overview:
+            OverviewView(model: model)
+            AskPanel(model: model, question: $askQuestion)
+        case .timeline:
+            ForEach(model.laneLayout.visible) { lanePresentation($0) }
+            AskPanel(model: model, question: $askQuestion)
+            if let report = model.rangeReport { RangePanel(model: model, report: report) }
+            Picker("Detail", selection: $model.detailPane) {
+                Text("Processes").tag(DetailPane.processes)
+                Text("Connections").tag(DetailPane.connections)
+                Text("Startup").tag(DetailPane.startup)
+                Text("Sensors").tag(DetailPane.sensors)
+                Text("Recordings").tag(DetailPane.sessions)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(maxWidth: 520)
+            detailPane
+            numericReadings
+        case .processes:
+            ProcessPane(model: model, filterFocused: $processFilterFocused)
+        case .startup:
+            StartupPane(model: model)
+        case .recordings:
+            SessionsPane(model: model)
+        default:
+            ForEach(model.section.lanes) { lanePresentation($0) }
+            if let report = model.rangeReport { RangePanel(model: model, report: report) }
+            detailPane
+            numericReadings
+        }
+    }
+
+    @ViewBuilder private var detailPane: some View {
+        switch model.detailPane {
+        case .processes: ProcessPane(model: model, filterFocused: $processFilterFocused)
+        case .connections: ConnectionsPane(model: model)
+        case .startup: StartupPane(model: model)
+        case .sensors: SensorsPane(model: model)
+        case .sessions: SessionsPane(model: model)
+        }
+    }
+
+    private func lanePresentation(_ kind: LaneKind) -> some View {
+        laneView(kind)
+            .environment(\.laneGraphHeight, model.section == .timeline
+                         ? Layout.graphHeight(model.laneLayout.size(of: kind)) : Layout.detailGraphHeight)
+            .overlay(alignment: .topTrailing) {
+                if model.section == .timeline {
+                    LaneMenu(model: model, lane: kind)
+                } else {
+                    Button("Facts and Sources", systemImage: "info.circle") { model.showLaneFacts(kind) }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.borderless)
+                        .padding(8)
+                }
+            }
+            .zIndex(kind == .cpu && inspection.isOpen ? 1 : 0)
+    }
+
+    @ViewBuilder private var numericReadings: some View {
+        if model.section == .timeline || model.section.lanes.contains(.cpu) {
+            DisclosureGroup("Numeric readings") {
+                Table(Array(model.frames.suffix(10))) {
+                    TableColumn("Time") { frame in
+                        Text(frame.stamp.wallTime, format: .dateTime.hour().minute().second())
+                    }
+                    TableColumn("CPU, whole machine") { frame in
+                        Text(MetricText.percent(frame.cpuPercentOfMachine.numericValue))
+                    }
+                    TableColumn("Used memory, estimated") { frame in
+                        Text(MetricText.bytes(frame.memoryUsedBytes.numericValue))
+                    }
+                    TableColumn("Thermal pressure") { frame in
+                        Text(ThermalText.level(frame.thermalPressure))
+                    }
+                }
+                .frame(height: 150)
+            }
+        }
+
+        if model.section == .timeline || model.section.lanes.contains(.memory) {
+            DisclosureGroup("Memory numeric readings") {
+                Table(Array(model.frames.suffix(10))) {
+                    TableColumn("Time") { Text($0.stamp.wallTime, format: .dateTime.hour().minute().second()) }
+                    TableColumn("Used") { ProcessMetricCell(reading: $0.memoryUsedBytes, format: .bytes) }
+                    TableColumn("App") { ProcessMetricCell(reading: $0.memory.appBytes, format: .bytes) }
+                    TableColumn("Wired") { ProcessMetricCell(reading: $0.memory.wiredBytes, format: .bytes) }
+                    TableColumn("Compressed") { ProcessMetricCell(reading: $0.memory.compressedBytes, format: .bytes) }
+                    TableColumn("Cached files") { ProcessMetricCell(reading: $0.memory.cachedBytes, format: .bytes) }
+                    TableColumn("Swap used") { ProcessMetricCell(reading: $0.memory.swapUsedBytes, format: .bytes) }
+                    TableColumn("Swap in/s") { ProcessMetricCell(reading: $0.memory.swapInBytesPerSecond, format: .rate) }
+                    TableColumn("Swap out/s") { ProcessMetricCell(reading: $0.memory.swapOutBytesPerSecond, format: .rate) }
+                    TableColumn("Pressure") { Text(MemoryText.pressure($0.memory.pressure)) }
+                }
+                .frame(height: 150)
+            }
+        }
+
+        if model.section == .timeline || model.section.lanes.contains(.gpu) {
+            DisclosureGroup("GPU numeric readings") {
+                Table(model.gpuReadings) {
+                    TableColumn("Time") { Text($0.time, format: .dateTime.hour().minute().second()) }
+                    TableColumn("GPU", value: \.name)
+                    TableColumn("Busy") { ProcessMetricCell(reading: $0.device.utilizationPercent, format: .percent) }
+                    TableColumn("Renderer") { ProcessMetricCell(reading: $0.device.rendererPercent, format: .percent) }
+                    TableColumn("Tiler") { ProcessMetricCell(reading: $0.device.tilerPercent, format: .percent) }
+                    TableColumn("Memory in use") { ProcessMetricCell(reading: $0.device.inUseMemoryBytes, format: .bytes) }
+                }
+                .frame(height: 150)
+            }
+        }
+
+        if model.section == .timeline || model.section.lanes.contains(.thermal) {
+            DisclosureGroup("Sensor numeric readings") {
+                Table(Array(model.sensorFrames.suffix(10))) {
+                    TableColumn("Time") { Text($0.stamp.wallTime, format: .dateTime.hour().minute().second()) }
+                    TableColumn("Hottest sensor") { Text($0.hottest?.key ?? "–") }
+                    TableColumn("Temperature") { Text(ThermalText.celsius($0.hottest?.celsius.numericValue)) }
+                    TableColumn("SMC system power") { ProcessMetricCell(reading: $0.systemPowerWatts, format: .watts) }
+                    TableColumn("Fans") { Text($0.fans.map { ThermalText.rpm($0.rpm.numericValue) }.joined(separator: ", ")) }
+                }
+                .frame(height: 150)
+            }
+        }
+
+        if model.section == .timeline || model.section.lanes.contains(.power) {
+            DisclosureGroup("Power numeric readings") {
+                Table(Array(model.powerFrames.suffix(10))) {
+                    TableColumn("Time") { Text($0.stamp.wallTime, format: .dateTime.hour().minute().second()) }
+                    TableColumn("Source") { Text(PowerText.source($0)) }
+                    TableColumn("System draw") { ProcessMetricCell(reading: $0.systemPowerWatts, format: .watts) }
+                    TableColumn("Battery") { ProcessMetricCell(reading: $0.batteryChargePercent, format: .percent) }
+                    TableColumn("Battery power") { ProcessMetricCell(reading: $0.batteryPowerWatts, format: .watts) }
+                    TableColumn("Adapter rating") { ProcessMetricCell(reading: $0.adapterRatingWatts, format: .watts) }
+                }
+                .frame(height: 150)
+            }
+        }
+
+        if model.section == .timeline || model.section.lanes.contains(.network) {
+            DisclosureGroup("Network numeric readings") {
+                Table(model.networkReadings) {
+                    TableColumn("Time") { Text($0.time, format: .dateTime.hour().minute().second()) }
+                    TableColumn("Interface") { Text($0.interfaceName ?? "–") }
+                    TableColumn("Received/s") { ProcessMetricCell(reading: $0.received, format: .rate) }
+                    TableColumn("Sent/s") { ProcessMetricCell(reading: $0.sent, format: .rate) }
+                }
+                .frame(height: 150)
+            }
+        }
+
+        if model.section == .timeline || model.section.lanes.contains(.disk) {
+            DisclosureGroup("Disk numeric readings") {
+                Table(model.diskReadings) {
+                    TableColumn("Time") { Text($0.time, format: .dateTime.hour().minute().second()) }
+                    TableColumn("Device") { Text($0.deviceName ?? $0.status ?? "–") }
+                    TableColumn("Read/s") { row in
+                        if let reading = row.read { ProcessMetricCell(reading: reading, format: .rate) }
+                        else { Text("–") }
+                    }
+                    TableColumn("Written/s") { row in
+                        if let reading = row.written { ProcessMetricCell(reading: reading, format: .rate) }
+                        else { Text("–") }
+                    }
+                }
+                .frame(height: 150)
+            }
+        }
     }
 
     private func braidGeometry(_ braid: CPUBraid, _ rect: CGRect, _ window: ClosedRange<Date>) -> BraidGeometry {
@@ -385,6 +491,8 @@ struct DashboardView: View {
     /// and Down choose a strand, Return catches the chosen app (or the
     /// biggest), Escape folds. Escape on a closed braid clears the scope.
     private func braidKey(_ press: BraidKeyPress) -> Bool {
+        guard model.section == .cpu || (model.section == .timeline && model.laneLayout.visible.contains(.cpu))
+        else { return false }
         guard !model.paletteShown, !model.markerPromptShown, !model.annotationPromptShown, model.typingFields.isEmpty
         else { return false }
         switch (press.key, inspection.phase) {
@@ -468,8 +576,9 @@ struct DashboardView: View {
 
     private func lane(_ metric: DashboardMetric) -> some View {
         let reading = model.reading(for: metric)
-        let laneSize = model.laneLayout.size(of: .cpu)
-        let graphHeight = Layout.graphHeight(laneSize)
+        let section = model.section
+        let laneSize = section == .timeline ? model.laneLayout.size(of: .cpu) : .regular
+        let graphHeight = model.section == .timeline ? Layout.graphHeight(laneSize) : Layout.detailGraphHeight
         let title = metric == .cpu ? String(localized: "CPU") : String(localized: "Memory")
         let maximum = metric == .cpu
             ? MetricText.percentScale
@@ -495,7 +604,7 @@ struct DashboardView: View {
         // Rows come from every recorded tier, so scrubbing never adds or drops one.
         let tierRows = Array(Set(allTiers.map(\.tier))).sorted()
         // The lane's detail (plan: double-click expands it): every core's activity.
-        let showsCores = metric == .cpu && model.expandedLanes.contains(.cpu)
+        let showsCores = metric == .cpu && model.showsLaneDetail(.cpu)
         let cores = showsCores ? model.coreHeatCells(in: start...end, maximumColumns: Layout.coreColumns) : []
         let clusters = showsCores
             ? model.clusterActivityPoints()
@@ -504,11 +613,8 @@ struct DashboardView: View {
         return HStack(alignment: .top, spacing: 24) {
             VStack(alignment: .leading, spacing: 10) {
                 Text(title).font(.caption.weight(.medium)).foregroundStyle(.secondary)
-                    .onTapGesture(count: 2) { if metric == .cpu { model.toggleDetail(.cpu) } }
-                    .help(String(localized: "Double-click to show or hide each core"))
-                    .accessibilityActions {
-                        if metric == .cpu { Button("Show or hide detail") { model.toggleDetail(.cpu) } }
-                    }
+                    .modifier(TimelineDetailToggle(model: model, lane: .cpu,
+                        hint: String(localized: "Double-click to show or hide each core")))
                 Text(metric == .cpu
                      ? MetricText.percent(reading?.numericValue)
                      : MetricText.bytes(reading?.numericValue))
@@ -624,7 +730,6 @@ struct DashboardView: View {
                             }
                         }
                     }
-                    .onAppear { if metric == .cpu { braidKeys.install(braidKey) } }
                     .accessibilityActions {
                         if let braid {
                             Button(inspection.isOpen ? "Close the CPU braid" : "Open the CPU braid") {
@@ -640,7 +745,6 @@ struct DashboardView: View {
                     .onDisappear {
                         guard metric == .cpu else { return }
                         inspection.reset(model: model)
-                        braidKeys.remove()
                     }
                     .onChange(of: braid == nil) { _, gone in if gone { inspection.reset(model: model) } }
                     // A new range or a return to live takes the inspected moment away.
@@ -674,6 +778,7 @@ struct DashboardView: View {
                         title: title, metric: metric, points: points,
                         start: start, end: end, maximum: max(1, maximum)
                     ))
+                    .accessibilityIdentifier("cpu-chart")
                     // Sheds first when the lane is compact (plan: lane sizes).
                     if laneSize != .compact, !tiers.isEmpty {
                         TierStrip(cells: tiers, tiers: tierRows, range: start...end)
@@ -695,6 +800,23 @@ struct DashboardView: View {
     }
 }
 
+private struct TimelineDetailToggle: ViewModifier {
+    let model: DashboardModel
+    let lane: LaneKind
+    let hint: String
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if model.section == .timeline {
+            content
+                .onTapGesture(count: 2) { model.toggleDetail(lane) }
+                .help(hint)
+                .accessibilityAction(named: Text("Show or hide detail")) { model.toggleDetail(lane) }
+        } else {
+            content
+        }
+    }
+}
+
 private struct MemoryLane: View {
     @Environment(\.laneGraphHeight) private var graphHeight
     @Bindable var model: DashboardModel
@@ -712,9 +834,8 @@ private struct MemoryLane: View {
         HStack(alignment: .top, spacing: 24) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Memory").font(.caption.weight(.medium)).foregroundStyle(.secondary)
-                    .onTapGesture(count: 2) { model.toggleDetail(.memory) }
-                    .help(String(localized: "Double-click to show or hide swap and page-ins over time"))
-                    .accessibilityAction(named: Text("Show or hide detail")) { model.toggleDetail(.memory) }
+                    .modifier(TimelineDetailToggle(model: model, lane: .memory,
+                        hint: String(localized: "Double-click to show or hide swap and page-ins over time")))
                 Text(MetricText.bytes(used?.numericValue))
                     .font(.system(size: 30, weight: .semibold))
                 Text("of \(MetricText.bytes(capacity)) used, estimated").font(.caption)
@@ -742,7 +863,7 @@ private struct MemoryLane: View {
                     chart(stack: stack, pressure: pressure, capacity: capacity, start: start, end: end)
                 }
                 // The lane's detail (plan: swap rate and page-ins over time).
-                if model.expandedLanes.contains(.memory) {
+                if model.showsLaneDetail(.memory) {
                     TransferMultiples(
                         series: model.pagingSeries(in: start...end), range: start...end,
                         idleNote: String(localized: "No swapping or page-ins in this range")
@@ -1089,9 +1210,8 @@ private struct PowerLane: View {
         HStack(alignment: .top, spacing: 24) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Power").font(.caption.weight(.medium)).foregroundStyle(.secondary)
-                    .onTapGesture(count: 2) { model.toggleDetail(.power) }
-                    .help(String(localized: "Double-click to show or hide battery capacity and sleep assertions"))
-                    .accessibilityAction(named: Text("Show or hide detail")) { model.toggleDetail(.power) }
+                    .modifier(TimelineDetailToggle(model: model, lane: .power,
+                        hint: String(localized: "Double-click to show or hide battery capacity and sleep assertions")))
                 Text(MetricText.watts(system?.numericValue) + (system?.availability == .estimated ? " est." : ""))
                     .font(.system(size: 30, weight: .semibold))
                 Text(PowerText.systemSource(system)).font(.caption)
@@ -1116,7 +1236,7 @@ private struct PowerLane: View {
                     chart(points: points, plugged: plugged, start: start, end: end)
                 }
                 // The lane's detail (plan: battery health as nested bars, assertions).
-                if model.expandedLanes.contains(.power) {
+                if model.showsLaneDetail(.power) {
                     PowerDetail(frame: latest, holders: model.sleepPreventers)
                 }
             }
@@ -1543,9 +1663,8 @@ private struct NetworkLane: View {
         HStack(alignment: .top, spacing: 24) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Network").font(.caption.weight(.medium)).foregroundStyle(.secondary)
-                    .onTapGesture(count: 2) { model.toggleDetail(.network) }
-                    .help(String(localized: "Double-click to show or hide each interface"))
-                    .accessibilityAction(named: Text("Show or hide detail")) { model.toggleDetail(.network) }
+                    .modifier(TimelineDetailToggle(model: model, lane: .network,
+                        hint: String(localized: "Double-click to show or hide each interface")))
                 Text("↓ " + MetricText.rate(receiveReading?.numericValue))
                     .font(.system(size: 24, weight: .semibold))
                 Text("↑ " + MetricText.rate(sendReading?.numericValue))
@@ -1586,7 +1705,7 @@ private struct NetworkLane: View {
                     )
                 }
                 // The lane's detail (plan: per-interface small multiples).
-                if model.expandedLanes.contains(.network) {
+                if model.showsLaneDetail(.network) {
                     TransferMultiples(
                         series: model.interfaceSeries(in: start...end), range: start...end,
                         idleNote: String(localized: "No interface moved data in this range")
@@ -1633,9 +1752,8 @@ private struct DiskLane: View {
         HStack(alignment: .top, spacing: 24) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Disk").font(.caption.weight(.medium)).foregroundStyle(.secondary)
-                    .onTapGesture(count: 2) { model.toggleDetail(.disk) }
-                    .help(String(localized: "Double-click to show or hide each device"))
-                    .accessibilityAction(named: Text("Show or hide detail")) { model.toggleDetail(.disk) }
+                    .modifier(TimelineDetailToggle(model: model, lane: .disk,
+                        hint: String(localized: "Double-click to show or hide each device")))
                 Text("↓ " + MetricText.rate(model.reading(for: .diskRead)?.numericValue))
                     .font(.system(size: 24, weight: .semibold))
                 Text("↑ " + MetricText.rate(model.reading(for: .diskWritten)?.numericValue))
@@ -1651,7 +1769,7 @@ private struct DiskLane: View {
                    inventory.enumerationTruncated || !inventory.issues.isEmpty {
                     Text("Storage inventory is incomplete.").font(.caption).foregroundStyle(.secondary)
                 }
-                VolumeBars(list: model.volumes)
+                VolumeBars(list: model.volumes, space: model.space, preferences: model.preferences)
             }
             .monospacedDigit()
             .frame(width: Layout.headerWidth, alignment: .leading)
@@ -1667,7 +1785,7 @@ private struct DiskLane: View {
                     )
                 }
                 // The lane's detail (plan: per-device small multiples, never summed).
-                if model.expandedLanes.contains(.disk) {
+                if model.showsLaneDetail(.disk) {
                     TransferMultiples(
                         series: model.deviceSeries(in: start...end), range: start...end,
                         idleNote: String(localized: "No device moved data in this range")
@@ -1939,6 +2057,7 @@ private struct ProcessPane: View {
     @State private var pendingAction: ProcessActionRequest?
     /// Which columns show, in which order; the header's menu changes it (plan: opt-in columns).
     @State private var columns: TableColumnCustomization<ProcessRow>
+    @State private var expanded = true
 
     init(model: DashboardModel, filterFocused: FocusState<Bool>.Binding) {
         self.model = model
@@ -1949,7 +2068,7 @@ private struct ProcessPane: View {
     var body: some View {
         let rows = model.visibleProcessRows
         let heat = HeatScale(rows)
-        DisclosureGroup("Processes") {
+        DisclosureGroup("Processes", isExpanded: $expanded) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     TextField("Filter: name, cpu:>10, mem:>1GB, user:me, port:443, file:~/Downloads, #apps, #new, #listening, #preventing-sleep, #rosetta, #not-responding", text: $model.processFilter)
@@ -2024,7 +2143,10 @@ private struct ProcessPane: View {
                             .help(isNew ? String(localized: "Started within the last 10 seconds") : ProcessText.grouping(row.groupingMethod))
                             .contextMenu {
                                 if !row.appName.isEmpty {
-                                    Button("Show \(row.appName) in lanes") { model.scopedApp = row.appName }
+                                    Button("Show \(row.appName) in Timeline") {
+                                        model.scopedApp = row.appName
+                                        model.navigate(to: .timeline)
+                                    }
                                 }
                                 if let process = row.process {
                                     ProcessActionMenu(model: model, process: process, pendingAction: $pendingAction)
@@ -2144,7 +2266,7 @@ private struct ProcessPane: View {
                         .defaultVisibility(.hidden)
                     }
                 }
-                .frame(height: 260)
+                .frame(height: model.section == .timeline ? Layout.tableHeight : Layout.detailTableHeight)
                 .onChange(of: columns) { _, chosen in ProcessColumns.save(chosen, in: model.preferences) }
                 // Signatures are read from disk, so checks start only while their
                 // column shows. `.automatic` is the column's hidden default.
@@ -2816,12 +2938,13 @@ private enum ProcessText {
 /// read only while this pane shows or a filter asks for `#listening`.
 private struct ConnectionsPane: View {
     @Bindable var model: DashboardModel
+    @State private var expanded = true
 
     var body: some View {
         let rows = model.appConnections.flatMap { app in
             (app.listening + app.connected).map { ConnectionRow(app: app.app, connection: $0) }
         }
-        DisclosureGroup("Connections") {
+        DisclosureGroup("Connections", isExpanded: $expanded) {
             VStack(alignment: .leading, spacing: 10) {
                 TextField("Filter: app, process, address or port", text: $model.connectionFilter)
                     .modifier(ReportsTyping(model: model, field: "connections"))
@@ -2839,7 +2962,7 @@ private struct ConnectionsPane: View {
                     TableColumn("Remote") { Text($0.connection.remote.map(ConnectionText.endpoint) ?? "–") }
                     TableColumn("Server") { Text($0.connection.remote.flatMap { model.serverNames[$0.address] } ?? "–") }
                 }
-                .frame(height: 260)
+                .frame(height: model.section == .timeline ? Layout.tableHeight : Layout.detailTableHeight)
             }
         }
     }
@@ -2849,9 +2972,10 @@ private struct ConnectionsPane: View {
 /// Startup tab). Read-only; Apple's items hidden by default.
 private struct StartupPane: View {
     @Bindable var model: DashboardModel
+    @State private var expanded = true
 
     var body: some View {
-        DisclosureGroup("Startup") {
+        DisclosureGroup("Startup", isExpanded: $expanded) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Picker("Show", selection: $model.startupVisibility) {
@@ -2895,7 +3019,7 @@ private struct StartupPane: View {
                     TableColumn("Footprint") { Text(MetricText.bytes($0.memoryFootprintBytes)) }
                     TableColumn("App CPU, last hour") { Text($0.appCPUSecondsLastHour.map(RangeText.cpuSeconds) ?? "–") }
                 }
-                .frame(height: 260)
+                .frame(height: model.section == .timeline ? Layout.tableHeight : Layout.detailTableHeight)
             }
         }
         .monospacedDigit()
@@ -2944,12 +3068,13 @@ private enum StartupText {
 /// percentile from raw readings, maximum, and the top apps.
 private struct SessionsPane: View {
     @Bindable var model: DashboardModel
+    @State private var expanded = true
     @State private var exportFile: ExportFile?
     @State private var exportType: UTType = .json
     @State private var exportError: String?
 
     var body: some View {
-        DisclosureGroup("Sessions") {
+        DisclosureGroup("Recordings", isExpanded: $expanded) {
             VStack(alignment: .leading, spacing: 12) {
                 if let comparison = model.sessionComparison {
                     SessionComparisonView(comparison: comparison)
@@ -3086,9 +3211,10 @@ private enum SessionText {
 /// Every sensor with current, minimum, maximum and mean since reset (plan P15).
 private struct SensorsPane: View {
     let model: DashboardModel
+    @State private var expanded = true
 
     var body: some View {
-        DisclosureGroup("Sensors") {
+        DisclosureGroup("Sensors", isExpanded: $expanded) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text(SensorText.since(model.sensorStatsSince))
@@ -3106,7 +3232,7 @@ private struct SensorsPane: View {
                     TableColumn("Max") { Text(SensorText.value($0.maximum, of: $0)) }
                     TableColumn("Average") { Text(SensorText.value($0.mean, of: $0)) }
                 }
-                .frame(height: 260)
+                .frame(height: model.section == .timeline ? Layout.tableHeight : Layout.detailTableHeight)
             }
         }
         .monospacedDigit()
@@ -3944,6 +4070,9 @@ private enum Layout {
     static let headerWidth: CGFloat = 180
     static let axisLabelWidth: CGFloat = 96
     static let regularGraphHeight: CGFloat = 120
+    static let detailGraphHeight: CGFloat = 200
+    static let tableHeight: CGFloat = 260
+    static let detailTableHeight: CGFloat = 420
 
     static func graphHeight(_ size: LaneSize) -> CGFloat {
         switch size {
@@ -4261,9 +4390,9 @@ private struct ClusterActivityChart: View {
 /// Each visible volume's used share and free space (plan: per-volume capacity).
 private struct VolumeBars: View {
     private static let shown = 4
-    /// Red is for bad states only; this matches the startup-disk alert's 10 % free.
-    private static let nearlyFull = 0.9
     let list: CapturedVolumes?
+    let space: SpaceSurveyor
+    let preferences: UserDefaults
 
     var body: some View {
         if let list {
@@ -4271,21 +4400,30 @@ private struct VolumeBars: View {
                 Text(problem).font(.caption).foregroundStyle(.secondary)
             }
             ForEach(list.volumes.prefix(Self.shown)) { volume in
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(volume.name) · \(MetricText.bytes(Double(volume.availableBytes))) free")
-                        .font(.caption)
-                        .lineLimit(1)
-                    ProgressView(value: volume.usedFraction)
-                        .progressViewStyle(.linear)
-                        .tint(volume.usedFraction > Self.nearlyFull ? .red : .blue)
+                // The startup volume holds the home folder, so only it can be taken apart.
+                if volume.isStartup {
+                    SpaceRope(volume: volume, space: space, detail: VolumeText.detail(volume), preferences: preferences)
+                } else {
+                    bar(volume)
                 }
-                .help(VolumeText.detail(volume))
-                .accessibilityElement(children: .combine)
             }
             if list.volumes.count > Self.shown {
                 Text("+\(list.volumes.count - Self.shown) more volumes").font(.caption).foregroundStyle(.secondary)
             }
         }
+    }
+
+    private func bar(_ volume: CapturedVolume) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("\(volume.name) · \(MetricText.bytes(Double(volume.availableBytes))) free")
+                .font(.caption)
+                .lineLimit(1)
+            ProgressView(value: volume.usedFraction)
+                .progressViewStyle(.linear)
+                .tint(volume.usedFraction > SpaceRope.nearlyFull ? .red : .blue)
+        }
+        .help(VolumeText.detail(volume))
+        .accessibilityElement(children: .combine)
     }
 }
 

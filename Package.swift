@@ -66,7 +66,7 @@ let runningManTargets: [Target] = []
 let runningManModule: [Target.Dependency] = []
 
 // MARK: Coreography
-// The engine moved as SwiftPM targets (Coreography@664a49f). Its sources
+// The engine moved as SwiftPM targets (Coreography@f9820e6). Its sources
 // are Swift 6, so every Coreography target keeps that language mode.
 // CSQLite became CoreographySQLite: target names are package-wide.
 let coreographySwift6: [SwiftSetting] = [.swiftLanguageMode(.v6)]

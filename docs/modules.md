@@ -221,12 +221,14 @@ SwiftPM.
 The system monitor: CPU/memory/disk/network lanes, process table, menu-bar
 extra, widgets, Shortcuts actions, a `coreo` CLI. `.xcodeproj` today.
 
-- **Status:** available. The pane is the monitor window (lanes, process
-  table, inspector, connections, startup items, sensors, sessions, Ask,
-  the command palette); the menu section is its menu-bar extra (CPU,
-  memory, network and disk mini lanes, the top process, pause, hold, HUD);
-  Settings has a Coreography tab.
-- **Provenance:** Coreography@664a49f6f40e35b2072af76bace8bac58afa427b
+- **Status:** available. The pane is the monitor window: a sidebar of
+  sections (Overview cards, CPU, Memory, GPU, Storage, Network, Power &
+  Thermals, Processes, Timeline, Startup, Recordings), with lanes, the
+  process table, inspector, connections, sensors, the startup volume's
+  space lens, Ask and the command palette. The menu section is its
+  menu-bar extra (CPU, memory, network and disk mini lanes, the top
+  process, pause, hold, HUD). Settings has a Coreography tab.
+- **Provenance:** Coreography@f9820e66467e0991d2130a9d4d0c7ea6b00e3b8b
 - **Targets:** `CoreographySystem` (C), `CoreographySQLite` (the source's
   `CSQLite`, renamed because target names are package-wide),
   `CoreographyDrivers`, `CoreographyKit`, `CoreographyServices` with their
@@ -253,27 +255,34 @@ extra, widgets, Shortcuts actions, a `coreo` CLI. `.xcodeproj` today.
   check, and nothing resolves before the watcher has measured a full hour.
   The standalone battery alert stays out: macOS warns itself and watchers
   pause on battery by default.
-- **Preselection:** nothing. Routes only navigate: `process?name=` filters
-  the process table by name and sorts by CPU, `memory` and `storage` sort it
-  by memory or disk writes, `thermal` shows the sensors. No row is selected
-  and no action is armed; quitting or signalling a process keeps its own
-  confirmation.
+- **Preselection:** nothing. Routes only navigate: `process?name=` opens
+  Processes filtered by name and sorted by CPU; `memory` and `storage` open
+  their sections with the process table by memory or disk writes;
+  `thermal` opens Power & Thermals with the sensors. No row is selected, no
+  action is armed and no space survey starts; quitting or signalling a
+  process keeps its own confirmation.
 - **Privilege:** the root XPC helper is Team-ID pinned, so ad-hoc suite
   builds leave it out (not embedded). Features behind it (other users'
   processes, spindump, raising priority, login and background items) show
   "Needs a signed build"; Settings shows the helper as unavailable.
-- **Left out:** the helper; the widgets and the briefing writer that feeds
-  them; App Intents (SwiftPM cannot extract their metadata); the `coreo`
-  CLI; the self update checker; the Dock tile graph and the menu-bar title
-  items (the shell owns the Dock and the status item); `coreography://`
-  links and opening `.coreotrace` from Finder (the suite registers no URL
-  scheme or document type; Open Recording… in the Tool menu reads them).
+- **Left out:** the helper; the widgets, their refresh and the briefing
+  writer that feeds them; App Intents (SwiftPM cannot extract their
+  metadata); the `coreo` CLI; the self update checker; the background
+  mode, its login item and Dock presence, and the menu's Settings and Quit
+  buttons (the suite's resident mode, login item and companion cover
+  them); the Dock tile graph and the menu-bar title items (the shell owns
+  the Dock and the status item); `coreography://` links and opening
+  `.coreotrace` from Finder (the suite registers no URL scheme or document
+  type; Open Recording… in the Tool menu reads them).
 - **State:** preferences use the module's store under their old keys, so
   the standalone app's settings do not carry over. History, sessions
   (`…/Coreography/Sessions`), the MCP socket (`…/Coreography/mcp.sock`) and
   the Keychain items (`ch.lkmc.Coreography.provider`) keep their places.
   Whether an Ask key exists is read from Keychain attributes, so opening
   the pane does not prompt; using a key the standalone app saved may.
+  The space lens walks only folders that never prompt until the person
+  asks it to include Desktop, Documents, Downloads, app data and cloud
+  drives; that choice (`spaceAccess`) is kept in the module's store.
 - **MCP and Ask:** kept, off by default and on request as before. The suite
   does not ship `coreo`; clients use the standalone app's
   `Coreography.app/Contents/Helpers/coreo mcp --stdio`, which the client

@@ -55,15 +55,15 @@ public enum CoreographyWatch {
     // MARK: Routes
 
     /// Actions a route may name and the context each accepts. They only
-    /// navigate: filter or sort the process table, or show the sensors.
+    /// navigate: open a section of the pane and filter or sort its table.
     public enum Action {
         /// The process table filtered to `name`, busiest first.
         public static let process = "process"
-        /// The process table by memory.
+        /// The memory section, its process table by memory.
         public static let memory = "memory"
-        /// The sensors pane.
+        /// The power and thermal section with its sensors.
         public static let thermal = "thermal"
-        /// The process table by disk writes.
+        /// The storage section, its process table by disk writes.
         public static let storage = "storage"
     }
 
