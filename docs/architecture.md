@@ -57,9 +57,10 @@ click suggestion ──▶ deep link ──▶ module pane ──▶ explicit co
 
 - **Watchers** run on a cadence (per-module interval, coalesced). They must be
   cheap and must not require privilege *to look*. The canonical example is
-  DockVac's watcher reusing the unprivileged Engine API client it inherits
-  from the standalone app — DockVac never shells out to the `docker` CLI.
-  A check that needs privilege is a tool action, not a watcher.
+  DockVac's watcher reusing the Engine API client it inherits from the
+  standalone app: reading the local Docker socket needs no elevation, and
+  DockVac never shells out to the `docker` CLI. A check that needs privilege
+  is a tool action, not a watcher.
 - **Rules** turn a finding into at most one suggestion per `key`. Thresholds
   ("≥ 4 GB reclaimable", "≥ 1 runner offline ≥ 10 min") live with the module.
 - **SuggestionStore** dedupes by `key` (a repeated finding refreshes, never
