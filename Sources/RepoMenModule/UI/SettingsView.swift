@@ -24,8 +24,10 @@ struct SettingsView: View {
 private struct GeneralSettingsView: View {
     @EnvironmentObject private var preferences: Preferences
 
+    // A VStack, not a columns Form: the Form puts the Stepper's label in a leading
+    // column, which squeezes every checkbox and caption past the window edge.
     var body: some View {
-        Form {
+        VStack(alignment: .leading, spacing: 8) {
             Toggle("Move reclaimed items to the Trash", isOn: $preferences.moveToTrash)
             Text(preferences.moveToTrash
                  ? "Reversible — drag items back out of the Trash if you change your mind."
@@ -36,11 +38,13 @@ private struct GeneralSettingsView: View {
             Stepper(value: $preferences.idleDays, in: 1...365) {
                 Text("Consider artifacts idle after \(preferences.idleDays) days")
             }
+            .padding(.top, 6)
             Text("Used by the “Select idle” quick action in the pane, and as the threshold for newly watched folders.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             Divider()
+                .padding(.vertical, 4)
 
             Toggle("Scan automatically when RepoMen opens", isOn: $preferences.scanAtLaunch)
         }

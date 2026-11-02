@@ -60,7 +60,7 @@ Docker disk-usage treemap with selective reclaim — deliberately not a broad
 Finds developer caches and build artifacts — `target/`, `node_modules/`,
 DerivedData, Homebrew caches — and reclaims them by age and size.
 
-- **Provenance:** RepoMen@5cc7be5e38f48fe12be359ec6feb764a6fbd8b09
+- **Provenance:** RepoMen@afd1fcb02929ecbeec0deeef5bb84b30d0a89b19
 - **Status:** available. The `.xcodeproj` is ported to SwiftPM:
   `RepoMenCore` (scan, ageing, selection, reclaim verification; Foundation
   only) and `RepoMenModule` (the pane, the osascript and `tmutil` runners,
