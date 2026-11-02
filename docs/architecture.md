@@ -69,19 +69,37 @@ click suggestion ──▶ deep link ──▶ module pane ──▶ explicit co
 - **Deep links**: `murten://<moduleID>[/<action>]` inside the app; each pane
   can register a payload (e.g. DockVac's "reclaimable set selected").
 
-## Privilege model
+## Privilege and capability model
 
-Merging tools into one binary must not union their privileges. The rules:
+Per-module confirmation is a product boundary, not process isolation. Swift
+package targets in one executable share its process and available capabilities;
+a module name does not isolate TCC grants, file access, credentials or sockets.
+Do not promise OS-enforced per-module permissions in the single-process shell.
 
-- The app itself asks for nothing ambiently. TCC-sensitive *observation* stays
-  read-only and per-module.
-- A repair path belongs to its module and asks at write time — e.g. the
-  HallPass module keeps its osascript write boundary; the DeviceControlDoctor
-  module keeps its confirmed `tccutil reset`; DockVac keeps its Docker socket
-  use scoped to the delete action.
-- If a module ever needs a privileged helper (it shouldn't, for the confirmed
-  roster), it ships an `SMAppService`-registered helper for that module only —
-  never a suite-wide root daemon.
+- Watchers receive observation-only domain services, not repair services or
+  raw command/socket clients. Pure cores describe findings and repair plans;
+  application services own side effects; adapters own OS access.
+- Observation never prompts for administrator access or a new privacy grant.
+  If a capability is unavailable, report the check as unavailable. Offer setup
+  in the module after the user opens it; do not silently treat it as healthy.
+- Repair coordinators require explicit confirmation of the current target and
+  operation. HallPass retains its baseline re-check and rollback;
+  DeviceControlDoctor retains its scoped, confirmed `tccutil reset`.
+- DockVac scans already use the Docker Engine API over a Unix socket or SSH.
+  The connection can also authorize mutation; a read operation is not a
+  read-only credential. Give the watcher only a scan interface. Never run
+  cleanup through that interface or initiate remote authentication prompts
+  from a background poll.
+- HallPass currently authorizes both reads and writes through osascript.
+  Its existing read service is therefore not a watcher. Any drift watcher
+  needs a separate unprivileged signal, or remains on-demand.
+- Before adding a permission-sensitive module, record its capabilities,
+  requesting identity, prompts and background behavior. If OS-enforced
+  isolation is required, design and verify a separate process/identity and a
+  narrow interface first; moving code to another target is insufficient.
+- Any privileged helper must have a module-specific interface and explicit
+  write-time authorization. Use `SMAppService` where appropriate; never add a
+  suite-wide root daemon or expose arbitrary command execution.
 
 ## Resident mode
 

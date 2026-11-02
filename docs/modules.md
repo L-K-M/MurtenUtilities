@@ -17,7 +17,9 @@ Docker disk-usage treemap with selective reclaim — deliberately not a broad
   `DockVacCore`; the treemap pane as its first real suite pane.
 - **Watcher:** `docker system df` on a slow cadence → "Docker is holding ~X GB"
   at a configurable threshold. The proof-of-concept for the whole pipeline.
-- **Privilege:** none to observe; the Docker socket only on the delete action.
+- **Capability:** scans and deletion both use the Docker Engine connection
+  (Unix socket or SSH). A watcher gets a scan-only service interface, not the
+  mutation client; the daemon connection itself is not a read-only grant.
 
 ### RepoMen — effort: medium — phase 3
 
@@ -71,8 +73,9 @@ privileged osascript with baseline re-check and rollback.
 - **Migrates:** `HallPassCore` + pane. Its privileged write path is the case
   study for "per-module privilege stays per-module" — it keeps its own
   confirmation flow inside the suite.
-- **Watcher:** little to offer; keep it on-demand. (Candidate: drift check —
-  "your exemptions changed since you last saved".)
+- **Watcher:** keep it on-demand. The current read service also requests
+  administrator access, so it cannot back a watcher. A future "exemptions
+  changed" check needs an unprivileged signal first.
 
 ### Zen Backup Manager — effort: medium — phase 3
 
