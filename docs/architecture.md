@@ -17,10 +17,14 @@ Sources/
     (later)             DeepLinkRouter, per-module pane hosts, Settings
   <Tool>Core/         migrated pure logic per tool (DockVacCore, …) — one
                       target each, kept free of AppKit/spawn/privilege
+  <Tool>Services/     the IO side a watcher needs when the source app has
+                      one (DockVacDocker's Engine client, a runner front) —
+                      library targets with injectable boundaries
   <Tool>Pane or in-app  each module's SwiftUI pane
 Tests/
   MurtenCoreTests/    contracts: registry invariants, dedupe/snooze rules
   <Tool>CoreTests/    each migrated core keeps its existing suite
+  <Tool>ServicesTests/  watcher logic against fixtures, never the live system
 ```
 
 Two extension points everything hangs off:
@@ -40,6 +44,13 @@ public struct Suggestion: Identifiable, Equatable, Sendable {
     public let detail: String
 }
 ```
+
+Watcher implementations live in the `<Tool>Services` layer, not in
+`MurtenCore` (which stays pure) and not in the app executable: a SwiftPM
+test target cannot import an executable target, so fixture-tested watchers
+must sit in importable libraries behind injectable process/socket
+boundaries. DockVac's existing `DockVacDocker` + `DockVacDockerTests` pair
+is the pattern to copy.
 
 ## The suggestion pipeline
 
