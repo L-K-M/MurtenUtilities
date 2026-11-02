@@ -106,8 +106,9 @@ Revisit only if the standalone apps stay alive long-term — at that point the
 shared cores could be extracted into their own tiny packages both sides
 consume.
 
-Per-module update checks do not migrate. Four roster apps poll their own
-GitHub releases, on by default:
+Per-module update checks do not migrate. Four roster apps check for new
+releases of themselves, on by default (RunningMan through a manifest file,
+the others through the GitHub releases API):
 
 | App | Checker | Announces with |
 | --- | --- | --- |
