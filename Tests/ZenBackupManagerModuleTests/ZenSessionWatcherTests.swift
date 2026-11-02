@@ -83,17 +83,23 @@ final class ZenSessionWatcherTests: XCTestCase {
         XCTAssertNil(observation.failures.first?.scope)
     }
 
-    func testAProfileThatLeftZensListResolves() async {
+    func testAProfileThatLeftZensListResolves() async throws {
         let source = FakeSource()
-        let watcher = watcher(source)
         source.set([work, home], dates: [work.id: now.addingTimeInterval(-9 * day), home.id: now.addingTimeInterval(-9 * day)])
-        _ = await watcher.observe()
+        let rule = SessionStalenessRule()
+        var ledger = SuggestionLedger()
+        let first = await watcher(source).observe()
+        let departed = try XCTUnwrap(first.findings.first { $0.scope == FindingScope(work.id) }?.key)
+        XCTAssertTrue(ledger.apply(first, rule: rule).contains(.opened(departed)), "the profile's suggestion is active")
 
+        // A fresh watcher is the relaunch case: nothing remembers the profile.
         source.set([home], dates: [home.id: now.addingTimeInterval(-9 * day)])
-        let observation = await watcher.observe()
+        let second = await watcher(source).observe()
 
-        XCTAssertTrue(observation.completedScopes.contains(FindingScope(work.id)), "checked and absent")
-        XCTAssertFalse(observation.findings.contains { $0.scope == FindingScope(work.id) })
+        XCTAssertEqual(second.coverage, .exhaustive)
+        XCTAssertFalse(second.completedScopes.contains(FindingScope(work.id)), "the scope is absent, not completed")
+        XCTAssertFalse(second.findings.contains { $0.scope == FindingScope(work.id) })
+        XCTAssertTrue(ledger.apply(second, rule: rule).contains(.resolved(departed)))
     }
 
     func testCancellationLeavesTheRestUnchecked() async {

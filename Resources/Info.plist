@@ -14,4 +14,9 @@
     <key>NSRequiresAquaSystemAppearance</key><true/>
     <key>NSHumanReadableCopyright</key><string>Public domain (Unlicense)</string>
     <key>NSPrincipalClass</key><string>NSApplication</string>
+    <!-- Plain HTTP only to the local network (a LAN Forgejo for Obtainintosh
+         or RunningMan); public hosts stay HTTPS-only. -->
+    <key>NSAppTransportSecurity</key><dict>
+        <key>NSAllowsLocalNetworking</key><true/>
+    </dict>
 </dict></plist>

@@ -14,7 +14,6 @@ struct ZenSessionWatcher: Watcher {
 
     private let source: any SessionSnapshotSource
     private let now: @Sendable () -> Date
-    private let seen = SeenProfiles()
 
     init(source: any SessionSnapshotSource, now: @escaping @Sendable () -> Date = { Date() }) {
         self.source = source
@@ -56,27 +55,9 @@ struct ZenSessionWatcher: Watcher {
             }
         }
 
-        // A profile that left Zen's list was checked and is gone, so its
-        // suggestion resolves. The ledger does not tell a watcher which scopes
-        // are active, so only profiles listed since launch can be named.
-        completed.formUnion(seen.departed(listed: Set(profiles.map { FindingScope($0.id) })))
-
+        // Zen's profile list is every scope that exists, so a profile absent
+        // from it is gone: its suggestion resolves even after a relaunch.
         return WatchObservation(moduleID: moduleID, observedAt: observedAt, findings: findings,
-                                completedScopes: completed, failures: failures)
-    }
-}
-
-/// Profiles the watcher has listed since launch. A reference, so every copy
-/// of the watcher value shares it.
-private final class SeenProfiles: @unchecked Sendable {
-    private let lock = NSLock()
-    private var scopes = Set<FindingScope>()
-
-    /// Records `listed` and returns the profiles seen before but not listed now.
-    func departed(listed: Set<FindingScope>) -> Set<FindingScope> {
-        lock.lock()
-        defer { lock.unlock() }
-        scopes.formUnion(listed)
-        return scopes.subtracting(listed)
+                                completedScopes: completed, failures: failures, coverage: .exhaustive)
     }
 }
