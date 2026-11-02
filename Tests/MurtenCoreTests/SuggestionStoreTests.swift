@@ -57,6 +57,34 @@ final class SuggestionStoreTests: XCTestCase {
         XCTAssertTrue(persistence.quarantined)
     }
 
+    func testFailedQuarantineNeverOverwritesTheUnreadableFile() async {
+        struct Corrupt: Error {}
+        struct MoveFailed: Error {}
+        let persistence = MemoryPersistence(failure: Corrupt(), quarantineFailure: MoveFailed())
+        let store = SuggestionStore(persistence: persistence, knownModules: [dockvac])
+        _ = await store.load(at: t0)
+        await store.record(complete([reclaimable(8 * gigabyte)]), rule: ReclaimableRule(), at: t0)
+
+        XCTAssertEqual(persistence.saveCount, 0, "the unreadable file stays as it was")
+        let error = await store.persistenceError
+        XCTAssertNotNil(error, "the user is told suggestions are not being saved")
+        let shown = await store.suggestions(at: t0)
+        XCTAssertEqual(shown.count, 1, "the store keeps working in memory")
+    }
+
+    func testQuarantineNamesNeverCollide() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let persistence = JSONFileSuggestionPersistence(fileURL: directory.appendingPathComponent("suggestions.json"))
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        try Data("bad".utf8).write(to: persistence.fileURL)
+        let first = try XCTUnwrap(try persistence.quarantine())
+        try Data("bad again".utf8).write(to: persistence.fileURL)
+        let second = try XCTUnwrap(try persistence.quarantine())
+        XCTAssertNotEqual(first, second)
+    }
+
     func testChangesStreamYieldsOnRecord() async {
         let store = SuggestionStore(persistence: MemoryPersistence(), knownModules: [dockvac])
         let changes = await store.changes()

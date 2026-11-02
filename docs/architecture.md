@@ -182,7 +182,9 @@ Do not promise OS-enforced per-module permissions in the single-process shell.
   network checks, on metered networks (Settings › Background Checks; the
   first three default on, quiet hours off). Budgets: cadence ≥ 15 minutes,
   a per-cadence timeout (60 s default), at most two polls at once, failures
-  back off up to 6 hours, overdue checks after wake run once after 60 s.
+  back off up to 6 hours, overdue checks after wake run once after 60 s. A
+  watcher still running at its timeout is reported as timed out and its
+  slot freed; it is not polled again until that work ends.
 
 ## Module packaging
 

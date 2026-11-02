@@ -44,11 +44,14 @@ final class MemoryPersistence: SuggestionPersisting, @unchecked Sendable {
     private let lock = NSLock()
     private var saved: SuggestionLedger?
     private var failure: Error?
+    private let quarantineFailure: Error?
     private(set) var quarantined = false
+    private(set) var saveCount = 0
 
-    init(saved: SuggestionLedger? = nil, failure: Error? = nil) {
+    init(saved: SuggestionLedger? = nil, failure: Error? = nil, quarantineFailure: Error? = nil) {
         self.saved = saved
         self.failure = failure
+        self.quarantineFailure = quarantineFailure
     }
 
     var ledger: SuggestionLedger? {
@@ -65,10 +68,12 @@ final class MemoryPersistence: SuggestionPersisting, @unchecked Sendable {
     func save(_ ledger: SuggestionLedger) throws {
         lock.lock(); defer { lock.unlock() }
         saved = ledger
+        saveCount += 1
     }
 
     func quarantine() throws -> URL? {
         lock.lock(); defer { lock.unlock() }
+        if let quarantineFailure { throw quarantineFailure }
         quarantined = true
         failure = nil
         return nil

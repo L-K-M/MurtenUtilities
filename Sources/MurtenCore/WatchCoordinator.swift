@@ -13,7 +13,8 @@ public struct SystemWatchClock: WatchClock {
     public func now() -> Date { Date() }
 
     public func sleep(until deadline: Date) async throws {
-        let interval = deadline.timeIntervalSinceNow
+        // Capped at a day so the nanosecond count can never overflow.
+        let interval = min(deadline.timeIntervalSinceNow, 24 * 3600)
         guard interval > 0 else { return }
         try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
     }
@@ -27,6 +28,10 @@ public struct SystemWatchClock: WatchClock {
 ///     loop: start due polls (gate open, under the concurrency bound)
 ///           sleep until the next deadline or a signal (enable, wake, finish)
 ///     poll: observe ─race─ timeout → generation still current? → sink
+///
+/// A watcher that ignores cancellation past its timeout is abandoned: its
+/// slot frees and the timeout is reported, but it does not poll again
+/// until the abandoned work has ended, so polls never overlap.
 public actor WatchCoordinator {
     public typealias Gate = @Sendable (WatchResources) async -> WatchGate
     public typealias Sink = @Sendable (WatchObservation, WatcherRegistration) async -> Void
@@ -41,6 +46,8 @@ public actor WatchCoordinator {
     private var schedule = WatchSchedule()
     private var enabled: Set<String> = []
     private var inFlight: [String: Task<Void, Never>] = [:]
+    /// Timed-out polls whose watcher has not stopped yet.
+    private var abandoned: Set<String> = []
     /// Bumped when a watcher is disabled, so its late result is dropped.
     private var generations: [String: Int] = [:]
     private var loop: Task<Void, Never>?
@@ -101,6 +108,7 @@ public actor WatchCoordinator {
 
     public var enabledModules: Set<String> { enabled }
     public var pollsInFlight: Set<String> { Set(inFlight.keys) }
+    public var pollsAbandoned: Set<String> { abandoned }
 
     // MARK: - Loop
 
@@ -116,6 +124,12 @@ public actor WatchCoordinator {
         for moduleID in schedule.dueModules(at: clock.now()) {
             guard inFlight.count < Self.maximumConcurrentPolls else { return }
             guard let registration = registrations[moduleID] else { continue }
+
+            // Still running past its timeout; never overlap two polls.
+            guard !abandoned.contains(moduleID) else {
+                schedule.postpone(moduleID, at: clock.now())
+                continue
+            }
 
             let verdict = await gate(registration.watcher.cadence.resources)
             // The gate suspended; the watcher may have been disabled meanwhile.
@@ -139,7 +153,9 @@ public actor WatchCoordinator {
         let task = Task<Void, Never> { _ = try? await clock.sleep(until: deadline) }
         sleeper = task
         await task.value
-        sleeper = nil
+        // A loop cancelled by a disable can resume after a re-enable started
+        // a new loop; it must not clear the new loop's sleeper.
+        if sleeper == task { sleeper = nil }
     }
 
     /// Ends the current sleep so the loop re-evaluates the schedule.
@@ -156,9 +172,36 @@ public actor WatchCoordinator {
 
         let clock = self.clock
         inFlight[moduleID] = Task { [weak self] in
-            let observation = await Self.observe(registration.watcher, clock: clock)
+            let watcher = registration.watcher
+            let work = Task { await watcher.observe() }
+
+            let observation: WatchObservation
+            switch await Self.race(work, timeout: watcher.cadence.timeout, clock: clock) {
+            case .finished(let result):
+                observation = result
+            case .timedOut:
+                work.cancel()
+                await self?.abandon(moduleID, work: work)
+                let failure = ObservationFailure(
+                    kind: .timedOut, message: "The check took longer than \(Int(watcher.cadence.timeout)) seconds.")
+                observation = .unavailable(moduleID: moduleID, at: clock.now(), failure)
+            }
             await self?.finish(registration, generation: generation, observation: observation)
         }
+    }
+
+    /// Tracks a timed-out poll until its watcher actually stops.
+    private func abandon(_ moduleID: String, work: Task<WatchObservation, Never>) {
+        abandoned.insert(moduleID)
+        Task { [weak self] in
+            _ = await work.value
+            await self?.releaseAbandoned(moduleID)
+        }
+    }
+
+    private func releaseAbandoned(_ moduleID: String) {
+        abandoned.remove(moduleID)
+        signal()
     }
 
     private func finish(_ registration: WatcherRegistration, generation: Int, observation: WatchObservation) async {
@@ -174,25 +217,54 @@ public actor WatchCoordinator {
         await sink(observation, registration)
     }
 
-    /// Races the watcher against its timeout. Cancellation reaches the
-    /// watcher's own work through structured concurrency.
-    private static func observe(_ watcher: any Watcher, clock: any WatchClock) async -> WatchObservation {
-        let timeout = watcher.cadence.timeout
-        let started = clock.now()
+    private enum RaceOutcome: Sendable {
+        case finished(WatchObservation)
+        case timedOut
+    }
 
-        return await withTaskGroup(of: WatchObservation?.self) { group in
-            group.addTask { await watcher.observe() }
-            group.addTask {
-                try? await clock.sleep(until: started.addingTimeInterval(timeout))
-                return nil
+    /// Waits for the watcher's work or its timeout, whichever comes first.
+    /// Unlike a task group, this returns at the timeout even when the work
+    /// ignores cancellation. Cancelling the caller cancels the work.
+    private static func race(_ work: Task<WatchObservation, Never>, timeout: TimeInterval,
+                             clock: any WatchClock) async -> RaceOutcome {
+        let deadline = clock.now().addingTimeInterval(timeout)
+        let race = RaceState()
+
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<RaceOutcome, Never>) in
+                race.install(continuation)
+                let timer = Task {
+                    try? await clock.sleep(until: deadline)
+                    race.resolve(.timedOut)
+                }
+                Task {
+                    let result = await work.value
+                    timer.cancel()
+                    race.resolve(.finished(result))
+                }
             }
+        } onCancel: {
+            work.cancel()
+        }
+    }
 
-            let first = await group.next() ?? nil
-            group.cancelAll()
-            if let first { return first }
+    /// Resumes the race's continuation exactly once.
+    private final class RaceState: @unchecked Sendable {
+        private let lock = NSLock()
+        private var continuation: CheckedContinuation<RaceOutcome, Never>?
 
-            let failure = ObservationFailure(kind: .timedOut, message: "The check took longer than \(Int(timeout)) seconds.")
-            return .unavailable(moduleID: watcher.moduleID, at: clock.now(), failure)
+        func install(_ continuation: CheckedContinuation<RaceOutcome, Never>) {
+            lock.lock()
+            self.continuation = continuation
+            lock.unlock()
+        }
+
+        func resolve(_ outcome: RaceOutcome) {
+            lock.lock()
+            let pending = continuation
+            continuation = nil
+            lock.unlock()
+            pending?.resume(returning: outcome)
         }
     }
 }

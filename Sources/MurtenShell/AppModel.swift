@@ -74,6 +74,7 @@ public final class AppModel {
         didSet {
             guard settings != oldValue else { return }
             services.settings.save(settings)
+            withdrawSilencedNotifications(previous: oldValue)
             Task { await applyWatchers() }
         }
     }
@@ -140,6 +141,10 @@ public final class AppModel {
             let location = quarantinedAt.map { " It was moved to \($0.path)." } ?? ""
             report(ShellDiagnostic(id: "store-recovered",
                                    message: "Saved suggestions could not be read, so the list starts empty.\(location)"))
+        }
+
+        if let error = await store.persistenceError {
+            report(ShellDiagnostic(id: "store-save", message: error))
         }
 
         launchAtLogin = services.launchAtLogin.status
@@ -221,6 +226,15 @@ public final class AppModel {
         for (moduleID, provider) in providers {
             applicability[moduleID] = await provider.applicability()
         }
+    }
+
+    /// Re-checks applicability (Docker installed meanwhile, a profile
+    /// removed) and restarts the watchers that may now run. Cheap; called
+    /// when the home screen appears and after wake.
+    public func refreshEnvironment() async {
+        guard started else { return }
+        await refreshApplicability()
+        await applyWatchers()
     }
 
     // MARK: - Navigation
@@ -305,15 +319,18 @@ public final class AppModel {
 
     private func observeStore() {
         let store = self.store
+        // Both loops end with the model: neither keeps it, or the store, alive.
         background.append(Task { [weak self] in
             for await _ in await store.changes() {
-                await self?.refreshFeed()
+                guard let self else { return }
+                await self.refreshFeed()
             }
         })
         background.append(Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: UInt64(Self.feedRefreshInterval * 1_000_000_000))
-                await self?.refreshFeed()
+                guard let self else { return }
+                await self.refreshFeed()
             }
         })
     }
@@ -358,7 +375,20 @@ public final class AppModel {
     }
 
     private func systemDidWake() {
-        Task { await coordinator?.systemDidWake() }
+        Task {
+            await coordinator?.systemDidWake()
+            await refreshEnvironment()
+        }
+    }
+
+    /// Turning the companion or a module's notifications off withdraws the
+    /// notifications already delivered, so a stale one cannot be clicked.
+    private func withdrawSilencedNotifications(previous: SuiteSettings) {
+        let wasNotifying = previous.residentMode == .on ? previous.notifyingModules : []
+        let isNotifying = settings.residentMode == .on ? settings.notifyingModules : []
+        let silenced = wasNotifying.subtracting(isNotifying)
+        guard !silenced.isEmpty else { return }
+        services.notifier.withdraw(modules: silenced)
     }
 
     // MARK: - Settings intents

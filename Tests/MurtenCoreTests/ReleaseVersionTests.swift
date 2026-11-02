@@ -12,6 +12,7 @@ final class ReleaseVersionTests: XCTestCase {
         XCTAssertNil(ReleaseVersion("latest"))
         XCTAssertNil(ReleaseVersion("1..2"))
         XCTAssertNil(ReleaseVersion(""))
+        XCTAssertNil(ReleaseVersion("+1.0"))
     }
 
     func testComparesNumericallyAndPadsMissingComponents() {

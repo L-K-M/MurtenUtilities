@@ -31,6 +31,7 @@ struct HomeView: View {
             // Coming back from a pane returns focus to the tile that opened it.
             focusedTile = model.lastOpenedModuleID
         }
+        .task { await model.refreshEnvironment() }
     }
 
     @ViewBuilder private var banners: some View {
