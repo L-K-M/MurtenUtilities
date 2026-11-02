@@ -128,7 +128,19 @@ public final class DashboardModel {
     @ObservationIgnored private var sampleRun: UUID?
     /// Filters kept as chips under the field.
     public private(set) var savedFilters: [String] = []
-    /// The pane under the lanes; connections are read only while shown or filtered on.
+    public private(set) var section: DashboardSection = .overview
+
+    /// Navigation changes presentation, not the shared time, scope or collection.
+    public func navigate(to section: DashboardSection) {
+        self.section = section
+        if let pane = section.detailPane { detailPane = pane }
+    }
+
+    public func showsLaneDetail(_ lane: LaneKind) -> Bool {
+        section.lanes.contains(lane) || expandedLanes.contains(lane)
+    }
+
+    /// The active detail pane; connections are read only while shown or filtered on.
     public var detailPane: DetailPane = .processes {
         didSet {
             if wantsConnections { sampleConnections() }
@@ -255,6 +267,8 @@ public final class DashboardModel {
     public private(set) var hasProviderKey = false
     public private(set) var contributorHistory: [ContributorSnapshot] = []
 
+    /// The app supplies timeline invalidation; command-line hosts leave it nil.
+    @ObservationIgnored private let refreshWidgets: (@MainActor (Date) -> Void)?
     @ObservationIgnored private let monitor: SystemMonitor?
     @ObservationIgnored private let controller: ProcessController
     @ObservationIgnored private let askService: AskService
@@ -339,6 +353,8 @@ public final class DashboardModel {
     @ObservationIgnored private var startupFreeFraction: Double?
     /// Every visible volume's capacity, read once a minute; nil before the first read.
     public private(set) var volumes: CapturedVolumes?
+    /// Where the startup volume's space goes, measured when the person looks.
+    public let space: SpaceSurveyor
     @ObservationIgnored private var volumeReadAt: Date?
     @ObservationIgnored private var askTask: Task<Void, Never>?
     @ObservationIgnored private let processMonitor: ProcessMonitor?
@@ -375,8 +391,9 @@ public final class DashboardModel {
     ///   the module's own store instead of the standard domain.
     public init(
         notifier: AlertDelivery? = nil, history: (recorder: HistoryRecorder?, error: String?) = (nil, nil),
-        preferences: UserDefaults = .standard
+        refreshWidgets: (@MainActor (Date) -> Void)? = nil, preferences: UserDefaults = .standard
     ) {
+        self.refreshWidgets = refreshWidgets
         self.preferences = preferences
         historyRetention = HistoryRetention.saved(in: preferences)
         processCPUScale = ProcessCPUScale.saved(in: preferences)
@@ -402,6 +419,7 @@ public final class DashboardModel {
         openFileMonitor = OpenFileMonitor()
         shortcutRunner = ShortcutLauncher()
         volumeReader = VolumeMonitor()
+        space = SpaceSurveyor(defaults: preferences)
         energyMode = EnergyModeMonitor()
         sessionArchive = SessionArchive.makeDefault()
         sampler = ProcessSampler()
@@ -465,8 +483,11 @@ public final class DashboardModel {
         responsivenessMonitor: ResponsivenessMonitor? = nil, exitWatcher: ProcessExitWatcher? = nil,
         maintenanceProvider: MaintenanceStatusProvider? = nil,
         shortcutRunner: ShortcutLauncher? = nil, volumeReader: VolumeMonitor? = nil,
-        energyMode: EnergyModeMonitor? = nil, preferences: UserDefaults = .standard
+        energyMode: EnergyModeMonitor? = nil, space: SpaceSurveyor? = nil,
+        refreshWidgets: (@MainActor (Date) -> Void)? = nil, preferences: UserDefaults = .standard
     ) {
+        self.refreshWidgets = refreshWidgets
+        self.space = space ?? SpaceSurveyor(survey: nil, defaults: UserDefaults(suiteName: UUID().uuidString) ?? .standard)
         self.preferences = preferences
         historyRetention = HistoryRetention.saved(in: preferences)
         processCPUScale = ProcessCPUScale.saved(in: preferences)
@@ -546,6 +567,8 @@ public final class DashboardModel {
     public private(set) var expandedLanes: Set<LaneKind> = []
 
     public func toggleDetail(_ lane: LaneKind) {
+        // Resource pages stay expanded without changing Timeline preferences.
+        guard section.lanes.isEmpty else { return }
         if expandedLanes.contains(lane) { expandedLanes.remove(lane) } else { expandedLanes.insert(lane) }
     }
 
@@ -916,6 +939,7 @@ public final class DashboardModel {
         openStoredData = storedData
         storedHistory = storedData.map { StoredHistory(reducing: $0) }
         refreshSystemMarkers()
+        navigate(to: .timeline)
         return nil
     }
 
@@ -1325,8 +1349,10 @@ public final class DashboardModel {
         switch evidence {
         case .app(let name):
             scopedApp = name
+            navigate(to: .timeline)
         case .range(let range):
             selection = range
+            navigate(to: .timeline)
         case .process(let pid):
             // A link from an answer no longer shown does nothing.
             guard case .answered(let answer) = askState else { return }
@@ -1334,6 +1360,7 @@ public final class DashboardModel {
                 actionMessage = "PID \(pid) is no longer running"
                 return
             }
+            navigate(to: .processes)
             selectedProcessRow = ProcessGroups.rowID(process)
         }
     }
@@ -1668,15 +1695,21 @@ public final class DashboardModel {
     public func perform(_ command: AutomationCommand) async -> String? {
         let failure: String?
         switch command {
-        case .show, .toggleHUD:
+        case .show:
+            navigate(to: .overview)
+            failure = nil
+        case .navigate(let section):
+            navigate(to: section)
+            failure = nil
+        case .toggleHUD:
             failure = nil
         case .filter(let text):
-            detailPane = .processes
+            navigate(to: .processes)
             processFilter = text
             failure = nil
         case .selectProcess(let pid):
             if let process = processSnapshot?.processes.first(where: { $0.id.pid == pid }) {
-                detailPane = .processes
+                navigate(to: .processes)
                 selectedProcessRow = ProcessGroups.rowID(process)
                 failure = nil
             } else {
@@ -1684,6 +1717,7 @@ public final class DashboardModel {
             }
         case .range(let range):
             timeRange = range
+            navigate(to: .timeline)
             failure = nil
         case .startRecording(let name):
             failure = sessionRecording == nil ? nil : "A session is already recording"
@@ -1821,6 +1855,7 @@ public final class DashboardModel {
             entry("Toggle HUD", .toggleHUD),
             entry("Open Settings", .openSettings)
         ]
+        entries += DashboardSection.allCases.map { entry("Go to \($0.title)", .section($0)) }
         entries += TimeRange.allCases.map { entry(CommandPalette.rangeTitle($0), .range($0)) }
         entries += DetailPane.allCases.map { entry(CommandPalette.paneTitle($0), .pane($0)) }
         entries += [
@@ -1866,11 +1901,12 @@ public final class DashboardModel {
         case .startRecording: startRecording()
         case .stopRecording: await stopRecording()
         case .range(let range): timeRange = range
-        case .pane(let pane): detailPane = pane
+        case .section(let section): navigate(to: section)
+        case .pane(let pane): navigate(to: DashboardSection(pane: pane))
         case .grouping(let grouping): processGrouping = grouping
         case .sort(let sort): processSort = sort
         case .filter(let text):
-            detailPane = .processes
+            navigate(to: .processes)
             processFilter = text
         case .clearFilter: processFilter = ""
         case .saveFilter: saveProcessFilter()
@@ -2183,6 +2219,8 @@ public final class DashboardModel {
                     self.evaluateAlerts()
                     self.refreshMaintenance(olderThan: Self.maintenanceRefreshAge)
                     self.recordHistory()
+                    // Widgets follow collection even while the display is held or replaying.
+                    if let sampledAt = self.liveSampleTime { self.refreshWidgets?(sampledAt) }
                     if self.timeRange.reachesStoredHistory, self.recordsHistory { self.refreshStoredHistory() }
                     if self.displayMode == .live {
                         self.frames = history
