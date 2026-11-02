@@ -1,9 +1,11 @@
 import SwiftUI
 import BootCaptainCore
 
-/// Review flow for broken startup leftovers. Nothing is preselected; helper-
-/// backed actions require a separate prototype warning and confirmation.
+/// Review flow for broken startup leftovers. Nothing is preselected.
 /// Already-cleaned items are excluded, so repeated runs never re-attempt them.
+/// System items are listed but cannot be selected: they need the privileged
+/// helper the suite leaves out (`HelperClient`), and with it the standalone
+/// app's separate administrator confirmation.
 struct CleanupSheet: View {
     let candidates: [CleanupPlanner.Candidate]
     @EnvironmentObject var scan: ScanViewModel
@@ -12,7 +14,6 @@ struct CleanupSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selected: Set<String> = []
     @State private var didInit = false
-    @State private var showAdminConfirmation = false
 
     /// Candidates that have not already been cleaned this session.
     private var pending: [CleanupPlanner.Candidate] {
@@ -25,11 +26,9 @@ struct CleanupSheet: View {
         pending.filter { $0.eligibility == .requiresHelper }
     }
     /// Selected IDs that are still pending (stale selections drop out).
+    /// Only items this build can act on are selectable.
     private var effectiveSelection: [CleanupPlanner.Candidate] {
-        pending.filter { selected.contains($0.itemID) }
-    }
-    private var includesSystemSelection: Bool {
-        effectiveSelection.contains { $0.eligibility == .requiresHelper }
+        userActionable.filter { selected.contains($0.itemID) }
     }
 
     var body: some View {
@@ -54,12 +53,6 @@ struct CleanupSheet: View {
             guard !didInit else { return }
             didInit = true
             selected = []
-        }
-        .alert("Experimental Administrator Action", isPresented: $showAdminConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Continue", role: .destructive) { performSelection() }
-        } message: {
-            Text("This helper-backed vault move has not completed BootCaptain's on-device authorization, interruption, and recovery qualification. Continue only if you are deliberately testing this prototype.")
         }
     }
 
@@ -90,9 +83,9 @@ struct CleanupSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             Label("System items — needs administrator approval", systemImage: "lock.shield")
                 .font(.headline)
-            Text("These live in /Library and require helper registration plus administrator approval. This prototype path has not completed its authorization, interruption, or recovery qualification.")
+            Text("These live in /Library and need BootCaptain's administrator helper. \(HelperClient.unavailableReason)")
                 .font(.caption).foregroundStyle(.secondary)
-            ForEach(systemActionable) { row($0) }
+            ForEach(systemActionable) { row($0).disabled(!helper.isAvailable) }
         }
     }
 
@@ -148,11 +141,7 @@ struct CleanupSheet: View {
                 .keyboardShortcut(.cancelAction)
                 .disabled(cleanup.isWorking)
             Button {
-                if includesSystemSelection {
-                    showAdminConfirmation = true
-                } else {
-                    performSelection()
-                }
+                performSelection()
             } label: {
                 let n = effectiveSelection.count
                 Text(n == 0 ? "Select Items" : "Apply to \(n) Item\(n == 1 ? "" : "s")")

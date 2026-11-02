@@ -108,7 +108,8 @@ struct ItemDetailView: View {
                     Text(cleanupButtonTitle(candidate))
                         .font(.headline)
                         .foregroundStyle(.secondary)
-                    Text("Open Clean Up from the toolbar to see the prototype warning and explicitly confirm any helper-backed action.")
+                    // The suite carries no privileged helper (HelperClient).
+                    Text("\(HelperClient.unavailableReason) Moving items in /Library needs BootCaptain's administrator helper.")
                         .font(.caption).foregroundStyle(.secondary)
                 } else {
                     HStack {
@@ -139,10 +140,12 @@ struct ItemDetailView: View {
                         Label(item.state.effectivelyEnabled == .no ? "Enable at Startup" : "Disable (reversible)",
                               systemImage: "switch.2")
                     }
-                    .disabled(working)
+                    .disabled(working || !helper.isAvailable)
                     if working { ProgressView().controlSize(.small) }
                 }
-                Text("BootCaptain records an undo before changing anything. Nothing is deleted.")
+                Text(helper.isAvailable
+                     ? "BootCaptain records an undo before changing anything. Nothing is deleted."
+                     : HelperClient.unavailableReason)
                     .font(.caption).foregroundStyle(.secondary)
             case .guidedAction:
                 Button {

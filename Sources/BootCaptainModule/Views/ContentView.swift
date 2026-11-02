@@ -41,6 +41,7 @@ struct ContentView: View {
                 CleanupSheet(candidates: cleanupCandidates)
             }
 
+            ReviewBar()
             CoverageBanner()
         }
     }

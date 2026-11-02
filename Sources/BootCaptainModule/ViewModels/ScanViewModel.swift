@@ -5,6 +5,11 @@ import BootCaptainKit
 
 /// Drives scanning and diagnosis off the main actor and publishes results for
 /// the UI. Grouping and filtering live here so the views stay declarative.
+/// The provider owns it, so results and the selection survive navigation.
+///
+/// It also keeps the reviewed inventory the background check compares
+/// against: seeded by the first completed scan, replaced when the user marks
+/// the list as reviewed.
 @MainActor
 final class ScanViewModel: ObservableObject {
     @Published var items: [StartupItem] = []
@@ -18,9 +23,20 @@ final class ScanViewModel: ObservableObject {
         didSet { reconcileSelection() }
     }
     @Published var selection: StartupItem.ID?
+    @Published private(set) var review: ReviewedInventoryLookup
+
+    private let reviewStore: ReviewedInventoryStore
+    private let reviewDidChange: @MainActor () -> Void
+
+    init(reviewStore: ReviewedInventoryStore, reviewDidChange: @escaping @MainActor () -> Void) {
+        self.reviewStore = reviewStore
+        self.reviewDidChange = reviewDidChange
+        review = reviewStore.reviewedInventory()
+    }
 
     enum Filter: String, CaseIterable, Identifiable {
         case all = "All"
+        case unreviewed = "New since last review"
         case thirdParty = "Third-party"
         case launchesAtLogin = "Launches at login"
         case orphans = "Orphaned / broken"
@@ -41,13 +57,56 @@ final class ScanViewModel: ObservableObject {
                              coverage: raw.coverage, generatedAt: raw.generatedAt)
                 : raw
             await MainActor.run {
-                self.items = result.items
-                self.reconcileSelection()
-                self.coverage = result.coverage
-                self.isScanning = false
-                self.lastScan = Date()
+                self.apply(result)
             }
         }
+    }
+
+    /// Publishes a finished scan. The first one also becomes the reviewed
+    /// inventory: whatever the user sees on first opening the pane is
+    /// what later checks compare against.
+    func apply(_ result: ScanResult) {
+        items = result.items
+        reconcileSelection()
+        coverage = result.coverage
+        isScanning = false
+        lastScan = Date()
+
+        if review == .notYetReviewed { markReviewed() }
+    }
+
+    // MARK: Review
+
+    /// Items not in the reviewed inventory. Empty until a review exists.
+    var unreviewedItems: [StartupItem] {
+        items.filter(isUnreviewed)
+    }
+
+    /// Makes the last completed scan the reviewed inventory and asks the
+    /// suite to re-check, so suggestions about these items resolve.
+    func markReviewed() {
+        guard lastScan != nil else { return }
+        let inventory = ReviewedInventory(reviewedAt: Date(), itemIDs: Set(items.map(\.id)))
+        guard reviewStore.save(inventory) else { return }
+        review = .reviewed(inventory)
+        // The new items just became reviewed; show the whole list again
+        // rather than an empty filter.
+        if filter == .unreviewed { filter = .all }
+        reconcileSelection()
+        reviewDidChange()
+    }
+
+    /// What a "review" route opens on: the unreviewed items, unfiltered by
+    /// search. Selects nothing; the user picks what to look at.
+    func showUnreviewed() {
+        searchText = ""
+        filter = .unreviewed
+        selection = nil
+    }
+
+    private func isUnreviewed(_ item: StartupItem) -> Bool {
+        guard case .reviewed(let inventory) = review else { return false }
+        return !inventory.contains(item.id)
     }
 
     /// Items after search + filter, grouped by tier for the sidebar/list.
@@ -85,6 +144,7 @@ final class ScanViewModel: ObservableObject {
     private func matchesFilter(_ item: StartupItem) -> Bool {
         switch filter {
         case .all: return true
+        case .unreviewed: return isUnreviewed(item)
         case .thirdParty:
             return !(item.trust == .applePlatform || item.trust == .appleDistributed)
         case .launchesAtLogin: return item.triggers.runsAtStartup
