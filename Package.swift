@@ -30,8 +30,33 @@ let suiteTargets: [Target] = [
 // conflicting.
 
 // MARK: DockVac
-let dockVacTargets: [Target] = []
-let dockVacModule: [Target.Dependency] = []
+// DockVac's own targets kept Swift 6 language mode; the fake daemon and SSH
+// bridge its driver tests spawn live in Tests/DockVacDockerTests/Scripts.
+let dockVacSwift6: [SwiftSetting] = [.swiftLanguageMode(.v6)]
+let dockVacTargets: [Target] = [
+    // MurtenCore only for the suggestion rule, which stays pure.
+    .target(name: "DockVacCore", dependencies: ["MurtenCore"], swiftSettings: dockVacSwift6),
+    .target(name: "DockVacDocker", dependencies: ["DockVacCore"], swiftSettings: dockVacSwift6),
+    // The pane, the watcher and the provider; the standalone app's AppKit views.
+    .target(
+        name: "DockVacModule",
+        dependencies: [
+            "DockVacCore", "DockVacDocker", "MurtenCore", "MurtenModuleKit",
+            .product(name: "RigiUI", package: "Rigi")
+        ],
+        resources: [.copy("Resources/DockVacIcon.png")], swiftSettings: dockVacSwift6),
+    .testTarget(
+        name: "DockVacCoreTests", dependencies: ["DockVacCore", "MurtenCore"],
+        resources: [.copy("Fixtures")], swiftSettings: dockVacSwift6),
+    .testTarget(
+        name: "DockVacDockerTests", dependencies: ["DockVacDocker", "DockVacCore"],
+        exclude: ["Scripts"], swiftSettings: dockVacSwift6),
+    .testTarget(
+        name: "DockVacModuleTests",
+        dependencies: ["DockVacModule", "DockVacCore", "DockVacDocker", "MurtenCore", "MurtenModuleKit"],
+        swiftSettings: dockVacSwift6)
+]
+let dockVacModule: [Target.Dependency] = ["DockVacModule"]
 
 // MARK: RepoMen
 // Ported from an .xcodeproj (Swift 5 mode there too). RepoMenCore: scan, ageing,
@@ -47,8 +72,26 @@ let repoMenTargets: [Target] = [
 let repoMenModule: [Target.Dependency] = ["RepoMenModule"]
 
 // MARK: BootCaptain
-let bootCaptainTargets: [Target] = []
-let bootCaptainModule: [Target.Dependency] = []
+// Core and Kit move in from BootCaptain's own package; Core adds the
+// watcher's pure diff and rule (Watch/). The app target's sources become
+// BootCaptainModule. The CLI and the root helper stay in the BootCaptain repo
+// (docs/modules.md, BootCaptain).
+let bootCaptainTargets: [Target] = [
+    // MurtenCore for the watcher's rule, which stays pure and lives here.
+    .target(name: "BootCaptainCore", dependencies: ["MurtenCore"]),
+    .target(name: "BootCaptainKit", dependencies: ["BootCaptainCore"]),
+    .target(
+        name: "BootCaptainModule",
+        dependencies: ["BootCaptainCore", "BootCaptainKit", "MurtenCore", "MurtenModuleKit"]
+    ),
+    .testTarget(name: "BootCaptainCoreTests", dependencies: ["BootCaptainCore"]),
+    .testTarget(name: "BootCaptainKitTests", dependencies: ["BootCaptainKit", "BootCaptainCore"]),
+    .testTarget(
+        name: "BootCaptainModuleTests",
+        dependencies: ["BootCaptainModule", "BootCaptainCore", "BootCaptainKit", "MurtenCore", "MurtenModuleKit"]
+    )
+]
+let bootCaptainModule: [Target.Dependency] = ["BootCaptainModule"]
 
 // MARK: DeviceControlDoctor
 // DoctorCore keeps its upstream name; its directory carries the tool's
@@ -68,8 +111,23 @@ let shortkingTargets: [Target] = []
 let shortkingModule: [Target.Dependency] = []
 
 // MARK: HallPass
-let hallPassTargets: [Target] = []
-let hallPassModule: [Target.Dependency] = []
+// The source package (tools 6.0, no explicit mode) builds in Swift 6.
+let hallPassSwiftSettings: [SwiftSetting] = [.swiftLanguageMode(.v6)]
+let hallPassTargets: [Target] = [
+    .target(name: "HallPassCore", swiftSettings: hallPassSwiftSettings),
+    .target(
+        name: "HallPassModule",
+        dependencies: ["HallPassCore", "MurtenCore", "MurtenModuleKit"],
+        swiftSettings: hallPassSwiftSettings
+    ),
+    .testTarget(name: "HallPassCoreTests", dependencies: ["HallPassCore"], swiftSettings: hallPassSwiftSettings),
+    .testTarget(
+        name: "HallPassModuleTests",
+        dependencies: ["HallPassModule", "HallPassCore", "MurtenCore", "MurtenModuleKit"],
+        swiftSettings: hallPassSwiftSettings
+    )
+]
+let hallPassModule: [Target.Dependency] = ["HallPassModule"]
 
 // MARK: ZenBackupManager
 // Ported from the standalone app's .xcodeproj (Swift 5, the package default).
@@ -88,8 +146,30 @@ let zenBackupManagerTargets: [Target] = [
 let zenBackupManagerModule: [Target.Dependency] = ["ZenBackupManagerModule"]
 
 // MARK: Obtainintosh
-let obtainintoshTargets: [Target] = []
-let obtainintoshModule: [Target.Dependency] = []
+// A native port of the Tauri app (docs/modules.md, Obtainintosh).
+let obtainintoshTargets: [Target] = [
+    .target(name: "ObtainintoshCore", dependencies: ["MurtenCore"]),
+    .target(name: "ObtainintoshServices", dependencies: ["ObtainintoshCore", "MurtenCore"]),
+    .target(
+        name: "ObtainintoshModule",
+        dependencies: ["ObtainintoshCore", "ObtainintoshServices", "MurtenCore", "MurtenModuleKit"]
+    ),
+    .testTarget(
+        name: "ObtainintoshCoreTests",
+        dependencies: ["ObtainintoshCore", "MurtenCore"],
+        resources: [.copy("Fixtures")]
+    ),
+    .testTarget(
+        name: "ObtainintoshServicesTests",
+        dependencies: ["ObtainintoshServices", "ObtainintoshCore", "MurtenCore"]
+    ),
+    .testTarget(
+        name: "ObtainintoshModuleTests",
+        dependencies: ["ObtainintoshModule", "ObtainintoshServices", "ObtainintoshCore", "MurtenCore",
+                       "MurtenModuleKit"]
+    )
+]
+let obtainintoshModule: [Target.Dependency] = ["ObtainintoshModule"]
 
 // MARK: RunningMan
 let runningManTargets: [Target] = []

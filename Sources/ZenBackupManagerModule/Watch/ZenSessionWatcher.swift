@@ -14,7 +14,6 @@ struct ZenSessionWatcher: Watcher {
 
     private let source: any SessionSnapshotSource
     private let now: @Sendable () -> Date
-    private let seen = SeenProfiles()
 
     init(source: any SessionSnapshotSource, now: @escaping @Sendable () -> Date = { Date() }) {
         self.source = source
@@ -25,8 +24,10 @@ struct ZenSessionWatcher: Watcher {
         let observedAt = now()
 
         let profiles: [ZenProfile]
+        let listed: Set<String>
         do {
             profiles = try source.profiles()
+            listed = try source.listedProfileDirectories()
         } catch {
             return .unavailable(moduleID: moduleID, at: observedAt, ObservationFailure(
                 kind: .failed, message: "Zen's profile list could not be read: \(error.localizedDescription)"))
@@ -56,27 +57,18 @@ struct ZenSessionWatcher: Watcher {
             }
         }
 
-        // A profile that left Zen's list was checked and is gone, so its
-        // suggestion resolves. The ledger does not tell a watcher which scopes
-        // are active, so only profiles listed since launch can be named.
-        completed.formUnion(seen.departed(listed: Set(profiles.map { FindingScope($0.id) })))
+        // A profile profiles.ini names but discovery skipped (no readable
+        // prefs.js) still exists: report it unchecked so its suggestion goes
+        // stale instead of resolving.
+        for directory in listed.subtracting(profiles.map(\.id)).sorted() {
+            failures.append(ObservationFailure(
+                kind: .failed, scope: FindingScope(directory),
+                message: "The Zen profile at \(directory) could not be read."))
+        }
 
+        // profiles.ini names every scope that exists, so a profile absent
+        // from it is gone: its suggestion resolves even after a relaunch.
         return WatchObservation(moduleID: moduleID, observedAt: observedAt, findings: findings,
-                                completedScopes: completed, failures: failures)
-    }
-}
-
-/// Profiles the watcher has listed since launch. A reference, so every copy
-/// of the watcher value shares it.
-private final class SeenProfiles: @unchecked Sendable {
-    private let lock = NSLock()
-    private var scopes = Set<FindingScope>()
-
-    /// Records `listed` and returns the profiles seen before but not listed now.
-    func departed(listed: Set<FindingScope>) -> Set<FindingScope> {
-        lock.lock()
-        defer { lock.unlock() }
-        scopes.formUnion(listed)
-        return scopes.subtracting(listed)
+                                completedScopes: completed, failures: failures, coverage: .exhaustive)
     }
 }

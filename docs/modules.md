@@ -35,20 +35,46 @@ tests the only supported release.
 ### DockVac — effort: cheap — phase 1 (first module)
 
 Docker disk-usage treemap with selective reclaim — deliberately not a broad
-`docker system prune`. Pure SwiftPM today.
+`docker system prune`.
 
-- **Migrates:** `DockVacCore` (usage analysis, treemap model, reclaim set)
-  plus the `DockVacDocker` Engine API transport the scan service wraps; the
-  treemap pane as its first real suite pane.
-- **Watcher:** a slow-cadence scan through an observation-only Docker Engine
-  service → "Docker is holding ~X GB" at a configurable threshold. An endpoint
-  requiring interactive authentication is unavailable to background polls.
-  The proof-of-concept for the whole pipeline.
+- **Status:** available. `DockVacCore` and `DockVacDocker` moved in unchanged
+  with their tests and fixtures (Swift 6 mode); the AppKit app is
+  `DockVacModule`. The driver tests' fake daemon and SSH bridge live in
+  `Tests/DockVacDockerTests/Scripts`.
+- **Provenance:** DockVac@a8fed1d880c5a16faba197fd741fc5f83cc9b328 (release
+  1.5.0, the source repository's `main`)
+- **Pane:** the standalone views, hosted through
+  `NSViewControllerRepresentable`. The window toolbar and subtitle became a
+  Rigi bar in the pane, the menu bar became Tool menu commands with the same
+  shortcuts, sheets attach to the suite window, and the quit alert became
+  `interruptionWarning`. The first scan runs when the pane first opens.
+- **Watcher:** hourly, three minutes per poll. It reads containers, images
+  and build cache (not volumes: no cleanup level removes one, and sizing them
+  is the slowest read) from the endpoint DockVac's automatic search finds,
+  through a reader with no removal. One finding per endpoint address,
+  `reclaimable`, whose bytes are the safe level's plan. The rule opens at
+  4 GB and holds until below 3 GB: "Docker is holding ~8 GB you can
+  rebuild". An SSH endpoint (`DOCKER_HOST` or the active context) is skipped
+  by default and reported unavailable, so its suggestion turns stale: an SSH
+  agent such as 1Password or Secretive can prompt even under `BatchMode`.
+  DockVac's Settings tab has "Check SSH endpoints in the background", off by
+  default; with it on, the watcher connects with `BatchMode` and declares
+  network use.
+- **Route:** `murten://dockvac/reclaim?endpoint=<address>` re-scans that
+  endpoint and, only if the scan reached it, replaces the selection with the
+  safe level. The confirmation sheet is unchanged, its acknowledgement box
+  off.
+- **Applicability:** a socket in a known location, `DOCKER_HOST` or a Docker
+  context; otherwise "No Docker endpoint found".
 - **Capability:** scans and deletion both use the Docker Engine connection
-  (Unix socket or SSH). A watcher gets a scan-only service interface, not the
-  mutation client; the daemon connection itself is not a read-only grant.
-- **UI:** AppKit throughout (`NSView`s, `NSToolbar`), no SwiftUI. The treemap
-  pane needs an `NSViewRepresentable` host or a rewrite.
+  (Unix socket or SSH). The watcher's reader is a guardrail against
+  accidental writes, not a read-only grant.
+- **Coexistence:** DockVac keeps no files, so nothing is shared but the
+  daemon. The standalone app and the module can both remove from it; every
+  removal is non-forcing, and the other copy's next scan shows the result.
+- **Left out:** `DOCKVAC_SMOKE_SCRIPT`, the window's saved frame, and the
+  menu's checkmarks on Show Everything / Show Reclaimable Only (the bar's
+  segmented control shows the filter).
 
 ### RepoMen — effort: medium — phase 3 — available
 
@@ -104,26 +130,49 @@ DerivedData, Homebrew caches — and reclaims them by age and size.
 ### BootCaptain — effort: medium — phase 3
 
 Inventories launch agents, login items and other startup mechanisms,
-attributes them to installed products, and investigates boot failures. SwiftUI
-app + CLI; **GitHub-only, not yet cloned**.
+attributes them to installed products, and investigates boot failures.
 
-- **Migrates:** inventory/attribution core; its investigator UI as the pane.
-  The CLI could survive as a bundled tool or stay in its repo.
-- **Privilege:** ships a root helper today (`SMAppService.daemon`) whose
-  enabled actions are reversible vault moves — launchd/cron mutations stay
-  gated off in the current build — and the app itself is Developer ID
-  signed, notarized and non-sandboxed. The helper embeds per-module at
-  migration and gates on the signing decision (docs/architecture.md §
+- **Status:** available.
+- **Provenance:** BootCaptain@1fd84a9f6ec8626fa7ef8a5a100554944a733940
+- **Migrated:** `BootCaptainCore` and `BootCaptainKit` with their test
+  suites; the app's views, view model and services as `BootCaptainModule`.
+  The `bootcaptain` CLI stays in its repo. Rescan (⌘R) and Run Boot Audit
+  (⇧⌘R) are in the Tool menu; the pane scans when it appears, as the app
+  did.
+- **Privilege:** the root helper (`SMAppService.daemon`, bundle ID and
+  Team ID pinned both ways) is left out, because ad-hoc suite builds cannot
+  authenticate it. Moving `/Library` items to the root vault, and the
+  launchd/cron toggles the standalone build already gates off, stay visible
+  but disabled: "Needs a signed build of Murten Utilities". User-scope vault
+  moves and login-item removal keep working, with their session undo. The
+  helper embeds per module once the suite is signed (docs/architecture.md §
   Module packaging).
-- **Watcher:** diff the startup inventory on a cadence → "X installed 2 new
-  login items". Boot-failure diagnosis stays an on-demand flow.
-- **Source facts:** the shipping app and helper build from XcodeGen
-  `project.yml`; `Package.swift` builds only the libraries and the CLI. Spawns
-  live in `BootCaptainKit`, so the module needs Kit as well as Core. launchd
-  plist folders are readable unprivileged, but Background Task Management
-  (`sfltool dumpbtm`), the source for modern login items, needs root and
-  likely Full Disk Access, and System Events login-item reads need Automation
-  consent. An unprivileged watcher sees plists only.
+- **State:** Clean Up's vault and journal stay in
+  `~/Library/Application Support/BootCaptain/{Vault,Journal}`. Items the
+  standalone helper moved to `/Library/Application Support/BootCaptain/Vault`
+  can only be restored by the standalone app. Undo history is per session,
+  as before. The reviewed inventory is the module default
+  `reviewedStartupInventory`.
+- **Consent:** login-item reads and removals through System Events
+  (Automation; `NSAppleEventsUsageDescription`), the Full Disk Access probe
+  and Background Task Management (`sfltool dumpbtm` needs root, so the scan
+  reports a coverage gap) stay in the pane's on-demand scan.
+- **Watcher:** hourly, unprivileged read of `/Library/LaunchDaemons`,
+  `/Library/LaunchAgents`, `~/Library/LaunchAgents` and the launchd plists
+  apps embed (`/Applications`, `/Applications/Setapp`, `~/Applications`),
+  compared with the inventory the user last reviewed in the pane → one
+  suggestion per product, "Docker installed 2 new startup items", route
+  `review`. The pane's first completed scan becomes the reviewed inventory;
+  its review bar marks the current list as reviewed. Not watched: Apple's
+  folders and `com.apple.` labels, BTM, login items, other users' homes.
+  Without a reviewed inventory the check is unavailable; an unreadable
+  folder makes it partial, so a suggestion goes stale instead of resolving.
+- **Preselection:** none. `review` opens the "New since last review" filter
+  with nothing selected; Clean Up preselects nothing, as before.
+- **Source facts:** the standalone app and helper build from XcodeGen
+  `project.yml`; `Package.swift` builds only the libraries and the CLI.
+  Spawns live in `BootCaptainKit`, so the module needs Kit as well as Core.
+  The app is Developer ID signed, notarized and non-sandboxed.
 
 ### DeviceControlDoctor — effort: cheap — phase 2
 
@@ -191,15 +240,41 @@ Manages system-wide CIDR exemptions from the macOS local-network privacy
 restriction. Already fleet-standard: `HallPassCore` is pure; writes go through
 privileged osascript with baseline re-check and rollback.
 
-- **Migrates:** `HallPassCore` + pane. Its privileged write path keeps its
-  own confirmation, baseline re-check and rollback inside the suite; this is
-  a repair-flow boundary, not OS-enforced isolation from other modules.
-- **Watcher:** keep it on-demand. The current read service also requests
+- **Status:** available. `HallPassCore` and its Swift Testing suites moved
+  in unchanged apart from English messages; the app target became
+  `HallPassModule` (provider, pane, backup store, privileged service), and
+  its model tests moved to `HallPassModuleTests`. All keep the source's
+  Swift 6 language mode.
+- **Provenance:** HallPass@1ab2ac48ba98bc11d606e509cdedc88a3f8afa70
+- **Migrated:** the Tahoe pane (sidebar, searchable table, inspector,
+  editing and review sheets, Help), preview with sample data, named undo,
+  draft recovery and the backup commands. The privileged write path keeps
+  its own confirmation, baseline re-check and rollback inside the suite;
+  this is a repair-flow boundary, not OS-enforced isolation from other
+  modules.
+- **Changed for the suite:** the UI and every message are English
+  ("WLAN" is "Wi-Fi"). The app delegate, the window takeover and its
+  close and quit guards are gone: the provider's `interruptionWarning`
+  covers an unsaved draft, a load and an apply. The menu commands are
+  Tool menu commands with the same shortcuts; window, full-screen and
+  sidebar commands are the shell's. The `--demo` flag is gone; *Try with
+  Sample Data* remains. The welcome shows the `ticket.fill` symbol
+  instead of the application icon. Undo uses the window's undo manager
+  while the pane is shown and leaves with it; it is not disabled during a
+  load or an apply, which needed the window delegate. osascript waits on
+  a dispatch thread rather than the shared cooperative pool.
+- **State:** `~/Library/Application Support/HallPass/Backups` and
+  `Draft.json` stay where they are, shared with the standalone app, so a
+  draft from one appears in the other; the apply still re-checks the
+  system state first. Quitting the suite keeps a real draft for next
+  time. The restart reminder's keys (`restartRequiredAtUptime`,
+  `restartRequiredBootTime`) live in the module's defaults, so a restart
+  the standalone app asked for is not shown here.
+- **Watcher:** none; HallPass stays on-demand. The read service requests
   administrator access, so it cannot back a watcher. A future "exemptions
   changed" check needs an unprivileged signal first.
-- **Source facts:** every UI string is German and hardcoded; every other
-  module is English. The suite needs a language decision before this pane
-  moves.
+- **Preselection:** nothing. The provider declares no route actions, so
+  only the bare route opens the pane.
 
 ### Zen Backup Manager — effort: medium — phase 3
 
@@ -240,36 +315,44 @@ with a verified safety copy and undo.
 
 Tracks applications and fonts distributed through GitHub or Forgejo
 releases, compares them with what is installed, downloads a matching asset
-and reveals it in the file manager. It does not install or replace
-anything. Tauri 2 and SvelteKit, shipped for macOS and Linux.
+and reveals it in Finder. It does not install or replace anything.
 
-- **Size:** about 10,400 lines of Rust, 186 tests included, and 2,500 lines
-  of TypeScript/Svelte. A native port re-implements all of it.
-- **Scope is already generic:** users add any GitHub or Forgejo repository.
-  The repo's `GENERIC_SOURCES.md` designs arbitrary vendor download pages
-  behind an identity and SSRF contract. PLAN.md's open question is whether
-  the suite keeps, narrows or extends that.
-- **Installed-app identity** on macOS is the user-typed name matched
-  against `<name>.app` in `/Applications` and `~/Applications`
-  (`src-tauri/src/installer.rs`), not a bundle id. A count like "3 app
-  updates available" inherits that guess; the repo's `ANALYSIS.md` already
-  specifies bundle-id matching.
-- **State:** `~/Library/Application Support/Obtainintosh/apps.json` holds
-  the tracked list and GitHub and Forgejo tokens in plain text
-  (`src-tauri/src/models.rs`). A migration imports the tokens into the
-  Keychain instead of copying the file, and leaves the standalone app's copy
-  alone while that app still runs.
-- **Platforms:** a Swift port is macOS-only. Linux users (deb, AppImage,
-  Flatpak) keep the Tauri app, so it stays maintained whatever the suite
-  does.
-- **Shapes, decide at phase 4:** (a) a pane that ports today's
-  download-and-reveal flow; (b) the suite's updater, which also needs the
-  verified install `ANALYSIS.md` specifies and does not exist yet (mount,
-  bundle id, signature, signer continuity) before "update" means more than
-  "download".
-- **Watcher:** checks run at launch and on demand; nothing polls today. The
-  suite's scheduler would supply the cadence. Checks use GitHub's REST API:
-  60 requests an hour unauthenticated, 5,000 with a token.
+- **Status:** migrated as a native port of the Tauri 2 and SvelteKit app:
+  `ObtainintoshCore` (models, the `apps.json` and `.obtainintosh` formats,
+  asset filters and the macOS asset picker, release selection, font version
+  reading, version comparison, the Add Program form, the watcher's rule),
+  `ObtainintoshServices` (GitHub and Forgejo REST clients behind an
+  injectable transport, installed-version detection for apps and fonts, the
+  tracked list, the Keychain vault, downloads, the watcher) and
+  `ObtainintoshModule` (the pane and provider). The Rust and Svelte tests
+  moved along as XCTest cases; the Linux-only parts (dpkg and AppImage
+  detection, the Linux asset picker) stayed behind with their tests.
+- **Provenance:** Obtainintosh@108a6c3e6bacb5485c87f490b1f3cc1d95651878
+- **Scope stays generic:** any GitHub or Forgejo repository the user adds.
+- **Installed-app identity:** the typed name matched against `<name>.app`
+  in `/Applications` and `~/Applications`, as before; an entry may also
+  record a bundle identifier, which is preferred when set.
+- **State:** the suite keeps its own list at
+  `~/Library/Application Support/MurtenUtilities/Obtainintosh/apps.json`
+  (the standalone shape, without secrets). Tokens live in the Keychain
+  (service `ch.lkmc.MurtenUtilities.obtainintosh`). When the standalone
+  app's `~/Library/Application Support/Obtainintosh/apps.json` exists, the
+  pane offers a one-click import, never automatic; that file is only read.
+  Downloads share the standalone app's `$TMPDIR/obtainintosh-downloads`.
+- **Watcher:** every 6 hours (`.network`), for each installed tracked
+  program, is a newer release out? One finding per program, scoped by its
+  entry id; the rule suggests when the latest version is newer, with the
+  pane's comparison. Programs that are not installed cost no request.
+  A poll spends at most 20 GitHub API requests without a token and keeps
+  10 of GitHub's hourly 60 in reserve. Tokens come only from memory the
+  pane already filled, so the check never reads the Keychain; a private
+  Forgejo program whose key is not in memory is reported as not checked.
+  Removed programs are reported as checked, so their suggestions resolve.
+  A check in the pane, or removing a program, asks the suite to poll soon.
+- **Preselection:** none. The suggestion's route `updates` opens the pane,
+  which checks again; downloading stays a click.
+- **Platforms:** macOS only. Linux users (deb, AppImage, Flatpak) keep the
+  Tauri app.
 
 ### RunningMan — effort: cheap — phase 2
 

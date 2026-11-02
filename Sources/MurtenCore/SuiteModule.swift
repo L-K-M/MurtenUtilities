@@ -38,8 +38,8 @@ public enum ModuleRegistry {
     public static let all: [SuiteModule] = [
         SuiteModule(
             id: "dockvac", name: "DockVac",
-            summary: "Reclaim space held by Docker images, volumes and build cache.",
-            systemImage: "shippingbox", sourceRepository: "DockVac"),
+            summary: "See what Docker keeps on disk and reclaim exactly what you choose.",
+            systemImage: "shippingbox", status: .available, sourceRepository: "DockVac"),
         SuiteModule(
             id: "repomen", name: "RepoMen",
             summary: "Hunt down build artifacts and caches that eat your disk.",
@@ -47,7 +47,7 @@ public enum ModuleRegistry {
         SuiteModule(
             id: "bootcaptain", name: "BootCaptain",
             summary: "Inventory startup items and investigate boot failures.",
-            systemImage: "power", sourceRepository: "BootCaptain"),
+            systemImage: "power", status: .available, sourceRepository: "BootCaptain"),
         SuiteModule(
             id: "devicecontroldoctor", name: "DeviceControlDoctor",
             summary: "Diagnose privacy permissions that look granted but fail.",
@@ -59,7 +59,7 @@ public enum ModuleRegistry {
         SuiteModule(
             id: "hallpass", name: "HallPass",
             summary: "Exempt trusted networks from local-network privacy prompts.",
-            systemImage: "network", sourceRepository: "HallPass"),
+            systemImage: "network", status: .available, sourceRepository: "HallPass"),
         SuiteModule(
             id: "zenbackupmanager", name: "Zen Backup Manager",
             summary: "Browse and restore Zen Browser session backups on a timeline.",
@@ -67,7 +67,7 @@ public enum ModuleRegistry {
         SuiteModule(
             id: "obtainintosh", name: "Obtainintosh",
             summary: "Track updates for apps and fonts installed from releases.",
-            systemImage: "arrow.down.circle", sourceRepository: "Obtainintosh"),
+            systemImage: "arrow.down.circle", status: .available, sourceRepository: "Obtainintosh"),
         SuiteModule(
             id: "runningman", name: "RunningMan",
             summary: "Keep self-hosted CI runners alive and signed in.",

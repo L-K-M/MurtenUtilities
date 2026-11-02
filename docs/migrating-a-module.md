@@ -103,7 +103,9 @@ Remove these from the migrated code; the suite has exactly one of each:
   exists (all runners, all profiles), say so with `coverage: .exhaustive`,
   so suggestions for a deleted scope resolve.
 - Pick a cadence of at least 15 minutes and declare `.network` when the
-  check talks to a remote host.
+  check talks to a remote host. The coordinator reads `cadence.resources`
+  before every poll, so it may change (an SSH endpoint appears), but reads
+  `interval` only when the watcher is enabled.
 
 ## State
 

@@ -10,13 +10,23 @@ private final class FakeSource: SessionSnapshotSource, @unchecked Sendable {
     private var listFailure: Error?
     private var dates: [String: Date] = [:]
     private var failing: Set<String> = []
+    private var unreadable: Set<String> = []
 
-    func set(_ profiles: [ZenProfile], dates: [String: Date] = [:], failing: Set<String> = [], listFailure: Error? = nil) {
+    /// `unreadable`: directories profiles.ini names that discovery skipped.
+    func set(_ profiles: [ZenProfile], dates: [String: Date] = [:], failing: Set<String> = [],
+             unreadable: Set<String> = [], listFailure: Error? = nil) {
         lock.lock(); defer { lock.unlock() }
         listed = profiles
         self.dates = dates
         self.failing = failing
+        self.unreadable = unreadable
         self.listFailure = listFailure
+    }
+
+    func listedProfileDirectories() throws -> Set<String> {
+        lock.lock(); defer { lock.unlock() }
+        if let listFailure { throw listFailure }
+        return Set(listed.map(\.id)).union(unreadable)
     }
 
     func profiles() throws -> [ZenProfile] {
@@ -83,17 +93,40 @@ final class ZenSessionWatcherTests: XCTestCase {
         XCTAssertNil(observation.failures.first?.scope)
     }
 
-    func testAProfileThatLeftZensListResolves() async {
+    func testAProfileThatLeftZensListResolves() async throws {
         let source = FakeSource()
-        let watcher = watcher(source)
         source.set([work, home], dates: [work.id: now.addingTimeInterval(-9 * day), home.id: now.addingTimeInterval(-9 * day)])
-        _ = await watcher.observe()
+        let rule = SessionStalenessRule()
+        var ledger = SuggestionLedger()
+        let first = await watcher(source).observe()
+        let departed = try XCTUnwrap(first.findings.first { $0.scope == FindingScope(work.id) }?.key)
+        XCTAssertTrue(ledger.apply(first, rule: rule).contains(.opened(departed)), "the profile's suggestion is active")
 
+        // A fresh watcher is the relaunch case: nothing remembers the profile.
         source.set([home], dates: [home.id: now.addingTimeInterval(-9 * day)])
-        let observation = await watcher.observe()
+        let second = await watcher(source).observe()
 
-        XCTAssertTrue(observation.completedScopes.contains(FindingScope(work.id)), "checked and absent")
-        XCTAssertFalse(observation.findings.contains { $0.scope == FindingScope(work.id) })
+        XCTAssertEqual(second.coverage, .exhaustive)
+        XCTAssertFalse(second.completedScopes.contains(FindingScope(work.id)), "the scope is absent, not completed")
+        XCTAssertFalse(second.findings.contains { $0.scope == FindingScope(work.id) })
+        XCTAssertTrue(ledger.apply(second, rule: rule).contains(.resolved(departed)))
+    }
+
+    func testAnUnreadableListedProfileGoesStaleNotResolved() async throws {
+        let source = FakeSource()
+        source.set([work], dates: [work.id: now.addingTimeInterval(-9 * day)])
+        let rule = SessionStalenessRule()
+        var ledger = SuggestionLedger()
+        let first = await watcher(source).observe()
+        let key = try XCTUnwrap(first.findings.first?.key)
+        ledger.apply(first, rule: rule)
+
+        // profiles.ini still names the profile, but its prefs.js is unreadable.
+        source.set([], unreadable: [work.id])
+        let second = await watcher(source).observe()
+
+        XCTAssertEqual(second.failures.compactMap(\.scope), [FindingScope(work.id)])
+        XCTAssertEqual(ledger.apply(second, rule: rule), [.becameStale(key)])
     }
 
     func testCancellationLeavesTheRestUnchecked() async {
