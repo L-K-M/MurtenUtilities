@@ -100,14 +100,38 @@ struct ToolCommands: Commands {
     var body: some Commands {
         CommandMenu("Tool") {
             if let commands, !commands.isEmpty {
-                ForEach(commands) { command in
-                    Button(command.title) { command.action() }
-                        .keyboardShortcut(command.shortcut)
-                        .disabled(!command.isEnabled)
+                ForEach(Array(commands.enumerated()), id: \.element.id) { index, command in
+                    if index > 0, commands[index - 1].group != command.group {
+                        Divider()
+                    }
+                    ToolCommandItem(command: command)
                 }
             } else {
                 Text("Open a tool to see its commands")
             }
+        }
+    }
+}
+
+/// One Tool-menu item: a button, or a toggle when it carries a checkmark.
+private struct ToolCommandItem: View {
+    let command: ModuleCommand
+
+    var body: some View {
+        item
+            .keyboardShortcut(command.shortcut)
+            .disabled(!command.isEnabled)
+            .help(command.help ?? "")
+    }
+
+    @ViewBuilder private var item: some View {
+        switch command.checkState {
+        case .none:
+            Button(command.title) { command.action() }
+        case .checked, .unchecked:
+            // Toggling runs the command; the pane publishes the new state.
+            Toggle(command.title, isOn: Binding(get: { command.checkState == .checked },
+                                                set: { _ in command.action() }))
         }
     }
 }
