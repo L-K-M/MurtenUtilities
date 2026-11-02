@@ -30,7 +30,19 @@ let suiteTargets: [Target] = [
 // conflicting.
 
 // MARK: DockVac
-let dockVacTargets: [Target] = []
+// DockVac's own targets kept Swift 6 language mode; the fake daemon and SSH
+// bridge its driver tests spawn live in Tests/DockVacDockerTests/Scripts.
+let dockVacSwift6: [SwiftSetting] = [.swiftLanguageMode(.v6)]
+let dockVacTargets: [Target] = [
+    .target(name: "DockVacCore", swiftSettings: dockVacSwift6),
+    .target(name: "DockVacDocker", dependencies: ["DockVacCore"], swiftSettings: dockVacSwift6),
+    .testTarget(
+        name: "DockVacCoreTests", dependencies: ["DockVacCore"],
+        resources: [.copy("Fixtures")], swiftSettings: dockVacSwift6),
+    .testTarget(
+        name: "DockVacDockerTests", dependencies: ["DockVacDocker", "DockVacCore"],
+        exclude: ["Scripts"], swiftSettings: dockVacSwift6)
+]
 let dockVacModule: [Target.Dependency] = []
 
 // MARK: RepoMen
