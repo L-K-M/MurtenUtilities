@@ -106,8 +106,8 @@ Coreography's root, peer-code-signature-checked sampling daemon (process
 counters of other users' processes, open files, sockets, signals, renice,
 spindump, the Background Task Management dump). Migrating those modules
 embeds each helper in the suite bundle — `Contents/Library/LaunchDaemons`,
-one daemon per module, never shared — and both gate on the signing
-decision: their code-signing requirements pin a real Team ID, so ad-hoc
+one daemon per module, never shared between modules — and both gate on the
+signing decision: their code-signing requirements pin a real Team ID, so ad-hoc
 suite builds cannot carry phase 3's helpers. The signing open question in
 PLAN.md sits on phase 3's critical path, not in a later distribution pass.
 
