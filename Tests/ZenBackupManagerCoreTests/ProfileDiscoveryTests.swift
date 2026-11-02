@@ -1,5 +1,5 @@
 import XCTest
-@testable import ZenBackupManager
+@testable import ZenBackupManagerCore
 
 final class ProfileDiscoveryTests: XCTestCase {
     func testINIParsesCRLFCommentsAndEqualsInPaths() {

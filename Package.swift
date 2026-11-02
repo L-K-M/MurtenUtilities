@@ -54,7 +54,11 @@ let hallPassTargets: [Target] = []
 let hallPassModule: [Target.Dependency] = []
 
 // MARK: ZenBackupManager
-let zenBackupManagerTargets: [Target] = []
+// Ported from the standalone app's .xcodeproj (Swift 5, the package default).
+let zenBackupManagerTargets: [Target] = [
+    .target(name: "ZenBackupManagerCore", dependencies: ["MurtenCore"]),
+    .testTarget(name: "ZenBackupManagerCoreTests", dependencies: ["ZenBackupManagerCore", "MurtenCore"])
+]
 let zenBackupManagerModule: [Target.Dependency] = []
 
 // MARK: Obtainintosh

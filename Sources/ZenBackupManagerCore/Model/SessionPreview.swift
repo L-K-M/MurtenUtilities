@@ -1,30 +1,30 @@
 import Foundation
 
-struct SessionPreview: Sendable {
-    enum Format: String, Sendable { case zen = "Zen session", firefox = "Legacy session" }
-    struct Tab: Identifiable, Sendable {
-        let id: String
-        let title: String
-        let url: String
-        let spaceID: String?
-        let pinned: Bool
-        let essential: Bool
-        var host: String { URL(string: url)?.host ?? url }
+public struct SessionPreview: Sendable {
+    public enum Format: String, Sendable { case zen = "Zen session", firefox = "Legacy session" }
+    public struct Tab: Identifiable, Sendable {
+        public let id: String
+        public let title: String
+        public let url: String
+        public let spaceID: String?
+        public let pinned: Bool
+        public let essential: Bool
+        public var host: String { URL(string: url)?.host ?? url }
     }
-    struct Space: Identifiable, Sendable {
-        let id: String
-        let name: String
-        let icon: String
+    public struct Space: Identifiable, Sendable {
+        public let id: String
+        public let name: String
+        public let icon: String
     }
-    let format: Format
-    let tabs: [Tab]
-    let spaces: [Space]
-    let folderCount: Int
-    let splitCount: Int
-    let collectedAt: Date?
-    var pinnedCount: Int { tabs.filter { $0.pinned || $0.essential }.count }
+    public let format: Format
+    public let tabs: [Tab]
+    public let spaces: [Space]
+    public let folderCount: Int
+    public let splitCount: Int
+    public let collectedAt: Date?
+    public var pinnedCount: Int { tabs.filter { $0.pinned || $0.essential }.count }
 
-    static func parse(_ data: Data) throws -> SessionPreview {
+    public static func parse(_ data: Data) throws -> SessionPreview {
         let document: Document
         do { document = try JSONDecoder().decode(Document.self, from: MozillaLZ4.decode(data)) }
         catch let error as BackupError { throw error }
@@ -61,7 +61,7 @@ struct SessionPreview: Sendable {
     }
 
     /// Compare URL multiplicities, so two copies of the same page count as two tabs.
-    func difference(from current: SessionPreview) -> (added: Int, removed: Int) {
+    public func difference(from current: SessionPreview) -> (added: Int, removed: Int) {
         let before = Dictionary(grouping: current.tabs, by: \.url).mapValues(\.count)
         let after = Dictionary(grouping: tabs, by: \.url).mapValues(\.count)
         let keys = Set(before.keys).union(after.keys)

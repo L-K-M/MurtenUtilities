@@ -3,13 +3,13 @@ import CryptoKit
 import Darwin
 
 /// Only these two files are ever replaced. Other profile data is never edited.
-enum SessionFiles {
+public enum SessionFiles {
     static let names = ["zen-sessions.jsonlz4", "sessionstore.jsonlz4"]
     static let maximumSize = MozillaLZ4.maximumSize
 
-    static func digest(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
+    public static func digest(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
 
-    static func validateProfile(_ directory: URL) throws {
+    public static func validateProfile(_ directory: URL) throws {
         guard directory.isFileURL, directory.standardizedFileURL == directory.resolvingSymlinksInPath().standardizedFileURL,
               try directory.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true,
               FileManager.default.fileExists(atPath: directory.appendingPathComponent("prefs.js").path) else {
@@ -25,7 +25,7 @@ enum SessionFiles {
         guard file.standardizedFileURL == file.resolvingSymlinksInPath().standardizedFileURL else { throw BackupError.unsafePath }
     }
 
-    static func read(_ file: URL) throws -> Data {
+    public static func read(_ file: URL) throws -> Data {
         try validateDestination(file)
         let values = try file.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
         guard values.isRegularFile == true, let size = values.fileSize, size >= 0, size <= maximumSize else {
@@ -36,7 +36,7 @@ enum SessionFiles {
         return data
     }
 
-    static func write(_ data: Data, to file: URL) throws {
+    public static func write(_ data: Data, to file: URL) throws {
         try validateDestination(file)
         let temporary = file.deletingLastPathComponent().appendingPathComponent(".zen-backup-" + UUID().uuidString)
         let descriptor = open(temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, S_IRUSR | S_IWUSR)

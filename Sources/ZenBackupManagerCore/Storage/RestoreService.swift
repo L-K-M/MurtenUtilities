@@ -1,12 +1,22 @@
 import Foundation
 
-struct RestoreService {
-    let safetyRoot: URL
-    var isZenRunning: () -> Bool
+public struct RestoreService {
+    public let safetyRoot: URL
+    public var isZenRunning: () -> Bool
     /// Injection point for failure/rollback tests. Production uses atomic writes.
-    var write: (Data, URL) throws -> Void = { try SessionFiles.write($0, to: $1) }
+    var write: (Data, URL) throws -> Void
 
-    func restore(_ backup: BackupRecord, to profile: ZenProfile) throws -> SafetyArchive {
+    public init(safetyRoot: URL, isZenRunning: @escaping () -> Bool) {
+        self.init(safetyRoot: safetyRoot, isZenRunning: isZenRunning, write: { try SessionFiles.write($0, to: $1) })
+    }
+
+    init(safetyRoot: URL, isZenRunning: @escaping () -> Bool, write: @escaping (Data, URL) throws -> Void) {
+        self.safetyRoot = safetyRoot
+        self.isZenRunning = isZenRunning
+        self.write = write
+    }
+
+    public func restore(_ backup: BackupRecord, to profile: ZenProfile) throws -> SafetyArchive {
         guard backup.canRestore, let digest = backup.digest else {
             throw BackupError.invalid("Select a readable backup before restoring.")
         }
@@ -39,7 +49,7 @@ struct RestoreService {
         return safety
     }
 
-    func undo(_ archive: SafetyArchive, profile: ZenProfile) throws -> SafetyArchive {
+    public func undo(_ archive: SafetyArchive, profile: ZenProfile) throws -> SafetyArchive {
         try SessionFiles.validateProfile(profile.directory)
         guard !isZenRunning() else { throw BackupError.zenRunning }
         let lock = try ProfileLock(directory: profile.directory)

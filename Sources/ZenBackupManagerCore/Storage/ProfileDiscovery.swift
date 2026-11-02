@@ -1,11 +1,11 @@
 import Foundation
 
-enum ProfileDiscovery {
-    static var zenRoot: URL {
+public enum ProfileDiscovery {
+    public static var zenRoot: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/zen", isDirectory: true)
     }
 
-    static func discover(root: URL = zenRoot) throws -> [ZenProfile] {
+    public static func discover(root: URL = zenRoot) throws -> [ZenProfile] {
         let ini = root.appendingPathComponent("profiles.ini")
         guard FileManager.default.fileExists(atPath: ini.path) else { return [] }
         let text = try String(contentsOf: ini, encoding: .utf8)

@@ -1,6 +1,6 @@
 import Foundation
 import Compression
-@testable import ZenBackupManager
+@testable import ZenBackupManagerCore
 
 enum Fixture {
     static func compressed(_ text: String) -> Data {

@@ -1,12 +1,12 @@
 import Foundation
 
-enum BackupError: LocalizedError {
+public enum BackupError: LocalizedError {
     case invalid(String)
     case zenRunning
     case changed
     case unsafePath
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .invalid(let message): return message
         case .zenRunning: return "Quit Zen completely (⌘Q), then try again. A running browser can overwrite restored tabs."

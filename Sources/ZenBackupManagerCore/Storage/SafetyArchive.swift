@@ -1,17 +1,17 @@
 import Foundation
 
-struct SafetyArchive: Sendable {
-    struct Manifest: Codable, Sendable {
-        let version: Int
-        let profilePath: String
-        let createdAt: Date
-        let reason: String
-        let hashes: [String: String]
+public struct SafetyArchive: Sendable {
+    public struct Manifest: Codable, Sendable {
+        public let version: Int
+        public let profilePath: String
+        public let createdAt: Date
+        public let reason: String
+        public let hashes: [String: String]
     }
-    let directory: URL
-    let manifest: Manifest
+    public let directory: URL
+    public let manifest: Manifest
 
-    static var defaultRoot: URL {
+    public static var defaultRoot: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/ZenBackupManager/Safety Copies", isDirectory: true)
     }
@@ -42,7 +42,7 @@ struct SafetyArchive: Sendable {
         return SafetyArchive(directory: directory, manifest: manifest)
     }
 
-    static func list(root: URL, profile: ZenProfile) throws -> [SafetyArchive] {
+    public static func list(root: URL, profile: ZenProfile) throws -> [SafetyArchive] {
         guard FileManager.default.fileExists(atPath: root.path) else { return [] }
         guard root.standardizedFileURL == root.resolvingSymlinksInPath().standardizedFileURL else { throw BackupError.unsafePath }
         let directories = try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)
