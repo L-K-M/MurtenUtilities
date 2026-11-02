@@ -12,12 +12,13 @@ final class ShortkingProviderTests: XCTestCase {
     private func makeProvider() throws -> ShortkingProvider {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: "ShortkingProviderTests.\(UUID().uuidString)"))
         return ShortkingProvider(context: ModuleContext(
-            moduleID: ShortkingProvider.moduleID, defaults: defaults,
+            moduleID: ShortkingProvider.identifier, defaults: defaults,
             requestRecheck: {}, open: { _ in }))
     }
 
     func testMatchesItsRegistryEntry() throws {
         let provider = try makeProvider()
+        XCTAssertEqual(provider.moduleID, ShortkingProvider.identifier)
         let entry = try XCTUnwrap(ModuleRegistry.all.first { $0.id == provider.moduleID })
         XCTAssertEqual(entry.status, .available)
     }

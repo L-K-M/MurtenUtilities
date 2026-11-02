@@ -15,10 +15,12 @@ import SwiftUI
 @MainActor
 public final class ShortkingProvider: SuiteModuleProvider {
 
-    /// Nonisolated so the app's module catalog can name it outside the main actor.
-    public nonisolated static let moduleID = ShortkingSuite.moduleID
+    /// The module id for the app's catalog. Nonisolated so the catalog can
+    /// name it outside the main actor; not called `moduleID`, which the
+    /// instance requirement needs to itself.
+    public nonisolated static let identifier = ShortkingSuite.moduleID
 
-    public let moduleID = ShortkingProvider.moduleID
+    public let moduleID = ShortkingSuite.moduleID
     public let watch: WatcherRegistration?
 
     private let context: ModuleContext
