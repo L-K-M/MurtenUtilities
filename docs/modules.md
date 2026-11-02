@@ -147,8 +147,12 @@ Ordered by fit with the suite's job ("notice a problem, open the right tool"):
   "app X was trashed; its support files remain". Privileged only on delete.
 - **Duplicates finder** — Norton had one; users expect it. On-demand pane;
   watcher optional ("Downloads has 400 MB of dupes").
-- **Secure erase / WipeInfo homage** — file shredder for sensitive files.
-  Small, self-contained, very on-brand.
+- **Deletion/privacy guidance, not a file shredder** — do not promise secure
+  per-file erasure on SSDs or APFS. Overwriting a path cannot prove removal of
+  old blocks, clones, snapshots or backup copies. Apple does not offer
+  [Disk Utility secure erase for SSDs](https://support.apple.com/guide/disk-utility/erase-and-reformat-a-storage-device-dskutl14079/mac).
+  A future pane could explain FileVault and supported whole-device erase
+  workflows; it must distinguish deleting a file from sanitizing a device.
 - **Whole-disk map** — DockVac and RepoMen cover Docker and dev caches; a
   general "what's eating my disk" treemap is the missing general case.
 - **Backup freshness** — "Time Machine (or your backup tool) hasn't run in N
