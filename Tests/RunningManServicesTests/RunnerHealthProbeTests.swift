@@ -23,7 +23,7 @@ final class RunnerHealthProbeTests: XCTestCase {
         try writeGitHubRunner(at: runner, label: label)
         try writeGitHubRunner(at: protected, label: "actions.runner.example-project.protected-mac")
         let fake = FakeExecutor()
-        let probe = RunnerHealthProbe(homeDirectory: home, systemDaemonsDirectory: nil, executor: fake, userID: 501)
+        let probe = RunnerHealthProbe(homeDirectory: home, systemDaemonsDirectory: nil, executor: fake, userID: getuid())
 
         let reading = await probe.read(additionalDirectories: [])
 
@@ -48,7 +48,7 @@ final class RunnerHealthProbeTests: XCTestCase {
         try writeGitHubRunner(at: runner, label: label)
         let fake = FakeExecutor()
         await fake.configure(processes: "4242 1 \(runner.path)/bin/Runner.Listener run --startuptype service\n")
-        let probe = RunnerHealthProbe(homeDirectory: home, systemDaemonsDirectory: nil, executor: fake, userID: 501)
+        let probe = RunnerHealthProbe(homeDirectory: home, systemDaemonsDirectory: nil, executor: fake, userID: getuid())
 
         let reading = await probe.read(additionalDirectories: [])
 
@@ -58,7 +58,7 @@ final class RunnerHealthProbeTests: XCTestCase {
 
     func testNoRunnersRunNoCommands() async {
         let fake = FakeExecutor()
-        let probe = RunnerHealthProbe(homeDirectory: home, systemDaemonsDirectory: nil, executor: fake, userID: 501)
+        let probe = RunnerHealthProbe(homeDirectory: home, systemDaemonsDirectory: nil, executor: fake, userID: getuid())
 
         let reading = await probe.read(additionalDirectories: [])
 

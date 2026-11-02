@@ -351,7 +351,7 @@ final class AppModelTests: XCTestCase {
         for runner in [restarted, previousBoot] {
             XCTAssertEqual(model.runners.first { $0.id == runner.id }?.status, .idle, runner.runner.name)
             XCTAssertFalse(model.drainingRunnerIDs.contains(runner.id), runner.runner.name)
-            XCTAssertTrue(model.events.contains { $0.title == "Stop after job ended: \(runner.runner.name) restarted while RunningMan was closed" })
+            XCTAssertTrue(model.events.contains { $0.title == "Stop after job ended: \(runner.runner.name) restarted while Murten Utilities was closed" })
         }
     }
 
