@@ -38,8 +38,26 @@ let repoMenTargets: [Target] = []
 let repoMenModule: [Target.Dependency] = []
 
 // MARK: BootCaptain
-let bootCaptainTargets: [Target] = []
-let bootCaptainModule: [Target.Dependency] = []
+// Core and Kit move in from BootCaptain's own package; Core adds the
+// watcher's pure diff and rule (Watch/). The app target's sources become
+// BootCaptainModule. The CLI and the root helper stay in the BootCaptain repo
+// (docs/modules.md, BootCaptain).
+let bootCaptainTargets: [Target] = [
+    // MurtenCore for the watcher's rule, which stays pure and lives here.
+    .target(name: "BootCaptainCore", dependencies: ["MurtenCore"]),
+    .target(name: "BootCaptainKit", dependencies: ["BootCaptainCore"]),
+    .target(
+        name: "BootCaptainModule",
+        dependencies: ["BootCaptainCore", "BootCaptainKit", "MurtenCore", "MurtenModuleKit"]
+    ),
+    .testTarget(name: "BootCaptainCoreTests", dependencies: ["BootCaptainCore"]),
+    .testTarget(name: "BootCaptainKitTests", dependencies: ["BootCaptainKit", "BootCaptainCore"]),
+    .testTarget(
+        name: "BootCaptainModuleTests",
+        dependencies: ["BootCaptainModule", "BootCaptainCore", "BootCaptainKit", "MurtenCore", "MurtenModuleKit"]
+    )
+]
+let bootCaptainModule: [Target.Dependency] = ["BootCaptainModule"]
 
 // MARK: DeviceControlDoctor
 // DoctorCore keeps its upstream name; its directory carries the tool's
@@ -78,8 +96,23 @@ let shortkingTargets: [Target] = [
 let shortkingModule: [Target.Dependency] = ["ShortkingModule"]
 
 // MARK: HallPass
-let hallPassTargets: [Target] = []
-let hallPassModule: [Target.Dependency] = []
+// The source package (tools 6.0, no explicit mode) builds in Swift 6.
+let hallPassSwiftSettings: [SwiftSetting] = [.swiftLanguageMode(.v6)]
+let hallPassTargets: [Target] = [
+    .target(name: "HallPassCore", swiftSettings: hallPassSwiftSettings),
+    .target(
+        name: "HallPassModule",
+        dependencies: ["HallPassCore", "MurtenCore", "MurtenModuleKit"],
+        swiftSettings: hallPassSwiftSettings
+    ),
+    .testTarget(name: "HallPassCoreTests", dependencies: ["HallPassCore"], swiftSettings: hallPassSwiftSettings),
+    .testTarget(
+        name: "HallPassModuleTests",
+        dependencies: ["HallPassModule", "HallPassCore", "MurtenCore", "MurtenModuleKit"],
+        swiftSettings: hallPassSwiftSettings
+    )
+]
+let hallPassModule: [Target.Dependency] = ["HallPassModule"]
 
 // MARK: ZenBackupManager
 // Ported from the standalone app's .xcodeproj (Swift 5, the package default).

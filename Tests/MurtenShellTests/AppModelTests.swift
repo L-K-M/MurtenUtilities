@@ -126,8 +126,11 @@ final class AppModelTests: XCTestCase {
         let harness = Harness()
         await harness.model.start()
 
+        let requests = harness.model.windowRequests
         harness.provider.context.open(ModuleRoute(moduleID: fakeModuleID))
         XCTAssertEqual(harness.model.openRoute, ModuleRoute(moduleID: fakeModuleID))
+        XCTAssertGreaterThan(harness.model.windowRequests, requests,
+                             "a menu-bar section opening a pane brings the window forward")
     }
 
     // MARK: - Snooze, dismiss
