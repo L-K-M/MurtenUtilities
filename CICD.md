@@ -19,8 +19,7 @@ Release.
 
 One job on `macos-26` selecting **Xcode 26.0** via `maxim-lobanov/setup-xcode` —
 pinned so a runner-image bump can't silently change the toolchain. The app's
-deployment target stays macOS 14 (`LSMinimumSystemVersion`); building on a
-newer SDK does not raise it. The build fetches the pinned Rigi revision from
+deployment target is macOS 26 (`LSMinimumSystemVersion`, `Package.swift`). The build fetches the pinned Rigi revision from
 GitHub like any other SwiftPM dependency. In-progress runs for the same *PR
 branch* are cancelled on a new push; main-branch runs are never cancelled.
 

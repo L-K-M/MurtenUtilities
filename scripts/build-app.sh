@@ -34,8 +34,16 @@ cd "$PROJECT_ROOT"
 swift build --configuration "$CONFIGURATION" --scratch-path "$BUILD_DIR" --cache-path "$BUILD_DIR/package-cache" --disable-sandbox ${ARCH_ARGS[@]+"${ARCH_ARGS[@]}"}
 BIN_DIR="$(swift build --configuration "$CONFIGURATION" --scratch-path "$BUILD_DIR" --cache-path "$BUILD_DIR/package-cache" --disable-sandbox --show-bin-path ${ARCH_ARGS[@]+"${ARCH_ARGS[@]}"})"
 
+# Assemble from scratch so bundles removed from the package do not linger.
+rm -rf "$APP_PATH"
 mkdir -p "$APP_PATH/Contents/MacOS" "$APP_PATH/Contents/Resources"
 cp "$BIN_DIR/MurtenUtilities" "$APP_PATH/Contents/MacOS/MurtenUtilities"
+
+# SwiftPM resource bundles (one per target with resources) go to
+# Contents/Resources, where code signing expects them. SwiftPM's generated
+# Bundle.module looks at the bundle root instead, so modules load resources
+# through their own accessor (docs/migrating-a-module.md, Resources).
+find "$BIN_DIR" -maxdepth 1 -name '*.bundle' -type d -exec cp -R {} "$APP_PATH/Contents/Resources/" \;
 cp "$PROJECT_ROOT/Resources/Info.plist" "$APP_PATH/Contents/Info.plist"
 printf 'APPL????' > "$APP_PATH/Contents/PkgInfo"
 

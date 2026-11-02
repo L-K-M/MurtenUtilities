@@ -26,8 +26,7 @@ swift test               # MurtenCore tests
 
 `scripts/build.sh` / `scripts/release.sh` wrap the shared `lkm-build` /
 `lkm-release` engines; releases are cut by tagging — see [CICD.md](CICD.md).
-Requires macOS 14+ and Xcode 26 (any Xcode 16+ builds the package; CI pins the
-toolchain). The classic chrome comes from
+Requires macOS 26 and Xcode 26 (CI pins the toolchain). The classic chrome comes from
 [Rigi](https://github.com/L-K-M/Rigi), pinned to an immutable commit in
 `Package.swift`.
 

@@ -119,32 +119,27 @@ Per-module migration notes, satellites, and new-module ideas:
   `NSRequiresAquaSystemAppearance` in `Info.plist`. If this ever changes it is
   a deliberate product decision plus real Rigi theming work — never a gradual
   accumulation of dark patches (docs/ui-direction.md).
+- **Deployment floor: macOS 26** (decided 2026-11-02). One tested OS,
+  matching CI, HallPass and Coreography. Users of macOS 14 and 15 keep the
+  standalone apps.
+- **Obtainintosh stays generic**: any GitHub or Forgejo repository the user
+  adds, as today. It downloads and reveals; it does not install.
+- **User-armed automation is allowed, narrowly** (RepoMen's Watch mode):
+  armed per target by the user, off by default, reversible (moves to the
+  Trash, never deletes), and visible in the menu while armed. It is the one
+  documented exception to "nothing repairs without a click"; a watcher's
+  suggestion still never acts.
+- **Suite update check off by default.** One check for the suite bundle,
+  daily when the user turns it on; it shows a banner, never downloads or
+  installs.
+- **English UI throughout.** HallPass's German strings are translated when
+  it migrates.
 
 ## Open questions
 
 - **Standalone app fate.** Keep shipping each tool alongside the suite, or
   does the suite become the product? Recommendation: keep them until the
   suite reaches per-module parity, then decide per tool.
-- **Obtainintosh scope.** Obtainintosh is already generic: any GitHub or
-  Forgejo repository the user adds. Keep that, narrow it to the fleet, or
-  add vendor pages (its `GENERIC_SOURCES.md`)? Leaning generic — the
-  suggestion is only useful with the full picture. Either way it downloads
-  and reveals; it does not install (docs/modules.md).
-- **Deployment floor.** The suite declares macOS 14; HallPass and Coreography
-  declare macOS 26 (docs/modules.md, *Platform floors*). Raising the suite to
-  26 means one tested OS, matching CI and both modules, but drops users of 14
-  and 15 whom the other eight modules support. Keeping 14 widens reach, but
-  HallPass's pane needs availability fallbacks and Coreography would sample
-  on releases it was never verified on, neither covered by CI. A middle
-  floor such as 15.5 is HallPass's own feature
-  floor. Decide before Phase 2 migrates HallPass. Any floor still needs
-  per-module applicability (docs/architecture.md).
-- **Suite updates.** One update check for the suite bundle replaces the
-  modules' own (docs/architecture.md §Module packaging). On by default keeps
-  ad-hoc-signed installs current, but contacts GitHub without the user
-  opting in; off by default matches "opt-in, never nagware" and leaves
-  installs stale. Sparkle would be a second dependency. A fleet-scoped
-  Obtainintosh could own this check.
 - **Name.** `MurtenUtilities` is the repo and bundle id; the *displayed* name
   can stay "Murten Utilities" or take a friendlier one later.
 - **Signing.** Ad-hoc now. That limits function, not just distribution.
@@ -157,20 +152,14 @@ Per-module migration notes, satellites, and new-module ideas:
   `Sources/RunningManServices/ForgejoConnectionStore.swift`). Shortking
   (Accessibility, Input Monitoring), BootCaptain (Automation, Full Disk Access
   for login items) and RepoMen (Documents, Full Disk Access for snapshots)
-  need a stable identity, Apple Development or Developer ID, before they
-  migrate; BootCaptain's and Coreography's helpers pin a Team ID as well.
-  Pick the final identity early: switching between them changes the
-  requirement, so users grant everything once more. HallPass does not drive
+  need a stable identity, Apple Development or Developer ID, to keep those
+  grants across updates; until one is chosen they migrate with that
+  limitation stated in their panes. BootCaptain's and Coreography's
+  helpers pin a Team ID, so they stay out of ad-hoc builds and the features
+  behind them show as unavailable. Pick the final identity early: switching
+  between them changes the requirement, so users grant everything once
+  more. HallPass does not drive
   this; its admin prompt is not a TCC grant.
 - **Suite icon language.** Tiles use SF Symbols today; real per-tool icons
   need a shared grammar (docs/ui-direction.md, Pict as the fleet's icon
   store).
-- **User-armed automation.** RepoMen's Watch mode, once armed, trashes stale
-  artifacts after each check with no per-item click. That is a watcher with
-  a write path, which the suite forbids (docs/modules.md, RepoMen). By
-  contrast, RunningMan's stop-after-job is one click on a named runner,
-  carried out later, and fits the rule. Dropping RepoMen-style automation
-  keeps "nothing repairs without a click" absolute, but RepoMen users lose a
-  feature. Allowing it only when armed per target, reversible, off by
-  default and visible in the menu keeps the feature, but the rule gets an
-  exception. Decide before RepoMen migrates in Phase 3.

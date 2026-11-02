@@ -5,57 +5,64 @@
 ```
 Sources/
   MurtenCore/         pure logic — no AppKit, no process spawning, no privilege
-    SuiteModule.swift   module descriptor (id, name, one-liner, icon, status)
-    ModuleRegistry      the roster, in home-screen order
-    Suggestion.swift    suggestion model + Watcher protocol
-    (later)             SuggestionStore, snooze/threshold rules, Finding types
-  MurtenUtilities/    the app shell
-    MurtenUtilitiesApp  WindowGroup("home") + MenuBarExtra — the two faces
-    HomeView            the Norton grid + suggestion feed
-    MenuBarView         menu face: suggestions, watcher toggles, open/quit
-    StatusBar           NSViewRepresentable → RigiUI
-    (later)             DeepLinkRouter, per-module pane hosts, Settings
+    SuiteModule         module descriptor (id, name, one-liner, icon, status) + ModuleRegistry
+    Finding/WatchObservation what a watcher saw, per scope, including failures
+    Watcher             observe() → WatchObservation; cadence, timeout, resources
+    SuggestionRule      finding → at most one suggestion, with hysteresis
+    SuggestionLedger    episodes, dedupe, snooze, dismissal, staleness, health
+    SuggestionStore     the ledger's single owner; JSON persistence
+    WatchSchedule/WatchCoordinator  cadence, back-off, gate, cancellation
+    ModuleRoute         murten://module/action?context, allowlist-validated
+    SuiteSettings       resident mode, per-module watchers and notifications, pauses
+  MurtenModuleKit/    SuiteModuleProvider, ModuleContext, module windows and commands
+  MurtenShell/        the app: AppModel, live services, scenes, views — a library,
+                      so app-level tests run against fake services
+  MurtenUtilities/    the executable: @main plus the module catalog
   <Tool>Core/         migrated pure logic per tool (DockVacCore, …) — one
                       target each, kept free of AppKit/spawn/privilege
   <Tool>Services/     the IO side a watcher needs when the source app has
                       one (DockVacDocker's Engine client, a runner front) —
                       library targets with injectable boundaries
-  <Tool>Pane or in-app  each module's SwiftUI pane
+  <Tool>Module/       each module's provider, pane and watcher
 Tests/
-  MurtenCoreTests/    contracts: registry invariants, dedupe/snooze rules
+  MurtenCoreTests/    contracts: registry, routes, ledger, store, schedule, coordinator
+  MurtenShellTests/   AppModel against fake services and a fake module
   <Tool>CoreTests/    each migrated core keeps its existing suite
-  <Tool>ServicesTests/  watcher logic against fixtures, never the live system
+  <Tool>ModuleTests/  watcher logic against fixtures, never the live system
 ```
 
-Current v0.1 scaffold contracts (not yet the full pipeline):
+The contracts, abridged:
 
 ```swift
 public protocol Watcher: Sendable {
     var moduleID: String { get }
-    func poll() async throws -> Suggestion?   // cheap, unprivileged, nil = quiet
+    var cadence: WatchCadence { get }          // ≥ 15 min, timeout, .network
+    func observe() async -> WatchObservation   // never throws; failures are data
+}
+
+public protocol SuggestionRule: Sendable {
+    func suggestion(for finding: Finding, state: RuleState) -> SuggestionContent?
+}
+
+@MainActor public protocol SuiteModuleProvider: AnyObject {
+    var moduleID: String { get }
+    var routeActions: [String: Set<String>] { get }
+    var watch: WatcherRegistration? { get }
+    func applicability() async -> Applicability
+    func makePane(route: ModuleRoute?) -> AnyView
+    func makeSettings() -> AnyView?
+    func makeWindow(_ request: ModuleWindowRequest) -> AnyView?
+    var interruptionWarning: String? { get }
 }
 ```
 
-```swift
-public struct Suggestion: Identifiable, Equatable, Sendable {
-    public let key: String       // "<module>.<finding>" — dedupe identity
-    public let moduleID: String  // deep-link target
-    public let title: String
-    public let detail: String
-}
-```
-
-The scaffold's `poll() -> Suggestion?` skips the finding/rule boundary and
-returns at most one result. Phase 1 must separate observation from rules and
-support multiple findings before module watchers depend on this API. The
-following lifecycle is the acceptance contract, not implemented behavior.
-
-Watcher implementations live in the `<Tool>Services` layer, not in
-`MurtenCore` (which stays pure) and not in the app executable: a SwiftPM
-test target cannot import an executable target, so fixture-tested watchers
-must sit in importable libraries behind injectable process/socket
-boundaries. DockVac's existing `DockVacDocker` + `DockVacDockerTests` pair
-is the pattern to copy.
+Watcher implementations live in the `<Tool>Services` or `<Tool>Module`
+library, not in `MurtenCore` (which stays pure) and not in the app
+executable: a SwiftPM test target cannot import an executable target, so
+fixture-tested watchers must sit in importable libraries behind injectable
+process/socket boundaries. DockVac's existing `DockVacDocker` +
+`DockVacDockerTests` pair is the pattern to copy. The step-by-step guide is
+[migrating-a-module.md](migrating-a-module.md).
 
 ## The suggestion pipeline
 
@@ -93,17 +100,18 @@ click suggestion ──▶ deep link ──▶ module pane ──▶ explicit co
   current ones. Only per-category opt-in permits `UNUserNotification`.
   Refreshes and startup restoration never replay old notifications.
 - **Routes** identify a module, an allowlisted action and typed context, not a
-  command or an executable path. `murten://<moduleID>[/<action>]` is proposed
-  notation; the scaffold has neither a URL handler nor scheme registration.
-  Internal navigation does not require an externally registered URL scheme.
-  Decide external-link support separately and validate all supplied context.
+  command or an executable path: `murten://<moduleID>[/<action>][?key=value]`.
+  The app registers no URL scheme; the notation round-trips through
+  notification payloads and is validated against each module's allowlist on
+  the way back in. External links stay out until decided separately.
 
 ### Observation and suggestion lifecycle
 
 - A successful, complete observation can mark a condition active or resolved.
-  `nil` in the scaffold only means "nothing worth reporting"; it cannot also
-  encode unavailable, partial, stale or resolved state. Define those outcomes
-  in Phase 1. A failed/incomplete check never proves a condition resolved.
+  A `WatchObservation` lists the scopes it completed and the failures it hit, so
+  "checked and absent" (resolved), "not checked" (unchanged) and "check
+  failed" (stale) stay distinct. A failed/incomplete check never proves a
+  condition resolved.
 - Record last success and failure separately. Permission denial, missing
   tools, offline endpoints, parse errors and timeouts make the check
   unavailable or its previous finding stale, not healthy. Show a non-modal
@@ -165,13 +173,18 @@ Do not promise OS-enforced per-module permissions in the single-process shell.
 
 - `MenuBarExtra` is the resident face; it does **not** launch at login by
   itself. Closing a window does not stop the process or its watchers.
-- The scaffold inserts the menu extra unconditionally and has no resident
-  preference yet. Before watchers ship, resident mode must default off and
-  govern background work independently of launch-at-login and notifications.
+- Resident mode defaults off. It inserts the menu extra and allows
+  background checks; launch at login and notifications are separate
+  settings. Removing the item from the menu bar turns resident mode off.
 - Launch at login is an explicit Settings toggle →
   `SMAppService.mainApp.register()` / `.unregister()`.
-- Watchers pause sensibly (on battery? metered network? user "quiet hours"?) —
-  a Settings section, designed before the first watcher ships.
+- Watchers pause on battery, in Low Power Mode, during quiet hours and, for
+  network checks, on metered networks (Settings › Background Checks; the
+  first three default on, quiet hours off). Budgets: cadence ≥ 15 minutes,
+  a per-cadence timeout (60 s default), at most two polls at once, failures
+  back off up to 6 hours, overdue checks after wake run once after 60 s. A
+  watcher still running at its timeout is reported as timed out and its
+  slot freed; it is not polled again until that work ends.
 
 ## Module packaging
 
@@ -220,14 +233,14 @@ is open (PLAN.md, *Suite updates*).
 ## Module applicability
 
 `SuiteModule` says what a tool is, not whether it can run on this Mac. Its
-`Status` is only `planned` or `available`. Before the first module ships, the
-descriptor also states:
+`Status` is only `planned` or `available`. The provider's `applicability()`
+answers the second question:
 
-- **Minimum OS**, for the pane and the watcher separately where they differ.
-  Example: the HallPass feature needs macOS 15.5, the first release with the
-  exemption defaults it edits
-  ([TN3179](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy)).
-  The suite itself declares macOS 14.
+- **Minimum OS**: the suite declares macOS 26, at or above every module's
+  floor (HallPass needs 15.5 for the exemption defaults it edits,
+  [TN3179](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy)),
+  so no module is inapplicable for its OS today. A module that later needs a
+  newer release checks it here.
 - **Required environment**, checked cheaply and without a prompt: a Docker
   endpoint for DockVac, a Zen profile for Zen Backup Manager, installed
   runners for RunningMan.
@@ -271,8 +284,9 @@ twice. Three rules hold either way:
 - `MurtenCore`: registry invariants, dedupe/snooze/threshold rules, deep-link
   parsing — pure and fully unit-testable.
 - Each `<Tool>Core` keeps the test suite it brings with it.
-- Before the first module ships, add macOS app-level smoke tests for
-  home/suggestion/pane routing, cancellation and focus with fake services.
+- `MurtenShellTests` drives `AppModel` with fake services and a fake module:
+  opt-in, home/suggestion/pane routing, route validation, snooze/dismiss,
+  notification opt-in, the quit guard, and a hosted render of `RootView`.
   Keyboard, VoiceOver, contrast and text-size acceptance live in
   [UI direction](ui-direction.md#accessibility-acceptance);
   unit tests and screenshots do not substitute for these checks.

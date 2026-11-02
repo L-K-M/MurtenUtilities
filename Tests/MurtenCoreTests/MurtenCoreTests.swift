@@ -15,23 +15,16 @@ final class MurtenCoreTests: XCTestCase {
         }
     }
 
-    func testSuggestionIdentityIsItsDedupeKey() {
-        let suggestion = Suggestion(key: "dockvac.reclaimable", moduleID: "dockvac",
-                                  title: "Docker is holding ~8 GB", detail: "Unused images and build cache.")
-        XCTAssertEqual(suggestion.id, suggestion.key)
+    func testModuleIDsAreRouteIdentifiers() throws {
+        let allowlist = RouteAllowlist(modules: Set(ModuleRegistry.all.map(\.id)))
+        for module in ModuleRegistry.all {
+            let route = try allowlist.route(from: ModuleRoute(moduleID: module.id).url)
+            XCTAssertEqual(route.moduleID, module.id)
+        }
     }
 
-    func testWatcherContractFeedsASuggestion() async throws {
-        struct DockerDiskWatcher: Watcher {
-            let moduleID = "dockvac"
-            func poll() async throws -> Suggestion? {
-                Suggestion(key: "dockvac.reclaimable", moduleID: moduleID,
-                           title: "Docker is holding ~8 GB", detail: "Unused images and build cache.")
-            }
-        }
-
-        let suggestion = try await DockerDiskWatcher().poll()
-        XCTAssertEqual(suggestion?.moduleID, "dockvac")
-        XCTAssertEqual(suggestion?.key, "dockvac.reclaimable")
+    func testSuggestionKeyRendersModuleConditionAndScope() {
+        XCTAssertEqual(reclaimable(5 * gigabyte).key.description,
+                       "dockvac.reclaimable@unix:///var/run/docker.sock")
     }
 }

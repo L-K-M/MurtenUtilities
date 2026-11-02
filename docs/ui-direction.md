@@ -76,7 +76,7 @@ not a notification center bolted on.
   plan a dark appearance to set the app's appearance instead
   ([Choosing a specific appearance](https://developer.apple.com/documentation/appkit/choosing-a-specific-appearance-for-your-macos-app)).
   So the app also sets `NSApp.appearance = NSAppearance(named: .aqua)` at
-  launch, as Lucerne does; the scaffold does not yet. Rigi's colors are fixed
+  launch, as Lucerne does (`SuiteAppDelegate`). Rigi's colors are fixed
   light values, so a key macOS stops honoring would leave light chrome under
   dark system controls.
   The key is per-bundle: any future helper, extension or satellite bundle that
@@ -100,8 +100,8 @@ menu-bar companion (`MenuBarView`) and pane together on macOS:
   sizes and display scales; fixed classic dimensions are not an exemption.
 - Use native-semantic Rigi controls where available (`ClassicToolControl`,
   `ClassicToolbarButton`). Verify custom controls explicitly. The current
-  `StatusBarView` includes zoom controls; the suite must wire a meaningful
-  action or omit them, not present inert buttons.
+  `StatusBarView` includes zoom controls; the suite hides them rather than
+  present inert buttons.
 
 Add a macOS UI smoke flow for home → suggestion → pane → cancel/back, with a
 fake observation/repair service. Check keyboard activation and accessible

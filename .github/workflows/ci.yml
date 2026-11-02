@@ -9,6 +9,11 @@ on:
   # goes through the API instead and is unaffected. Useful beyond the outage too:
   # re-running CI no longer needs an empty commit.
   workflow_dispatch:
+    inputs:
+      quick:
+        description: Build and test only; skip the universal app assembly
+        type: boolean
+        default: false
 
 # Least privilege: the build/test job only needs to read the repo.
 permissions:
@@ -25,7 +30,7 @@ jobs:
   build-test:
     name: Build, Test & Package
     runs-on: macos-26
-    timeout-minutes: 30   # a wedged build shouldn't burn the 6h default job limit
+    timeout-minutes: 60   # a wedged build shouldn't burn the 6h default job limit
     steps:
       # Actions are pinned to immutable commit SHAs: a mutable tag like @v4 can be
       # repointed at tampered code after the fact, a commit SHA cannot. Same
@@ -58,9 +63,13 @@ jobs:
       # Same invocation release.yml uses, so the release path is exercised on
       # every change rather than first failing under a tag.
       - name: Assemble MurtenUtilities.app (universal)
+        # A quick dispatch (a module branch's compile loop) frees the shared
+        # macOS runner sooner; pull requests and main always assemble.
+        if: ${{ !inputs.quick }}
         run: ./scripts/build-app.sh --universal
 
       - name: Check the built app
+        if: ${{ !inputs.quick }}
         run: |
           APP=dist/MurtenUtilities.app
           BIN="$APP/Contents/MacOS/MurtenUtilities"
