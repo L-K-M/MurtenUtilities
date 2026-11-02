@@ -60,6 +60,12 @@ DerivedData, Homebrew caches — and reclaims them by age and size.
   the core; the review-and-delete UI becomes the pane.
 - **Watcher:** periodic scan of configured roots → "N GB of build products
   older than 60 days".
+- **Existing automation:** RepoMen's Watch mode can move stale artifacts to
+  the Trash after every periodic check once the user arms it
+  (`watchAutoTrash`, off by default; `RepoMen/Watch/WatchManager.swift`).
+  That is a watcher with a write path, which the suite forbids, so it cannot
+  migrate as a watcher. Whether it survives in another form is open
+  (PLAN.md, *User-armed automation*).
 
 ### BootCaptain — effort: medium — phase 3
 
@@ -158,6 +164,26 @@ extra, widgets, Shortcuts actions, a `coreo` CLI. `.xcodeproj` today.
   same signing gate (docs/architecture.md § Module packaging).
 - **Watcher:** sustained-pressure signals → "X has pinned a core for an hour";
   thermal/disk-full warnings.
+
+## What a suggestion may preselect
+
+A deep link can open a pane with a selection already made, and one click
+then confirms it. The module owns that selection rule, not the suggestion
+engine:
+
+- The headline counts exactly what the preselected set frees. DockVac's
+  "~8 GB" comes from its own analysis, not from the `RECLAIMABLE` column of
+  `docker system df`, which also counts stopped containers, unused volumes
+  and every unused image.
+- Data-bearing or non-reproducible targets are never preselected. The user
+  adds them in the pane, one by one, with the module's own warnings.
+- A module whose dossier states no rule preselects nothing.
+
+| Module | May preselect | Never preselects | Source |
+| --- | --- | --- | --- |
+| DockVac | Its *Rebuildable* level: untagged image leftovers and unused build cache (`AutomaticCleanupLevel.safe`) | Containers and volumes, which no DockVac level removes; *re-pullable* images, which the user opts into in the pane | `Sources/DockVacCore/AutomaticCleanup.swift`, README |
+| RepoMen | Nothing: "Nothing is pre-selected; you check items" | Anything | README |
+| Others | Nothing until their dossier states a rule | Anything | |
 
 ## Satellites — fleet tools that stay separate but can still feed suggestions
 

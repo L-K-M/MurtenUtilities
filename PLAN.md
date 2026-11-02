@@ -26,9 +26,11 @@ The confirmed roster — and what each tool is for — lives in
   `SMAppService`, off until the user turns it on.
 - **Suggestion feed** — on the home screen and in the menu. Every suggestion
   deep-links into the relevant pane with a safe default preselected. Example:
-  the watcher sees ~8 GB of unused Docker images → "Docker is holding ~8 GB —
-  clean up?" → opens DockVac with the reclaimable set selected. Nothing
-  repairs without a click.
+  the watcher sees ~8 GB of untagged image leftovers and unused build cache →
+  "Docker is holding ~8 GB you can rebuild. Clean up?" → opens DockVac with
+  exactly that set selected. The module defines what "safe" means
+  (docs/modules.md, *What a suggestion may preselect*). Nothing repairs
+  without a click.
 
 ## Principles
 
@@ -130,3 +132,12 @@ Per-module migration notes, satellites, and new-module ideas:
 - **Suite icon language.** Tiles use SF Symbols today; real per-tool icons
   need a shared grammar (docs/ui-direction.md, Pict as the fleet's icon
   store).
+- **User-armed automation.** RepoMen's Watch mode, once armed, trashes stale
+  artifacts after each check with no per-item click. That is a watcher with
+  a write path, which the suite forbids (docs/modules.md, RepoMen). By
+  contrast, RunningMan's stop-after-job is one click on a named runner,
+  carried out later, and fits the rule. Dropping RepoMen-style automation
+  keeps "nothing repairs without a click" absolute, but RepoMen users lose a
+  feature. Allowing it only when armed per target, reversible, off by
+  default and visible in the menu keeps the feature, but the rule gets an
+  exception. Decide before RepoMen migrates in Phase 3.
