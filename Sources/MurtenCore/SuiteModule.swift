@@ -62,8 +62,8 @@ public enum ModuleRegistry {
             systemImage: "network", status: .available, sourceRepository: "HallPass"),
         SuiteModule(
             id: "zenbackupmanager", name: "Zen Backup Manager",
-            summary: "Browse and restore browser-session backups on a timeline.",
-            systemImage: "clock.arrow.circlepath", sourceRepository: "ZenBackupManager"),
+            summary: "Browse and restore Zen Browser session backups on a timeline.",
+            systemImage: "clock.arrow.circlepath", status: .available, sourceRepository: "ZenBackupManager"),
         SuiteModule(
             id: "obtainintosh", name: "Obtainintosh",
             summary: "Track updates for apps and fonts installed from releases.",
