@@ -3,7 +3,7 @@ import Foundation
 public enum NetworkInterface: String, CaseIterable, Codable, Sendable, Identifiable {
     case wifi, ethernet
     public var id: String { rawValue }
-    public var title: String { self == .wifi ? "WLAN" : "Ethernet" }
+    public var title: String { self == .wifi ? "Wi-Fi" : "Ethernet" }
     public var symbol: String { self == .wifi ? "wifi" : "cable.connector" }
     public var key: String {
         self == .wifi ? "AllowedWiFiLocalNetworkAddresses" : "AllowedEthernetLocalNetworkAddresses"
@@ -51,10 +51,10 @@ public enum ConfigurationError: LocalizedError {
     case invalidPropertyList, invalidKey(String), tooManyNetworks, unsupportedBackup
     public var errorDescription: String? {
         switch self {
-        case .invalidPropertyList: "Die Systemeinstellungen konnten nicht als gültige Property List gelesen werden."
-        case .invalidKey(let key): "Die Einstellung \(key) enthält kein Array aus Zeichenketten. HallPass ändert diese Konfiguration nicht."
-        case .tooManyNetworks: "Pro Verbindung sind höchstens 512 Netzbereiche möglich."
-        case .unsupportedBackup: "Dieses Backup hat ein unbekanntes Format."
+        case .invalidPropertyList: "The system settings could not be read as a valid property list."
+        case .invalidKey(let key): "The setting \(key) does not contain an array of strings. HallPass does not change this configuration."
+        case .tooManyNetworks: "Each connection allows at most 512 network ranges."
+        case .unsupportedBackup: "This backup has an unknown format."
         }
     }
 }

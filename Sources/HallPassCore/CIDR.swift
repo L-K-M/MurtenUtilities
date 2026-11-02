@@ -15,19 +15,19 @@ public struct CIDR: Hashable, Sendable {
     /// Parses a CIDR notation string and returns a canonical ``CIDR`` value.
     ///
     /// - Parameter input: The raw CIDR string (e.g., "192.168.1.42/24").
-    /// - Throws: A ``CIDRError`` with a German explanation if the input is invalid.
+    /// - Throws: A ``CIDRError`` with an English explanation if the input is invalid.
     public init(_ input: String) throws {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
 
         // Must contain exactly one slash
         let slashCount = trimmed.filter { $0 == "/" }.count
         guard slashCount == 1 else {
-            throw CIDRError.invalidFormat("Genau ein Schrägstrich ist erforderlich.")
+            throw CIDRError.invalidFormat("Exactly one slash is required.")
         }
 
         let components = trimmed.split(separator: "/", maxSplits: 1)
         guard components.count == 2 else {
-            throw CIDRError.invalidFormat("Genau ein Schrägstrich ist erforderlich.")
+            throw CIDRError.invalidFormat("Exactly one slash is required.")
         }
 
         let hostPart = String(components[0])
@@ -35,27 +35,27 @@ public struct CIDR: Hashable, Sendable {
 
         // Reject inner whitespace in host or prefix
         if hostPart.contains(where: { $0.isWhitespace }) || prefixPart.contains(where: { $0.isWhitespace }) {
-            throw CIDRError.invalidFormat("Keine Leerzeichen innerhalb der Notation erlaubt.")
+            throw CIDRError.invalidFormat("Spaces are not allowed inside the notation.")
         }
 
         // Reject embedded NUL characters
         if hostPart.contains("\0") || prefixPart.contains("\0") {
-            throw CIDRError.invalidFormat("Einbettete NUL-Zeichen sind nicht erlaubt.")
+            throw CIDRError.invalidFormat("Embedded NUL characters are not allowed.")
         }
 
         // Prefix must contain ASCII digits only (reject +, -, and other characters)
         guard !prefixPart.isEmpty, prefixPart.allSatisfy({ $0.isASCII && $0.isNumber }) else {
-            throw CIDRError.invalidPrefix("Präfixlänge muss eine dezimale Zahl sein.")
+            throw CIDRError.invalidPrefix("The prefix length must be a decimal number.")
         }
         guard let prefixLength = Int(prefixPart) else {
-            throw CIDRError.invalidPrefix("Präfixlänge muss eine dezimale Zahl sein.")
+            throw CIDRError.invalidPrefix("The prefix length must be a decimal number.")
         }
 
         // Reject non-ASCII characters in host part before passing to inet_pton
         // Allow only ASCII hex digits, colon, and period
         let allowedHostChars = CharacterSet(charactersIn: "0123456789abcdefABCDEF:.")
         if hostPart.rangeOfCharacter(from: allowedHostChars.inverted) != nil {
-            throw CIDRError.invalidFormat("Ungültige Zeichen in der Adresse.")
+            throw CIDRError.invalidFormat("The address contains invalid characters.")
         }
 
         // Detect IPv4 vs IPv6
@@ -64,26 +64,26 @@ public struct CIDR: Hashable, Sendable {
 
         // Reject bracket notation
         if hostPart.contains("[") || hostPart.contains("]") {
-            throw CIDRError.invalidFormat("Klammer-Notation ist nicht erlaubt.")
+            throw CIDRError.invalidFormat("Bracket notation is not allowed.")
         }
 
         // Reject scoped IPv6 zone IDs
         if hostPart.contains("%") {
-            throw CIDRError.invalidFormat("IPv6-Zonen-IDs (Scope-IDs) sind nicht erlaubt.")
+            throw CIDRError.invalidFormat("IPv6 zone IDs (scope IDs) are not allowed.")
         }
 
         // Reject shell syntax characters
         let shellChars = Set<Character>(";|&`$(){}!#~<>")
         if hostPart.contains(where: { shellChars.contains($0) }) {
-            throw CIDRError.invalidFormat("Shell-Syntax-Zeichen sind nicht erlaubt.")
+            throw CIDRError.invalidFormat("Shell syntax characters are not allowed.")
         }
         if prefixPart.contains(where: { shellChars.contains($0) }) {
-            throw CIDRError.invalidPrefix("Shell-Syntax-Zeichen sind nicht erlaubt.")
+            throw CIDRError.invalidPrefix("Shell syntax characters are not allowed.")
         }
 
         // Reject hostnames (letters in IPv4 context)
         if isIPv4 && hostPart.rangeOfCharacter(from: .letters) != nil {
-            throw CIDRError.invalidFormat("Hostnamen sind nicht erlaubt.")
+            throw CIDRError.invalidFormat("Hostnames are not allowed.")
         }
 
         // Parse the address using inet_pton
@@ -92,11 +92,11 @@ public struct CIDR: Hashable, Sendable {
             var addr6 = in6_addr()
             let result = inet_pton(AF_INET6, (hostPart as NSString).utf8String, &addr6)
             if result != 1 {
-                throw CIDRError.invalidFormat("Ungültige IPv6-Adresse: \"\(hostPart)\".")
+                throw CIDRError.invalidFormat("Invalid IPv6 address: \"\(hostPart)\".")
             }
             // Validate prefix range for IPv6
             guard prefixLength >= 0 && prefixLength <= 128 else {
-                throw CIDRError.invalidPrefix("IPv6-Präfixlänge muss zwischen 0 und 128 liegen.")
+                throw CIDRError.invalidPrefix("The IPv6 prefix length must be between 0 and 128.")
             }
             // Convert in6_addr to Data
             var bytes = [UInt8](repeating: 0, count: MemoryLayout<in6_addr>.size)
@@ -106,11 +106,11 @@ public struct CIDR: Hashable, Sendable {
             var addr4 = in_addr()
             let result = inet_pton(AF_INET, (hostPart as NSString).utf8String, &addr4)
             if result != 1 {
-                throw CIDRError.invalidFormat("Ungültige IPv4-Adresse: \"\(hostPart)\".")
+                throw CIDRError.invalidFormat("Invalid IPv4 address: \"\(hostPart)\".")
             }
             // Validate prefix range for IPv4
             guard prefixLength >= 0 && prefixLength <= 32 else {
-                throw CIDRError.invalidPrefix("IPv4-Präfixlänge muss zwischen 0 und 32 liegen.")
+                throw CIDRError.invalidPrefix("The IPv4 prefix length must be between 0 and 32.")
             }
             // Convert in_addr to Data
             var bytes = [UInt8](repeating: 0, count: MemoryLayout<in_addr>.size)
@@ -131,7 +131,7 @@ public struct CIDR: Hashable, Sendable {
             if let ptr = inet_ntop(AF_INET6, &addr6, &buffer, socklen_t(buffer.count)) {
                 canonicalHost = String(cString: ptr)
             } else {
-                throw CIDRError.invalidFormat("Fehler beim Konvertieren der IPv6-Adresse.")
+                throw CIDRError.invalidFormat("Could not convert the IPv6 address.")
             }
         } else {
             var addr4 = in_addr()
@@ -140,7 +140,7 @@ public struct CIDR: Hashable, Sendable {
             if let ptr = inet_ntop(AF_INET, &addr4, &buffer, socklen_t(buffer.count)) {
                 canonicalHost = String(cString: ptr)
             } else {
-                throw CIDRError.invalidFormat("Fehler beim Konvertieren der IPv4-Adresse.")
+                throw CIDRError.invalidFormat("Could not convert the IPv4 address.")
             }
         }
 
