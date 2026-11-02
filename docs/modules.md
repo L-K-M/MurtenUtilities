@@ -18,6 +18,8 @@ Docker disk-usage treemap with selective reclaim — deliberately not a broad
 - **Watcher:** `docker system df` on a slow cadence → "Docker is holding ~X GB"
   at a configurable threshold. The proof-of-concept for the whole pipeline.
 - **Privilege:** none to observe; the Docker socket only on the delete action.
+- **UI:** AppKit throughout (`NSView`s, `NSToolbar`), no SwiftUI. The treemap
+  pane needs an `NSViewRepresentable` host or a rewrite.
 
 ### RepoMen — effort: medium — phase 3
 
@@ -28,6 +30,11 @@ DerivedData, Homebrew caches — and reclaims them by age and size.
   the core; the review-and-delete UI becomes the pane.
 - **Watcher:** periodic scan of configured roots → "N GB of build products
   older than 60 days".
+- **Source facts:** Watch mode already scans user-added folders (none by
+  default) every 6 hours, with a 30-day idle default. A scan walks up to 16
+  levels and sizes every candidate, so it is not a cheap poll, and the default
+  manual roots include `~/Documents`, which raises a Files & Folders prompt.
+  RepoMen already has its own `MenuBarExtra`, login item and notifications.
 
 ### BootCaptain — effort: medium — phase 3
 
@@ -39,6 +46,13 @@ app + CLI; **GitHub-only, not yet cloned**.
   The CLI could survive as a bundled tool or stay in its repo.
 - **Watcher:** diff the startup inventory on a cadence → "X installed 2 new
   login items". Boot-failure diagnosis stays an on-demand flow.
+- **Source facts:** the shipping app and helper build from XcodeGen
+  `project.yml`; `Package.swift` builds only the libraries and the CLI. Spawns
+  live in `BootCaptainKit`, so the module needs Kit as well as Core. launchd
+  plist folders are readable unprivileged, but Background Task Management
+  (`sfltool dumpbtm`), the source for modern login items, needs root and
+  likely Full Disk Access, and System Events login-item reads need Automation
+  consent. An unprivileged watcher sees plists only.
 
 ### DeviceControlDoctor — effort: cheap — phase 2
 
@@ -52,6 +66,12 @@ fixed paths, repair is user-confirmed per service.
 - **Watcher:** periodic grant-vs-function drift checks where a cheap signal
   exists → "X lost its working permission after the update". No
   watcher-triggered resets, ever.
+- **Source facts:** the cheap signal detects identity and record changes,
+  not functional failure, so a suggestion can only say "verify again". Reads
+  use `tccutil list`, verified only on macOS 27.2; elsewhere they degrade to
+  unavailable. `ProcessRunner` is a concrete struct, so the reset path has no
+  fake seam. The app inserts its `MenuBarExtra` unconditionally and monitors
+  by default (`monitorEnabled = true`).
 
 ### Shortking — effort: medium — phase 3
 
@@ -61,6 +81,14 @@ tests to find who owns — or stole — a hotkey. **GitHub-only**.
 - **Migrates:** the inventory/diagnosis core; capture stays in the pane.
 - **Watcher:** inventory diff → "new shortcut conflict: ⌘⇧Space is claimed by
   two apps". Diagnosis itself is on-demand.
+- **Source facts:** bundle id `com.shortking.app`. Needs Accessibility
+  (menu shortcuts) and Input Monitoring (capture). `ShortkingKit` mixes AppKit,
+  event taps, private SkyLight calls and process spawning; only its models,
+  parsers and analysis are pure. Diagnosis writes system state: a blackout
+  that disables every global hotkey for up to 30 s, and probe registrations
+  run in a separate short-lived `shortking-probe` process that must stay
+  separate. `ScanOptions.unprivileged` already scopes a watcher-sized scan,
+  but a cold scan spawns hundreds of `nm` processes.
 
 ### HallPass — effort: cheap — phase 2
 
@@ -73,6 +101,9 @@ privileged osascript with baseline re-check and rollback.
   confirmation flow inside the suite.
 - **Watcher:** little to offer; keep it on-demand. (Candidate: drift check —
   "your exemptions changed since you last saved".)
+- **Source facts:** every UI string is German and hardcoded; every other
+  module is English. The suite needs a language decision before this pane
+  moves.
 
 ### Zen Backup Manager — effort: medium — phase 3
 
@@ -81,6 +112,11 @@ with a verified safety copy and undo. **GitHub-only**.
 
 - **Migrates:** the backup-timeline/restore core and its pane.
 - **Watcher:** backup freshness → "last session snapshot is 9 days old".
+- **Source facts:** Zen Browser only. Zen writes the session snapshots; the
+  app reads them and writes safety copies around restores. A stale snapshot
+  means Zen has not saved a session (unused, or crashing), not an overdue
+  backup, so the suggestion must say that. Restore requires quitting Zen, and
+  the pane offers to quit it.
 
 ### Obtainintosh — effort: port — phase 4
 
@@ -103,6 +139,13 @@ SwiftPM.
 
 - **Migrates:** its discovery/control core + the manager pane.
 - **Watcher:** runner health → "2 of 4 runners offline for 10 min — restart?"
+- **Source facts:** discovery and control span `RunningManCore` and
+  `RunningManServices`; the pane's drain engine, polling, notifications and
+  widget publishing are about 7,200 lines in the app target. It has its own
+  unconditional `MenuBarExtra`, login item, `runningman://` scheme and a
+  WidgetKit extension that `scripts/build-app.sh` assembles from SwiftPM.
+  Health states and 48 hours of activity samples exist; no
+  offline-for-10-minutes rule does.
 
 ### Coreography — effort: medium — phase 3
 
@@ -115,6 +158,15 @@ extra, widgets, Shortcuts actions, a `coreo` CLI. `.xcodeproj` today.
   instruments).
 - **Watcher:** sustained-pressure signals → "X has pinned a core for an hour";
   thermal/disk-full warnings.
+- **Source facts:** the engine is already SwiftPM (`CoreographyKit`,
+  `CoreographyServices`, `CoreographyDrivers`, plus the `coreo` and helper
+  executables); Xcode builds only the app shell, widgets and packaging. Its
+  menu-bar extra is the primary surface, not chrome. It keeps a one-hour
+  in-memory history and SQLite rollups, and already ships its own alerts and
+  notifications (memory, thermal, battery, disk). Unmentioned surfaces: App
+  Intents, a `coreography://` scheme, a local MCP server (off by default) and
+  "Ask", which sends system context to Anthropic or an OpenAI-compatible
+  endpoint on request.
 
 ## Satellites — fleet tools that stay separate but can still feed suggestions
 
