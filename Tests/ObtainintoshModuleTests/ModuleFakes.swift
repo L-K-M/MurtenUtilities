@@ -124,8 +124,12 @@ final class Fixture {
             now: { Date(timeIntervalSince1970: 1_800_000_000) })
     }
 
+    /// How often the model asked the suite to run the background check.
+    private(set) var recheckRequests = 0
+
     func model() -> ObtainintoshModel {
-        ObtainintoshModel(environment: environment(), defaults: defaults)
+        ObtainintoshModel(environment: environment(), defaults: defaults,
+                          requestRecheck: { [weak self] in self?.recheckRequests += 1 })
     }
 
     func context() -> ModuleContext {

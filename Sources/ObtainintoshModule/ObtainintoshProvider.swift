@@ -22,7 +22,8 @@ public final class ObtainintoshProvider: SuiteModuleProvider {
     }
 
     init(context: ModuleContext, environment: ObtainintoshEnvironment) {
-        model = ObtainintoshModel(environment: environment, defaults: context.defaults)
+        model = ObtainintoshModel(environment: environment, defaults: context.defaults,
+                                  requestRecheck: context.requestRecheck)
         watch = WatcherRegistration(watcher: ObtainintoshWatcher(observer: environment.observer), rule: UpdateRule())
     }
 

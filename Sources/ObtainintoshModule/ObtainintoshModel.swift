@@ -62,7 +62,8 @@ final class ObtainintoshModel {
     private(set) var notices: [Notice] = []
     /// A problem with the list itself, shown above the table.
     var errorBanner: String?
-    var sort = ProgramSort()
+    /// The table's sort, kept here so it survives navigating away.
+    var sortOrder = [ProgramComparator(field: .name)]
     /// How many programs the standalone app's list holds, while its import
     /// is on offer.
     private(set) var standaloneOffer: Int?
@@ -76,11 +77,16 @@ final class ObtainintoshModel {
 
     private let environment: ObtainintoshEnvironment
     private let defaults: UserDefaults
+    /// Asks the suite to run the background check soon, so a suggestion
+    /// that a check or a removal settled resolves without waiting hours.
+    private let requestRecheck: @MainActor () -> Void
     private let downloadSlot = DownloadSlot()
 
-    init(environment: ObtainintoshEnvironment, defaults: UserDefaults) {
+    init(environment: ObtainintoshEnvironment, defaults: UserDefaults,
+         requestRecheck: @escaping @MainActor () -> Void = {}) {
         self.environment = environment
         self.defaults = defaults
+        self.requestRecheck = requestRecheck
     }
 
     var isBusy: Bool { isChecking || downloadProgress != nil }
@@ -91,8 +97,6 @@ final class ObtainintoshModel {
         if isChecking { return "An update check is still running." }
         return nil
     }
-
-    var sortedApps: [TrackedApp] { sort.sorted(apps) }
 
     // MARK: - Opening
 
@@ -192,6 +196,7 @@ final class ObtainintoshModel {
             try store.remove(id: id)
             apps = store.apps
             post("\"\(app.name)\" removed", .success)
+            requestRecheck()
         } catch {
             post("Failed to remove app: \(error.localizedDescription)", .error)
             return
@@ -241,6 +246,8 @@ final class ObtainintoshModel {
             isChecking = false
             checkProgress = nil
             apps = store.apps
+            // Installed versions may have changed since the last poll.
+            requestRecheck()
         }
 
         let snapshots = store.apps

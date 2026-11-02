@@ -56,6 +56,20 @@ final class ObtainintoshModelTests: XCTestCase {
         XCTAssertEqual(try TrackedListStore.readSnapshot(at: fixture.listURL)?.removedAppIDs, [id])
     }
 
+    func testChecksAndRemovalsAskForAPromptBackgroundCheck() async throws {
+        let fixture = Fixture()
+        let model = fixture.model()
+        try await model.add(SourceInput(url: "https://github.com/o/tool", name: "Tool"))
+        XCTAssertEqual(fixture.recheckRequests, 0, "adding changes nothing a suggestion reports")
+
+        fixture.lookup.releases["https://github.com/o/tool"] = release("2.0")
+        await model.checkForUpdates()
+        XCTAssertEqual(fixture.recheckRequests, 1)
+
+        await model.remove(id: try XCTUnwrap(model.apps.first?.id))
+        XCTAssertEqual(fixture.recheckRequests, 2)
+    }
+
     func testEditingAwayFromForgejoRemovesTheKey() async throws {
         let fixture = Fixture()
         let model = fixture.model()

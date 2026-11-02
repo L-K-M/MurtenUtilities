@@ -5,15 +5,14 @@ import ObtainintoshCore
 /// versions, status, and the row's actions. Sortable by every column but
 /// the actions, as in the standalone app.
 struct ProgramTable: View {
-    let model: ObtainintoshModel
+    @Bindable var model: ObtainintoshModel
     let onEdit: (TrackedApp) -> Void
     let onRemove: (TrackedApp) -> Void
 
-    @State private var sortOrder = [ProgramComparator(field: .name)]
     @Environment(\.openURL) private var openURL
 
     var body: some View {
-        Table(model.apps.sorted(using: sortOrder), sortOrder: $sortOrder) {
+        Table(model.apps.sorted(using: model.sortOrder), sortOrder: $model.sortOrder) {
             TableColumn("Name", sortUsing: ProgramComparator(field: .name)) { app in
                 nameCell(app)
             }
