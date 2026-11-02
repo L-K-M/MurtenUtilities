@@ -175,6 +175,9 @@ final class AppModel {
     /// by the pane when it next appears. The suite never brings a window forward for it.
     var errorMessage: String?
     var confirmation: RunnerConfirmation?
+    /// The standalone app's imported runner folders and Forgejo servers, offered once in the
+    /// pane while the module's own store has none. Nil once answered, or with nothing to offer.
+    private(set) var standaloneImportOffer: StandalonePreferences?
     var githubAccount: String?
     var creationProgress = ""
     var isCreating = false
@@ -265,9 +268,11 @@ final class AppModel {
 
     /// - Parameters:
     ///   - defaults: the module's preferences; keys keep the standalone app's names.
+    ///   - standaloneDefaults: the standalone app's preferences domain, read only to offer
+    ///     its settings once; never written.
     ///   - demoMode: the standalone app's `--demo` preview workspace, kept for tests: fictional
     ///     runners, nothing read from or written to this Mac.
-    init(defaults: UserDefaults, demoMode: Bool = false) {
+    init(defaults: UserDefaults, standaloneDefaults: UserDefaults? = nil, demoMode: Bool = false) {
         self.demoMode = demoMode
         preferences = defaults
         // One credential store and API client, so a token read from Keychain or saved
@@ -295,7 +300,29 @@ final class AppModel {
             importedDirectories = Self.importedDirectories(in: preferences)
             restoreDrainRequests(drainRequestStore?.load() ?? [:])
             lapSoundsEnabled = preferences.object(forKey: "lapSoundsEnabled") as? Bool ?? true
+            standaloneImportOffer = StandalonePreferences.offer(standalone: standaloneDefaults, module: preferences)
         }
+    }
+
+    /// Copies the offered folders and servers into the module's store; the standalone app's
+    /// preferences stay as they are. Their Forgejo tokens are already shared through the Keychain.
+    func acceptStandaloneImport() {
+        guard let offer = standaloneImportOffer else { return }
+        standaloneImportOffer = nil
+        offer.apply(to: preferences)
+        importedDirectories = Self.importedDirectories(in: preferences)
+        forgejoServers = (preferences.stringArray(forKey: "forgejoServers") ?? []).compactMap(URL.init(string:))
+        defaultForgejoServer = preferences.string(forKey: "defaultForgejoServer") ?? forgejoServers.first?.absoluteString ?? ""
+        lastWorkloadAttempt = nil
+        // The pane is on screen when you answer, so polling runs; refresh now rather than at its next turn.
+        if pollingTask != nil { Task { await refresh() } }
+    }
+
+    /// Keeps the module's store as it is; the offer does not come back.
+    func declineStandaloneImport() {
+        guard standaloneImportOffer != nil else { return }
+        standaloneImportOffer = nil
+        StandalonePreferences.decline(in: preferences)
     }
 
     /// What quitting now would leave undone, or nil when the suite can quit without asking.

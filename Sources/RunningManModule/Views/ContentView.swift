@@ -15,16 +15,21 @@ struct ContentView: View {
             sidebar
                 .navigationSplitViewColumnWidth(min: Self.sidebarWidth.min, ideal: Self.sidebarWidth.ideal, max: Self.sidebarWidth.max)
         } detail: {
-            Group {
-                switch model.section {
-                case .overview: OverviewView()
-                case .runners: RunnersView()
-                case .workload: WorkloadView()
-                case .history: HistoryView()
-                case .cleanup: CleanupView()
+            VStack(spacing: 0) {
+                if let offer = model.standaloneImportOffer {
+                    StandaloneImportBanner(offer: offer)
                 }
+                Group {
+                    switch model.section {
+                    case .overview: OverviewView()
+                    case .runners: RunnersView()
+                    case .workload: WorkloadView()
+                    case .history: HistoryView()
+                    case .cleanup: CleanupView()
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(RunningManStyle.canvas)
             .navigationTitle(model.section.title)
             .toolbar {
@@ -151,5 +156,45 @@ private struct RefreshSymbol: View {
     let isActive: Bool
     var body: some View {
         Image(systemName: "arrow.clockwise").symbolEffect(.rotate, isActive: isActive && !reduceMotion)
+    }
+}
+
+/// Offers the standalone app's imported runner folders and Forgejo server list once, so
+/// the suite does not silently start without them. Nothing is copied until you choose Import.
+private struct StandaloneImportBanner: View {
+    @Environment(AppModel.self) private var model
+    let offer: StandalonePreferences
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Image(systemName: "square.and.arrow.down.on.square").foregroundStyle(RunningManStyle.accentText)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Import settings from the standalone RunningMan?").font(.system(size: 12, weight: .semibold))
+                Text(summary).font(.system(size: 11)).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .help(details)
+            }
+            Spacer(minLength: 8)
+            Button("Don’t Import") { model.declineStandaloneImport() }
+            Button("Import") { model.acceptStandaloneImport() }.buttonStyle(.borderedProminent)
+        }
+        .controlSize(.small)
+        .padding(.horizontal, 16).padding(.vertical, 10)
+        .background(RunningManStyle.accent.opacity(0.08))
+        .accessibilityElement(children: .contain)
+    }
+
+    private var summary: String {
+        var parts: [String] = []
+        let folders = offer.runnerDirectories.count, servers = offer.forgejoServers.count
+        if folders > 0 { parts.append("\(folders) imported runner \(folders == 1 ? "folder" : "folders")") }
+        if servers > 0 { parts.append("\(servers) Forgejo \(servers == 1 ? "server" : "servers")") }
+        return "It has " + parts.joined(separator: " and ")
+            + ". Forgejo tokens stay in your Keychain, and the standalone app keeps its settings either way."
+    }
+
+    private var details: String {
+        (offer.runnerDirectories + offer.forgejoServers.compactMap { URL(string: $0)?.host }).joined(separator: "\n")
     }
 }

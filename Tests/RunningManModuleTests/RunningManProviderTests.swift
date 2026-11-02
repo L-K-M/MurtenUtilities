@@ -89,6 +89,45 @@ final class RunningManProviderTests: XCTestCase {
         XCTAssertTrue(warning.contains("A runner is being created."))
     }
 
+    /// The standalone app's folders and servers are offered once and copied only on consent.
+    func testStandaloneSettingsAreImportedOnlyWhenAccepted() throws {
+        let standaloneName = "RunningManModuleTests.standalone.\(UUID().uuidString)"
+        let standalone = try XCTUnwrap(UserDefaults(suiteName: standaloneName))
+        defer { standalone.removePersistentDomain(forName: standaloneName) }
+        standalone.set(["/Users/example/runners/imported"], forKey: "importedRunnerDirectories")
+        standalone.set(["https://forge.example.com"], forKey: "forgejoServers")
+
+        let model = AppModel(defaults: defaults, standaloneDefaults: standalone)
+        let offer = try XCTUnwrap(model.standaloneImportOffer)
+        XCTAssertEqual(offer.runnerDirectories, ["/Users/example/runners/imported"])
+        XCTAssertNil(defaults.stringArray(forKey: "importedRunnerDirectories"), "Nothing is copied before you accept")
+
+        model.acceptStandaloneImport()
+
+        XCTAssertNil(model.standaloneImportOffer)
+        XCTAssertEqual(AppModel.importedDirectories(in: defaults).map(\.path), ["/Users/example/runners/imported"])
+        XCTAssertEqual(model.forgejoServers.map(\.absoluteString), ["https://forge.example.com"])
+        XCTAssertEqual(model.defaultForgejoServer, "https://forge.example.com")
+        XCTAssertNil(standalone.string(forKey: "standalonePreferencesImport"), "The standalone domain is never written")
+        XCTAssertNil(AppModel(defaults: defaults, standaloneDefaults: standalone).standaloneImportOffer, "Offered once")
+    }
+
+    func testDecliningTheStandaloneSettingsIsRemembered() throws {
+        let standaloneName = "RunningManModuleTests.standalone.\(UUID().uuidString)"
+        let standalone = try XCTUnwrap(UserDefaults(suiteName: standaloneName))
+        defer { standalone.removePersistentDomain(forName: standaloneName) }
+        standalone.set(["/Users/example/runners/imported"], forKey: "importedRunnerDirectories")
+
+        let model = AppModel(defaults: defaults, standaloneDefaults: standalone)
+        XCTAssertNotNil(model.standaloneImportOffer)
+        model.declineStandaloneImport()
+
+        XCTAssertNil(model.standaloneImportOffer)
+        XCTAssertNil(defaults.stringArray(forKey: "importedRunnerDirectories"))
+        XCTAssertNil(AppModel(defaults: defaults, standaloneDefaults: standalone).standaloneImportOffer)
+        XCTAssertNil(AppModel(defaults: defaults, standaloneDefaults: standalone, demoMode: true).standaloneImportOffer)
+    }
+
     func testNothingPollsUntilSomeoneLooks() {
         let provider = makeProvider(demoMode: false)
         XCTAssertFalse(provider.model.shouldMonitor)

@@ -25,7 +25,8 @@ public final class RunningManProvider: SuiteModuleProvider {
     /// - Parameter demoMode: the standalone app's fictional preview workspace, for tests.
     init(context: ModuleContext, probe: any RunnerStateProbing, demoMode: Bool = false) {
         self.context = context
-        model = AppModel(defaults: context.defaults, demoMode: demoMode)
+        model = AppModel(defaults: context.defaults,
+                         standaloneDefaults: UserDefaults(suiteName: StandalonePreferences.domain), demoMode: demoMode)
 
         let memory = RunnerHealthMemoryStore()
         if !demoMode {
