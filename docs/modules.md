@@ -95,15 +95,16 @@ anything. Tauri 2 and SvelteKit, shipped for macOS and Linux.
   The repo's `GENERIC_SOURCES.md` designs arbitrary vendor download pages
   behind an identity and SSRF contract. PLAN.md's open question is whether
   the suite keeps, narrows or extends that.
-- **Installed-app identity** is the user-typed name matched against
-  `<name>.app` in `/Applications` and `~/Applications`
+- **Installed-app identity** on macOS is the user-typed name matched
+  against `<name>.app` in `/Applications` and `~/Applications`
   (`src-tauri/src/installer.rs`), not a bundle id. A count like "3 app
   updates available" inherits that guess; the repo's `ANALYSIS.md` already
   specifies bundle-id matching.
 - **State:** `~/Library/Application Support/Obtainintosh/apps.json` holds
   the tracked list and GitHub and Forgejo tokens in plain text
-  (`src-tauri/src/models.rs`). A migration moves the tokens to the Keychain
-  rather than copying them.
+  (`src-tauri/src/models.rs`). A migration imports the tokens into the
+  Keychain instead of copying the file, and leaves the standalone app's copy
+  alone while that app still runs.
 - **Platforms:** a Swift port is macOS-only. Linux users (deb, AppImage,
   Flatpak) keep the Tauri app, so it stays maintained whatever the suite
   does.
@@ -113,8 +114,8 @@ anything. Tauri 2 and SvelteKit, shipped for macOS and Linux.
   bundle id, signature, signer continuity) before "update" means more than
   "download".
 - **Watcher:** checks run at launch and on demand; nothing polls today. The
-  suite's scheduler would supply the cadence, within GitHub's
-  unauthenticated rate limit unless the user adds a token.
+  suite's scheduler would supply the cadence. Checks use GitHub's REST API:
+  60 requests an hour unauthenticated, 5,000 with a token.
 
 ### RunningMan — effort: cheap — phase 2
 
