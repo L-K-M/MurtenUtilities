@@ -1,6 +1,10 @@
 import MurtenModuleKit
+import HallPassModule
 
 extension ModuleCatalog {
-    /// HallPass's provider; nil until it migrates (docs/migrating-a-module.md).
-    static let hallPass: ModuleFactory? = nil
+    /// HallPass's provider: an on-demand pane without a watcher
+    /// (docs/modules.md, HallPass).
+    static let hallPass: ModuleFactory? = ModuleFactory(moduleID: HallPassProvider.moduleID) { context in
+        HallPassProvider(context: context)
+    }
 }

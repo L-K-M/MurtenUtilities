@@ -54,9 +54,19 @@ let shortkingModule: [Target.Dependency] = []
 let hallPassSwiftSettings: [SwiftSetting] = [.swiftLanguageMode(.v6)]
 let hallPassTargets: [Target] = [
     .target(name: "HallPassCore", swiftSettings: hallPassSwiftSettings),
-    .testTarget(name: "HallPassCoreTests", dependencies: ["HallPassCore"], swiftSettings: hallPassSwiftSettings)
+    .target(
+        name: "HallPassModule",
+        dependencies: ["HallPassCore", "MurtenCore", "MurtenModuleKit"],
+        swiftSettings: hallPassSwiftSettings
+    ),
+    .testTarget(name: "HallPassCoreTests", dependencies: ["HallPassCore"], swiftSettings: hallPassSwiftSettings),
+    .testTarget(
+        name: "HallPassModuleTests",
+        dependencies: ["HallPassModule", "HallPassCore", "MurtenCore", "MurtenModuleKit"],
+        swiftSettings: hallPassSwiftSettings
+    )
 ]
-let hallPassModule: [Target.Dependency] = []
+let hallPassModule: [Target.Dependency] = ["HallPassModule"]
 
 // MARK: ZenBackupManager
 let zenBackupManagerTargets: [Target] = []
