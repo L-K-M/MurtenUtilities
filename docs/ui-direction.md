@@ -14,8 +14,9 @@ Two fleet assets recreate the era: **osmium-ui** (pixel-perfect Mac OS 8 in
 HTML/CSS for web pages and WKWebView) and **Rigi** (native AppKit classic
 controls extracted from Lucerne, shared with Sion). Chosen: **Rigi**.
 
-- Native: accessibility, keyboard navigation, focus, and text scaling come
-  free instead of being re-implemented inside a web view.
+- Native controls provide a starting point for accessibility and keyboard
+  behavior, not a guarantee. Rigi also has custom-drawn `NSControl` subclasses
+  and fixed-size text; verify semantics, focus and scaling in the suite.
 - Already proven: two shipped apps use it; `RigiGallery` demos every control
   (`swift run RigiGallery` in that repo).
 - The right granularity: module panes are SwiftUI (what the fleet already
@@ -71,11 +72,44 @@ not a notification center bolted on.
   that while modules are still unmigrated. If it is ever revisited it is a
   product decision plus Rigi work — not per-screen dark patches, which is how
   apps end up with the worst of both.
+  Apple documents the key as a temporary opt-out and tells apps that never
+  plan a dark appearance to set the app's appearance instead
+  ([Choosing a specific appearance](https://developer.apple.com/documentation/appkit/choosing-a-specific-appearance-for-your-macos-app)).
+  So the app also sets `NSApp.appearance = NSAppearance(named: .aqua)` at
+  launch, as Lucerne does; the scaffold does not yet. Rigi's colors are fixed
+  light values, so a key macOS stops honoring would leave light chrome under
+  dark system controls.
   The key is per-bundle: any future helper, extension or satellite bundle that
   presents its own UI must set it too, or it will go dark on a dark system.
 - **Subtlety over skins**: the classic look lives in chrome, typography scale
   and the grid — not in texture overload. If a screen needs four kinds of
   bevel to feel classic, it's wrong; two is enough.
+
+## Accessibility acceptance
+
+Before the first module ships, verify the home window, suggestion feed,
+menu-bar companion (`MenuBarView`) and pane together on macOS:
+
+- Keyboard-only: reach every action, open a suggestion, cancel confirmation
+  and return to the originating control. Check focus after a feed refresh and
+  pane switch; do not steal focus for new findings.
+- VoiceOver: expose names, roles, selection, stale/unavailable state and action
+  labels. Icons and badge colors are not the only carriers of meaning.
+- Respect increased contrast, reduced transparency/motion and larger text
+  while remaining light-only. Check wrapping and clipping at supported window
+  sizes and display scales; fixed classic dimensions are not an exemption.
+- Use native-semantic Rigi controls where available (`ClassicToolControl`,
+  `ClassicToolbarButton`). Verify custom controls explicitly. The current
+  `StatusBarView` includes zoom controls; the suite must wire a meaningful
+  action or omit them, not present inert buttons.
+
+Add a macOS UI smoke flow for home → suggestion → pane → cancel/back, with a
+fake observation/repair service. Check keyboard activation and accessible
+labels. Record the VoiceOver/Full Keyboard Access pass and visual checks for
+contrast, scaling and light appearance in the shipping module's PR.
+Build success and a screenshot alone do not prove accessibility; Rigi's own
+[verification guide](https://github.com/L-K-M/Rigi/blob/dcfc91e3b72aee612b2b48aed4a744397b78dc77/docs/verification.md)
+makes the same distinction.
 
 ## First milestone for the eye
 
