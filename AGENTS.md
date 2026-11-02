@@ -65,6 +65,10 @@ are cut by tagging: `scripts/release.sh X.Y.Z --push` — see `CICD.md`.
 - **The suite is opt-in, not nagware.** Resident mode, launch at login
   (`SMAppService`), and notifications are off until the user turns them on;
   suggestions dedupe and snooze. No modal alerts for findings.
+- **Light appearance only.** `NSRequiresAquaSystemAppearance` keeps the app
+  aqua under a dark system — a deliberate product decision
+  (docs/ui-direction.md). Don't add dark-appearance paths; changing it means
+  redesigning Rigi theming first.
 - **Per-module privilege stays per-module.** Merging tools into one binary
   must not union their privileges into an ambient grant — each repair asks at
   its own write time, exactly as the standalone apps do today.

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Locked the app's appearance to light (`NSRequiresAquaSystemAppearance`) —
+  a documented product decision, not a missing feature; dark mode would be a
+  Rigi redesign, not a reskin.
+
 ## [0.1.0] - 2026-11-01
 
 ### Added

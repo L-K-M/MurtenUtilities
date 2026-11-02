@@ -63,10 +63,14 @@ not a notification center bolted on.
   only for destructive confirmations.
 - **Keyboard + VoiceOver are first-class**: grid is fully navigable,
   suggestions expose their deep link as an action.
-- **Dark mode is an open question** (PLAN.md): Rigi is a light classic theme
-  today. Options: light-only (authentic, matches classic source), or a dark
-  classic variant (charcoal chrome + muted tile colors — real work, decided
-  deliberately, not slipped into).
+- **Light only — decided.** The app always renders aqua, enforced by
+  `NSRequiresAquaSystemAppearance` in `Info.plist`, whatever the system
+  appearance. Rationale: the classic look *is* light platinum — a dark
+  variant is a redesign (charcoal chrome, re-tuned tile colors, re-checked
+  engraving contrast), not a reskin, and the suite has no business paying
+  that while modules are still unmigrated. If it is ever revisited it is a
+  product decision plus Rigi work — not per-screen dark patches, which is how
+  apps end up with the worst of both.
 - **Subtlety over skins**: the classic look lives in chrome, typography scale
   and the grid — not in texture overload. If a screen needs four kinds of
   bevel to feel classic, it's wrong; two is enough.
