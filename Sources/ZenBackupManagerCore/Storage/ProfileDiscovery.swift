@@ -21,6 +21,30 @@ public enum ProfileDiscovery {
         }.sorted { $0.isDefault != $1.isDefault ? $0.isDefault : $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
+    /// The directory of every profile profiles.ini names, readable or not,
+    /// standardized like `ZenProfile.id`. `discover` keeps only those with a
+    /// prefs.js; the rest still exist as far as the watcher can tell.
+    public static func listedDirectories(root: URL = zenRoot) throws -> Set<String> {
+        let ini = root.appendingPathComponent("profiles.ini")
+        guard FileManager.default.fileExists(atPath: ini.path) else {
+            // No profiles.ini means no profiles, unless Zen's folder exists but
+            // cannot be searched: then nothing is known, which must not read
+            // as "every profile is gone".
+            let fileManager = FileManager.default
+            if fileManager.fileExists(atPath: root.path),
+               !fileManager.isReadableFile(atPath: root.path) || !fileManager.isExecutableFile(atPath: root.path) {
+                throw CocoaError(.fileReadNoPermission, userInfo: [NSFilePathErrorKey: root.path])
+            }
+            return []
+        }
+        let text = try String(contentsOf: ini, encoding: .utf8)
+        return Set(parseINI(text).filter { $0.key.hasPrefix("Profile") }.compactMap { _, values -> String? in
+            guard let path = values["Path"], !path.isEmpty else { return nil }
+            let directory = values["IsRelative"] == "0" ? URL(fileURLWithPath: path) : root.appendingPathComponent(path)
+            return directory.standardizedFileURL.path
+        })
+    }
+
     static func parseINI(_ text: String) -> [String: [String: String]] {
         var result: [String: [String: String]] = [:]
         var section = ""

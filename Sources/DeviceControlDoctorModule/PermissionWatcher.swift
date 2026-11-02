@@ -25,7 +25,6 @@ struct PermissionWatcher: Watcher {
     private let runner: any ProcessRunning
     private let home: String
     private let now: @Sendable () -> Date
-    private let history = ScopeHistory()
 
     init(watchList: URL, runner: any ProcessRunning,
          home: String = FileManager.default.homeDirectoryForCurrentUser.path,
@@ -40,11 +39,16 @@ struct PermissionWatcher: Watcher {
         let started = now()
 
         let apps: [WatchedApp]
+        // A missing file can also mean a folder that could not be searched,
+        // so only a loaded list proves which apps exist.
+        let coverage: WatchObservation.ScopeCoverage
         switch WatchListFile.read(at: watchList) {
         case .missing:
             apps = []
+            coverage = .listed
         case .loaded(let state):
             apps = state.apps
+            coverage = .exhaustive
         case .unreadable:
             return .unavailable(moduleID: moduleID, at: started, ObservationFailure(
                 kind: .malformedResponse,
@@ -76,10 +80,10 @@ struct PermissionWatcher: Watcher {
             }
         }
 
-        // An app removed from the list was checked and is absent.
-        completed.formUnion(history.retire(keeping: Set(apps.map { VerificationFinding.scope(for: $0.id) })))
+        // A loaded watch list names every scope that exists: an app absent
+        // from it was removed, so its suggestion resolves even after a relaunch.
         return WatchObservation(moduleID: moduleID, observedAt: started, findings: findings,
-                                completedScopes: completed, failures: failures)
+                                completedScopes: completed, failures: failures, coverage: coverage)
     }
 
     // MARK: - One app
@@ -146,25 +150,5 @@ struct PermissionWatcher: Watcher {
         let attributes = try? FileManager.default.attributesOfItem(atPath: path)
         guard attributes?[.type] as? FileAttributeType == .typeSymbolicLink else { return nil }
         return try? FileManager.default.destinationOfSymbolicLink(atPath: path)
-    }
-
-    // MARK: - Removed apps
-
-    /// The scopes the previous poll saw on the list, so a removed app's
-    /// suggestion resolves instead of lingering. The contract has no way to
-    /// retire a scope and a watcher persists nothing, so this memory starts
-    /// empty at launch: an app removed while the suite was not running keeps
-    /// its suggestion until the user dismisses it.
-    private final class ScopeHistory: @unchecked Sendable {
-        private let lock = NSLock()
-        private var previous: Set<FindingScope> = []
-
-        /// Remembers `current`; returns the scopes that left the list since the last call.
-        func retire(keeping current: Set<FindingScope>) -> Set<FindingScope> {
-            lock.lock(); defer { lock.unlock() }
-            let removed = previous.subtracting(current)
-            previous = current
-            return removed
-        }
     }
 }

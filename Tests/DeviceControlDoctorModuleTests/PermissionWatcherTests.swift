@@ -22,9 +22,11 @@ final class PermissionWatcherTests: XCTestCase {
         mac.remove()
     }
 
-    private func observeWithoutWriting() async throws -> WatchObservation {
+    /// Observes with `watcher`, or the shared one, and proves it wrote nothing.
+    private func observeWithoutWriting(_ watcher: PermissionWatcher? = nil) async throws -> WatchObservation {
+        let observer = watcher ?? self.watcher!
         let before = try? Data(contentsOf: mac.watchList)
-        let observation = await watcher.observe()
+        let observation = await observer.observe()
         XCTAssertEqual(try? Data(contentsOf: mac.watchList), before, "the watcher must never write the watch list")
         return observation
     }
@@ -232,6 +234,15 @@ final class PermissionWatcherTests: XCTestCase {
         XCTAssertEqual(observation.failures.first?.kind, .malformedResponse)
     }
 
+    func testMissingWatchListClaimsNothingAboutWhichAppsExist() async {
+        // A missing file may be a folder that could not be searched.
+        let now = self.now
+        let absent = mac.watchList.deletingLastPathComponent().appendingPathComponent("absent.json")
+        let observation = await PermissionWatcher(watchList: absent, runner: runner,
+                                                  home: mac.home.path, now: { now }).observe()
+        XCTAssertEqual(observation.coverage, .listed)
+    }
+
     func testRemovedAppIsCheckedAndAbsent() async throws {
         let kept = try mac.installApp("Kept", bundleID: "com.example.Kept")
         let removed = try mac.installApp("Removed", bundleID: "com.example.Removed")
@@ -241,13 +252,23 @@ final class PermissionWatcherTests: XCTestCase {
             runner.sign(app.path)
         }
         try mac.saveWatchList([kept, removed])
-        _ = try await observeWithoutWriting()
+        let rule = VerificationRule()
+        var ledger = SuggestionLedger()
+        let first = try await observeWithoutWriting()
+        let departed = try XCTUnwrap(first.findings.first { $0.scope == scope(removed) }?.key)
+        XCTAssertTrue(ledger.apply(first, rule: rule).contains(.opened(departed)), "the removed app's suggestion is active")
 
+        // A fresh watcher is the relaunch case: nothing remembers the app.
         try mac.saveWatchList([kept])
-        let observation = try await observeWithoutWriting()
+        let now = self.now
+        let relaunched = PermissionWatcher(watchList: mac.watchList, runner: runner,
+                                           home: mac.home.path, now: { now })
+        let second = try await observeWithoutWriting(relaunched)
 
-        XCTAssertTrue(observation.completedScopes.contains(scope(removed)))
-        XCTAssertEqual(observation.findings.map(\.scope), [scope(kept)])
+        XCTAssertEqual(second.coverage, .exhaustive)
+        XCTAssertFalse(second.completedScopes.contains(scope(removed)), "the scope is absent, not completed")
+        XCTAssertEqual(second.findings.map(\.scope), [scope(kept)])
+        XCTAssertTrue(ledger.apply(second, rule: rule).contains(.resolved(departed)))
     }
 
     // MARK: - Cancellation

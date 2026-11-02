@@ -2,6 +2,21 @@ import XCTest
 @testable import ZenBackupManagerCore
 
 final class ProfileDiscoveryTests: XCTestCase {
+    func testUnsearchableZenFolderIsAnErrorNotAnEmptyList() throws {
+        let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try "[Profile0]\nPath=a\nIsRelative=1\n".write(to: root.appendingPathComponent("profiles.ini"), atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: root.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root.path)
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        XCTAssertThrowsError(try ProfileDiscovery.listedDirectories(root: root))
+        XCTAssertEqual(try ProfileDiscovery.listedDirectories(root: root.appendingPathComponent("absent")), [],
+                       "no Zen folder at all means no profiles")
+    }
+
     func testINIParsesCRLFCommentsAndEqualsInPaths() {
         let parsed = ProfileDiscovery.parseINI(";comment\r\n[Profile0]\r\nName=Work\r\nPath=Profiles/a=b\r\nIsRelative=1\r\n")
         XCTAssertEqual(parsed["Profile0"]?["Path"], "Profiles/a=b")
@@ -37,6 +52,11 @@ final class ProfileDiscoveryTests: XCTestCase {
         XCTAssertEqual(profiles.map(\.name), ["B", "A"])
         XCTAssertTrue(profiles[0].isDefault)
         XCTAssertFalse(profiles[1].isDefault)
+
+        // The watcher's view: every listed profile exists, readable or not.
+        let listed = try ProfileDiscovery.listedDirectories(root: root)
+        XCTAssertEqual(listed, Set(["a", "b", "missing"].map { root.appendingPathComponent($0).standardizedFileURL.path }))
+        XCTAssertTrue(Set(profiles.map(\.id)).isSubset(of: listed), "ids match the listed directories")
     }
 
     func testCatalogIncludesCorruptFilesAsDisabledRecords() throws {
