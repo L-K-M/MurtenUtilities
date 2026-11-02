@@ -115,9 +115,21 @@ Per-module migration notes, satellites, and new-module ideas:
   only useful with the full picture.
 - **Name.** `MurtenUtilities` is the repo and bundle id; the *displayed* name
   can stay "Murten Utilities" or take a friendlier one later.
-- **Signing.** Ad-hoc now; Developer ID + notarization later is a distribution
-  question — and HallPass-class modules that write system preferences may
-  shape the answer.
+- **Signing.** Ad-hoc now. That limits function, not just distribution.
+  Privacy grants and Keychain item access are checked against the app's
+  designated requirement, and an ad-hoc signature has no stable one: it is
+  tied to that build ([TN3127](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements)).
+  Each update therefore loses Accessibility, Input Monitoring, Automation,
+  Full Disk Access and folder grants, and Keychain items prompt again.
+  RunningMan already works around both (`Sources/RunningManCore/Discovery.swift`,
+  `Sources/RunningManServices/ForgejoConnectionStore.swift`). Shortking
+  (Accessibility, Input Monitoring), BootCaptain (Automation, Full Disk Access
+  for login items) and RepoMen (Documents, Full Disk Access for snapshots)
+  need a stable identity, Apple Development or Developer ID, before they
+  migrate; BootCaptain's and Coreography's helpers pin a Team ID as well.
+  Pick the final identity early: switching between them changes the
+  requirement, so users grant everything once more. HallPass does not drive
+  this; its admin prompt is not a TCC grant.
 - **Suite icon language.** Tiles use SF Symbols today; real per-tool icons
   need a shared grammar (docs/ui-direction.md, Pict as the fleet's icon
   store).
