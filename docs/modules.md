@@ -6,6 +6,32 @@ costs, and what it could watch for. Order follows PLAN.md's phases.
 Legend — **effort**: cheap (SwiftPM core moves nearly unchanged) · medium
 (`.xcodeproj` port or not-yet-cloned) · port (non-Swift tech to re-implement).
 
+## Platform floors
+
+The suite declares macOS 14 (`Package.swift`, `LSMinimumSystemVersion`). The
+source repos declare these floors (checked 2026-11-02 against each `main`):
+
+| Module | Declared floor | Declared in | What needs it |
+| --- | --- | --- | --- |
+| DockVac | 13 | `Package.swift` | fits the suite |
+| RepoMen | 13 | `.xcodeproj` | fits the suite |
+| BootCaptain | 13 | `Package.swift`, `project.yml` | fits the suite |
+| DeviceControlDoctor | 14 | `Package.swift` | fits the suite |
+| Shortking | 14 | `Package.swift` | fits the suite |
+| RunningMan | 14 | `Package.swift` | fits the suite |
+| Zen Backup Manager | 14 | `.xcodeproj` | fits the suite |
+| HallPass | 26 | `Package.swift` | The pane uses Tahoe-only SwiftUI (`ToolbarSpacer`). The feature needs 15.5: local network privacy arrived in macOS 15 and the exemption defaults in 15.5 (TN3179). |
+| Coreography | 26 | `Package.swift`, `.xcodeproj` | Native host sampling (`coreo` help: "requires macOS 26 or later"). Its per-process network driver reads a private framework's macOS 26 keys. |
+| Obtainintosh | Tauri app | `tauri.conf.json` | a port; no Swift floor yet |
+
+Two modules sit above the suite floor, so "moves in nearly unchanged" holds
+for their pure cores at most, not their panes or samplers. Either the suite
+floor rises, or those modules gate on availability and keep pre-26 paths that
+CI never runs (`ci.yml` tests only on `macos-26`). Any floor below 15.5 also
+needs HallPass marked inapplicable on those releases
+([architecture.md](architecture.md#module-applicability)). The choice is open
+(PLAN.md, *Deployment floor*).
+
 ## Confirmed roster
 
 ### DockVac — effort: cheap — phase 1 (first module)

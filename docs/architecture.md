@@ -106,6 +106,26 @@ Revisit only if the standalone apps stay alive long-term — at that point the
 shared cores could be extracted into their own tiny packages both sides
 consume.
 
+## Module applicability
+
+`SuiteModule` says what a tool is, not whether it can run on this Mac. Its
+`Status` is only `planned` or `available`. Before the first module ships, the
+descriptor also states:
+
+- **Minimum OS**, for the pane and the watcher separately where they differ.
+  Example: the HallPass feature needs macOS 15.5, the first release with the
+  exemption defaults it edits
+  ([TN3179](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy)).
+  The suite itself declares macOS 14.
+- **Required environment**, checked cheaply and without a prompt: a Docker
+  endpoint for DockVac, a Zen profile for Zen Backup Manager, installed
+  runners for RunningMan.
+
+An inapplicable module never runs its watcher, never surfaces a suggestion and
+never opens a pane that cannot work. Showing it with the reason or hiding it
+is a UI decision. Declared floors per module are in
+[modules.md](modules.md#platform-floors).
+
 ## Testing strategy
 
 - `MurtenCore`: registry invariants, dedupe/snooze/threshold rules, deep-link
