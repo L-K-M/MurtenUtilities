@@ -117,8 +117,9 @@ Per-module migration notes, satellites, and new-module ideas:
   declare macOS 26 (docs/modules.md, *Platform floors*). Raising the suite to
   26 means one tested OS, matching CI and both modules, but drops users of 14
   and 15 whom the other eight modules support. Keeping 14 widens reach, but
-  those two panes and samplers need availability gates and pre-26 paths that
-  CI does not run. A middle floor such as 15.5 is HallPass's own feature
+  HallPass's pane needs availability fallbacks and Coreography would sample
+  on releases it was never verified on, neither covered by CI. A middle
+  floor such as 15.5 is HallPass's own feature
   floor. Decide before Phase 2 migrates HallPass. Any floor still needs
   per-module applicability (docs/architecture.md).
 - **Name.** `MurtenUtilities` is the repo and bundle id; the *displayed* name
