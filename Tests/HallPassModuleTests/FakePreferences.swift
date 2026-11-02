@@ -1,0 +1,85 @@
+import Foundation
+import HallPassCore
+@testable import HallPassModule
+
+/// Stands in for the osascript service: no administrator prompt, no
+/// system preferences. Saves echo the desired configuration unless the
+/// test scripts a failure; `holding` parks calls until `release()`.
+actor FakePreferences: PreferencesService {
+    private let baseline: PreferencesSnapshot
+    private let saveFailure: PreferencesServiceError?
+    private let holdCalls: Bool
+    private var parked: CheckedContinuation<Void, Never>?
+    private(set) var loads = 0
+    private(set) var saves: [NetworkConfiguration] = []
+
+    init(baseline: NetworkConfiguration, saveFailure: PreferencesServiceError? = nil, holdCalls: Bool = false) throws {
+        self.baseline = try PreferencesSnapshot(configuration: baseline)
+        self.saveFailure = saveFailure
+        self.holdCalls = holdCalls
+    }
+
+    var holding: Bool { parked != nil }
+
+    func release() {
+        parked?.resume()
+        parked = nil
+    }
+
+    func load() async throws -> PreferencesSnapshot {
+        loads += 1
+        await hold()
+        return baseline
+    }
+
+    func save(_ plan: PreferencePlan) async throws -> PreferencesSnapshot {
+        saves.append(plan.desired)
+        await hold()
+        if let saveFailure { throw saveFailure }
+        return try PreferencesSnapshot(configuration: plan.desired)
+    }
+
+    private func hold() async {
+        guard holdCalls else { return }
+        await withCheckedContinuation { parked = $0 }
+    }
+}
+
+/// A throwaway preferences domain and backup folder per test.
+@MainActor
+struct Sandbox {
+    let suiteName: String
+    let defaults: UserDefaults
+    let backups: URL
+
+    init() {
+        suiteName = "HallPassModuleTests.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)!
+        backups = FileManager.default.temporaryDirectory
+            .appendingPathComponent("HallPassModuleTests-\(UUID().uuidString)", isDirectory: true)
+    }
+
+    func model(_ service: FakePreferences) -> HallPassModel {
+        HallPassModel(defaults: defaults, service: service, backupLocation: backups)
+    }
+
+    func backupFiles() throws -> [URL] {
+        guard FileManager.default.fileExists(atPath: backups.path) else { return [] }
+        return try FileManager.default.contentsOfDirectory(at: backups, includingPropertiesForKeys: nil)
+    }
+
+    func cleanUp() {
+        defaults.removePersistentDomain(forName: suiteName)
+        try? FileManager.default.removeItem(at: backups)
+    }
+}
+
+/// Polls an actor-held condition without wall-clock sleeps.
+@MainActor
+func eventually(_ condition: () async -> Bool) async -> Bool {
+    for _ in 0..<10_000 {
+        if await condition() { return true }
+        await Task.yield()
+    }
+    return await condition()
+}
