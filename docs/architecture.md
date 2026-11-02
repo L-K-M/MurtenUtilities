@@ -235,6 +235,35 @@ An inapplicable module never runs its watcher, never surfaces a suggestion and
 never opens a pane that cannot work. Showing it with the reason or hiding it
 is a UI decision. Declared floors per module are in
 [modules.md](modules.md#platform-floors).
+## Transition from the standalone apps
+
+Until PLAN.md's *Standalone app fate* is settled, each migrated tool exists
+twice. Three rules hold either way:
+
+- **Record provenance.** Each migrated core notes the upstream commit it was
+  copied from (docs/modules.md). Without it, fixes made on either side after
+  the move cannot be found and the copies drift unnoticed.
+- **Never orphan undo data.** The suite's bundle id gives it its own
+  UserDefaults domain. The paths below are hardcoded app names, so code moved
+  verbatim shares them with the standalone app, and renaming them to
+  `MurtenUtilities` hides what the standalone app saved. Some of that is the
+  user's only way back:
+
+  | Module | State | Holds |
+  | --- | --- | --- |
+  | BootCaptain | `~/Library/Application Support/BootCaptain/{Vault,Journal}`, `/Library/Application Support/BootCaptain/Vault` | startup items it moved aside; unfinished actions |
+  | HallPass | `~/Library/Application Support/HallPass/{Backups,Draft.json}` | the backup taken before each apply; unsaved edits |
+  | Zen Backup Manager | `~/Library/Application Support/ZenBackupManager/Safety Copies` | the copy taken before each restore |
+  | RunningMan | Keychain items; launchd labels `ch.lkmc.RunningMan.forgejo.*` | Forgejo tokens; which runners it manages |
+
+  A module reads these locations, or imports them once with the user's
+  consent; it never starts empty over them. Keychain items whose access list
+  names the standalone app may prompt or fail when the suite reads them;
+  verify per item before relying on a silent import.
+- **Define coexistence.** With both installed, both copies can act on the same
+  runners, startup items, preferences and the shared files above, and
+  menu-bar items, login items and update checks double up. Each module states
+  whether it defers to a running standalone app, and what the user sees.
 
 ## Testing strategy
 
