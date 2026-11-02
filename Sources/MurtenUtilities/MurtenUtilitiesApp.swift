@@ -1,19 +1,18 @@
 import SwiftUI
-import MurtenCore
+import MurtenShell
 
 @main
 struct MurtenUtilitiesApp: App {
-    var body: some Scene {
-        // The home window: the Norton-style grid of tools.
-        WindowGroup("Murten Utilities", id: "home") {
-            HomeView()
-        }
+    @NSApplicationDelegateAdaptor(SuiteAppDelegate.self) private var delegate
+    @State private var model: AppModel
 
-        // The resident face. MenuBarExtra alone does not launch at login —
-        // that stays an explicit opt-in via SMAppService (see PLAN.md).
-        MenuBarExtra("Murten Utilities", systemImage: "wrench.and.screwdriver") {
-            MenuBarView()
-        }
-        .menuBarExtraStyle(.menu)
+    init() {
+        let model = AppModel(factories: ModuleCatalog.factories, services: .live())
+        _model = State(initialValue: model)
+        SuiteAppDelegate.model = model
+    }
+
+    var body: some Scene {
+        SuiteScenes(model: model)
     }
 }
