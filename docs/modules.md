@@ -40,20 +40,43 @@ needs HallPass marked inapplicable on those releases
 ### DockVac — effort: cheap — phase 1 (first module)
 
 Docker disk-usage treemap with selective reclaim — deliberately not a broad
-`docker system prune`. Pure SwiftPM today.
+`docker system prune`.
 
-- **Migrates:** `DockVacCore` (usage analysis, treemap model, reclaim set)
-  plus the `DockVacDocker` Engine API transport the scan service wraps; the
-  treemap pane as its first real suite pane.
-- **Watcher:** a slow-cadence scan through an observation-only Docker Engine
-  service → "Docker is holding ~X GB" at a configurable threshold. An endpoint
-  requiring interactive authentication is unavailable to background polls.
-  The proof-of-concept for the whole pipeline.
+- **Status:** available. `DockVacCore` and `DockVacDocker` moved in unchanged
+  with their tests and fixtures (Swift 6 mode); the AppKit app is
+  `DockVacModule`. The driver tests' fake daemon and SSH bridge live in
+  `Tests/DockVacDockerTests/Scripts`.
+- **Provenance:** DockVac@a8fed1d880c5a16faba197fd741fc5f83cc9b328 (release
+  1.5.0, the source repository's `main`)
+- **Pane:** the standalone views, hosted through
+  `NSViewControllerRepresentable`. The window toolbar and subtitle became a
+  Rigi bar in the pane, the menu bar became Tool menu commands with the same
+  shortcuts, sheets attach to the suite window, and the quit alert became
+  `interruptionWarning`. The first scan runs when the pane first opens.
+- **Watcher:** hourly, three minutes per poll. It reads containers, images
+  and build cache (not volumes: no cleanup level removes one, and sizing them
+  is the slowest read) from the endpoint DockVac's automatic search finds,
+  through a reader with no removal. One finding per endpoint address,
+  `reclaimable`, whose bytes are the safe level's plan. The rule opens at
+  4 GB and holds until below 3 GB: "Docker is holding ~8 GB you can
+  rebuild". It declares network use when `DOCKER_HOST` or the active context
+  names an SSH host; SSH keeps `BatchMode`, so an endpoint needing a
+  passphrase fails as unavailable instead of prompting.
+- **Route:** `murten://dockvac/reclaim?endpoint=<address>` re-scans that
+  endpoint and, only if the scan reached it, replaces the selection with the
+  safe level. The confirmation sheet is unchanged, its acknowledgement box
+  off.
+- **Applicability:** a socket in a known location, `DOCKER_HOST` or a Docker
+  context; otherwise "No Docker endpoint found".
 - **Capability:** scans and deletion both use the Docker Engine connection
-  (Unix socket or SSH). A watcher gets a scan-only service interface, not the
-  mutation client; the daemon connection itself is not a read-only grant.
-- **UI:** AppKit throughout (`NSView`s, `NSToolbar`), no SwiftUI. The treemap
-  pane needs an `NSViewRepresentable` host or a rewrite.
+  (Unix socket or SSH). The watcher's reader is a guardrail against
+  accidental writes, not a read-only grant.
+- **Coexistence:** DockVac keeps no files, so nothing is shared but the
+  daemon. The standalone app and the module can both remove from it; every
+  removal is non-forcing, and the other copy's next scan shows the result.
+- **Left out:** `DOCKVAC_SMOKE_SCRIPT`, the window's saved frame, and the
+  menu's checkmarks on Show Everything / Show Reclaimable Only (the bar's
+  segmented control shows the filter).
 
 ### RepoMen — effort: medium — phase 3
 
