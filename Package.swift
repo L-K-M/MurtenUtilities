@@ -52,13 +52,21 @@ let deviceControlDoctorModule: [Target.Dependency] = []
 // short-lived probe helper; scripts/build-app.sh embeds it as
 // Contents/MacOS/shortking-probe.
 let shortkingTargets: [Target] = [
-    .target(name: "ShortkingCore"),
+    .target(name: "ShortkingCore", dependencies: ["MurtenCore"]),
     .target(name: "ShortkingKit", dependencies: ["ShortkingCore"]),
     .executableTarget(name: "ShortkingProbe", dependencies: ["ShortkingKit", "ShortkingCore"]),
-    .testTarget(name: "ShortkingCoreTests", dependencies: ["ShortkingCore"]),
-    .testTarget(name: "ShortkingKitTests", dependencies: ["ShortkingKit", "ShortkingCore"])
+    .target(
+        name: "ShortkingModule",
+        dependencies: ["ShortkingCore", "ShortkingKit", "MurtenCore", "MurtenModuleKit"]
+    ),
+    .testTarget(name: "ShortkingCoreTests", dependencies: ["ShortkingCore", "MurtenCore"]),
+    .testTarget(name: "ShortkingKitTests", dependencies: ["ShortkingKit", "ShortkingCore"]),
+    .testTarget(
+        name: "ShortkingModuleTests",
+        dependencies: ["ShortkingModule", "ShortkingKit", "ShortkingCore", "MurtenCore", "MurtenModuleKit"]
+    )
 ]
-let shortkingModule: [Target.Dependency] = []
+let shortkingModule: [Target.Dependency] = ["ShortkingModule"]
 
 // MARK: HallPass
 let hallPassTargets: [Target] = []
