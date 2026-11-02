@@ -42,7 +42,12 @@ let bootCaptainTargets: [Target] = []
 let bootCaptainModule: [Target.Dependency] = []
 
 // MARK: DeviceControlDoctor
-let deviceControlDoctorTargets: [Target] = []
+// DoctorCore keeps its upstream name; its directory carries the tool's
+// prefix like the module's other targets.
+let deviceControlDoctorTargets: [Target] = [
+    .target(name: "DoctorCore", dependencies: ["MurtenCore"], path: "Sources/DeviceControlDoctorCore"),
+    .testTarget(name: "DeviceControlDoctorCoreTests", dependencies: ["DoctorCore", "MurtenCore"])
+]
 let deviceControlDoctorModule: [Target.Dependency] = []
 
 // MARK: Shortking
