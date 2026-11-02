@@ -71,6 +71,13 @@ not a notification center bolted on.
   that while modules are still unmigrated. If it is ever revisited it is a
   product decision plus Rigi work — not per-screen dark patches, which is how
   apps end up with the worst of both.
+  Apple documents the key as a temporary opt-out and tells apps that never
+  plan a dark appearance to set the app's appearance instead
+  ([Choosing a specific appearance](https://developer.apple.com/documentation/appkit/choosing-a-specific-appearance-for-your-macos-app)).
+  So the app also sets `NSApp.appearance = NSAppearance(named: .aqua)` at
+  launch, as Lucerne does; the scaffold does not yet. Rigi's colors are fixed
+  light values, so a key macOS stops honoring would leave light chrome under
+  dark system controls.
   The key is per-bundle: any future helper, extension or satellite bundle that
   presents its own UI must set it too, or it will go dark on a dark system.
 - **Subtlety over skins**: the classic look lives in chrome, typography scale
