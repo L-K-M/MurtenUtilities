@@ -1,4 +1,5 @@
 import SwiftUI
+import ZenBackupManagerCore
 
 struct BackupSidebar: View {
     @ObservedObject var model: AppModel
@@ -10,7 +11,7 @@ struct BackupSidebar: View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
                 Text("PROFILE").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                Picker("Profile", selection: $model.profileID) {
+                Picker("Profile", selection: Binding(get: { model.profileID }, set: { model.selectProfile($0) })) {
                     ForEach(model.profiles) { profile in
                         Text(profile.name + (profile.isDefault ? " · Default" : "")).tag(Optional(profile.id))
                     }
@@ -20,7 +21,7 @@ struct BackupSidebar: View {
                     Spacer()
                     if let profile = model.profile {
                         Button { NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: profile.directory.path) } label: { Image(systemName: "folder") }
-                            .buttonStyle(.plain).help("Show profile in Finder")
+                            .buttonStyle(.plain).help("Show profile in Finder").accessibilityLabel("Show profile in Finder")
                     }
                 }
             }.padding(16)

@@ -1,4 +1,5 @@
 import AppKit
+import ZenBackupManagerCore
 
 enum ZenRuntime {
     static var applications: [NSRunningApplication] {

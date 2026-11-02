@@ -1,7 +1,15 @@
 import SwiftUI
+import MurtenCore
+import MurtenModuleKit
+import ZenBackupManagerCore
 
+/// The module's pane: the standalone app's window content. The suite owns
+/// the window, its title and the app menu; the pane's commands go to the
+/// Tool menu.
 struct ContentView: View {
     @ObservedObject var model: AppModel
+    /// The suggestion or tile click that opened the pane.
+    let route: ModuleRoute?
     @State private var confirmingRestore = false
     @State private var confirmingUndo = false
 
@@ -39,7 +47,6 @@ struct ContentView: View {
                 }
             }.background(Color(nsColor: .windowBackgroundColor))
         }
-        .navigationTitle("Zen Backup Manager")
         .toolbar {
             ToolbarItemGroup {
                 Button { model.refresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
@@ -52,7 +59,6 @@ struct ContentView: View {
                     .disabled(model.busy || model.selected?.canRestore != true)
             }
         }
-        .onChange(of: model.profileID) { model.notice = nil; model.refresh() }
         .sheet(isPresented: $confirmingRestore) {
             if let backup = model.selected, let profile = model.profile {
                 RestoreConfirmation(backup: backup, profile: profile, current: model.current?.preview) {
@@ -69,5 +75,10 @@ struct ContentView: View {
         .alert("Couldn't complete the operation", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
             Button("OK", role: .cancel) { model.error = nil }
         } message: { Text(model.error ?? "") }
+        .moduleCommands([
+            ModuleCommand("Choose Profile Folder…", isEnabled: !model.busy) { model.chooseProfile() },
+            ModuleCommand("Refresh Backups", shortcut: KeyboardShortcut("r"), isEnabled: !model.busy) { model.refresh() },
+        ])
+        .onAppear { model.appear(for: route) }
     }
 }

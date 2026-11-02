@@ -1,4 +1,5 @@
 import SwiftUI
+import ZenBackupManagerCore
 
 struct RestoreConfirmation: View {
     let backup: BackupRecord

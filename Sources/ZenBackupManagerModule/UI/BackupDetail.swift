@@ -1,4 +1,5 @@
 import SwiftUI
+import ZenBackupManagerCore
 
 struct BackupDetail: View {
     let backup: BackupRecord

@@ -1,10 +1,25 @@
 import AppKit
 import SwiftUI
+import MurtenCore
+import ZenBackupManagerCore
 
+/// The pane's state. The provider owns it for the app's lifetime, so a scan
+/// or a restore survives navigating away from the pane.
 @MainActor
 final class AppModel: ObservableObject {
+    /// How a finished scan picks the backup the detail shows.
+    enum Selection {
+        /// The previous selection while it exists, else the newest restorable
+        /// backup: the standalone app's behavior.
+        case previousOrNewestRestorable
+        /// The current state only. A suggestion preselects no backup to
+        /// restore (docs/modules.md, Zen Backup Manager).
+        case currentState
+    }
+
     @Published var profiles: [ZenProfile] = []
-    @Published var profileID: String? = nil
+    /// Changes go through `selectProfile(_:)`, which re-scans.
+    @Published private(set) var profileID: String? = nil
     @Published var records: [BackupRecord] = []
     @Published var selectedID: String?
     @Published var busy = false
@@ -14,9 +29,22 @@ final class AppModel: ObservableObject {
     @Published var lastSafety: SafetyArchive?
     @Published var showLegacy = false
     @Published var showSafety = false
+    /// True while a restore or undo is writing session files; quitting then
+    /// needs confirmation.
+    private(set) var isWritingSession = false
     private var scanTask: Task<Void, Never>?
     private var generation = UUID()
-    let safetyRoot = SafetyArchive.defaultRoot
+    private var hasStarted = false
+    /// Folders the user chose this session. They stay listed when a
+    /// suggestion re-discovers Zen's profiles.
+    private var chosenProfiles: [ZenProfile] = []
+    let zenRoot: URL
+    let safetyRoot: URL
+
+    init(zenRoot: URL, safetyRoot: URL) {
+        self.zenRoot = zenRoot
+        self.safetyRoot = safetyRoot
+    }
 
     var profile: ZenProfile? { profiles.first { $0.id == profileID } }
     var selected: BackupRecord? { records.first { $0.id == selectedID } }
@@ -27,13 +55,40 @@ final class AppModel: ObservableObject {
         records.filter { (showLegacy || $0.kind != .legacy) && (showSafety || $0.kind != .safety) }
     }
 
-    func start() {
-        guard NSClassFromString("XCTestCase") == nil else { return }
+    /// The pane appeared. The first visit discovers profiles and scans, as
+    /// the standalone app did at launch; a later plain visit keeps its state.
+    /// A suggestion's route discovers again, opens the profile it names and
+    /// re-scans without selecting a backup to restore; it waits for nothing
+    /// but a running restore, which re-scans when it ends.
+    func appear(for route: ModuleRoute?) {
+        let fromSuggestion = route?.action == ZenBackupRoute.timelineAction
+        guard !hasStarted || (fromSuggestion && !isWritingSession) else { return }
+        hasStarted = true
+
         do {
-            profiles = try ProfileDiscovery.discover()
-            profileID = profiles.first?.id
-            if profiles.isEmpty { notice = "No Zen profiles found. Choose a profile folder to get started." }
-        } catch { self.error = error.localizedDescription }
+            let discovered = try ProfileDiscovery.discover(root: zenRoot)
+            profiles = discovered + chosenProfiles.filter { chosen in !discovered.contains { $0.id == chosen.id } }
+        } catch {
+            self.error = error.localizedDescription
+            return
+        }
+        guard !profiles.isEmpty else {
+            notice = "No Zen profiles found. Choose a profile folder to get started."
+            return
+        }
+
+        let requested = route?.context[ZenBackupRoute.profileKey]
+        profileID = profiles.first { $0.id == requested }?.id ?? profiles.first { $0.id == profileID }?.id ?? profiles.first?.id
+        notice = nil
+        refresh(selecting: fromSuggestion ? .currentState : .previousOrNewestRestorable)
+    }
+
+    /// The profile picker and Choose Folder land here.
+    func selectProfile(_ id: String?) {
+        guard id != profileID else { return }
+        profileID = id
+        notice = nil
+        refresh()
     }
 
     func chooseProfile() {
@@ -45,12 +100,12 @@ final class AppModel: ObservableObject {
         do {
             try SessionFiles.validateProfile(url)
             let profile = ZenProfile(name: url.lastPathComponent, directory: url, isDefault: false)
-            if !profiles.contains(where: { $0.id == profile.id }) { profiles.append(profile) }
-            profileID = profile.id
+            if !profiles.contains(where: { $0.id == profile.id }) { profiles.append(profile); chosenProfiles.append(profile) }
+            selectProfile(profile.id)
         } catch { self.error = error.localizedDescription }
     }
 
-    func refresh() {
+    func refresh(selecting selection: Selection = .previousOrNewestRestorable) {
         scanTask?.cancel()
         generation = UUID()
         let token = generation
@@ -73,7 +128,12 @@ final class AppModel: ObservableObject {
                 guard generation == token, !Task.isCancelled else { return }
                 records = result
                 lastSafety = try SafetyArchive.list(root: root, profile: profile).first
-                selectedID = visibleRecords.first { $0.id == previousSelection }?.id ?? visibleRecords.first { $0.canRestore }?.id ?? visibleRecords.first?.id
+                switch selection {
+                case .previousOrNewestRestorable:
+                    selectedID = visibleRecords.first { $0.id == previousSelection }?.id ?? visibleRecords.first { $0.canRestore }?.id ?? visibleRecords.first?.id
+                case .currentState:
+                    selectedID = visibleRecords.first { $0.kind == .current }?.id
+                }
             } catch is CancellationError { }
             catch { if generation == token { self.error = error.localizedDescription } }
             if generation == token { busy = false }
@@ -91,9 +151,10 @@ final class AppModel: ObservableObject {
     }
 
     private func perform(profile: ZenProfile, isUndo: Bool = false, operation: @escaping (RestoreService) throws -> SafetyArchive) {
-        busy = true; progress = "Saving a safety copy and verifying the restore…"; notice = nil
+        busy = true; isWritingSession = true; progress = "Saving a safety copy and verifying the restore…"; notice = nil
         let root = safetyRoot
         Task {
+            defer { isWritingSession = false }
             do {
                 let archive = try await Task.detached(priority: .userInitiated) {
                     try operation(RestoreService(safetyRoot: root, isZenRunning: { ZenRuntime.isRunning }))
