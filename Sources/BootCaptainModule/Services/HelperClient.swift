@@ -8,9 +8,9 @@ import BootCaptainKit
 /// The standalone app registers an `SMAppService.daemon` and both sides pin
 /// each other's exact bundle ID and Team ID. Murten Utilities is ad-hoc
 /// signed, so that connection could never be authenticated
-/// (docs/architecture.md, Module packaging). Actions that need the helper —
-/// moving `/Library` items to the root vault, and the launchd/cron toggles
-/// the standalone build already keeps disabled — stay visible but disabled
+/// (docs/architecture.md, Module packaging). Actions that need the helper
+/// (moving `/Library` items to the root vault, and the launchd/cron toggles
+/// the standalone build already keeps disabled) stay visible but disabled
 /// with `unavailableReason`; everything that runs as the user keeps working.
 /// Re-adding the helper means restoring the standalone `HelperClient` and
 /// embedding the helper once the suite is signed with a real Team ID.
