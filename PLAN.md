@@ -50,7 +50,7 @@ The confirmed roster — and what each tool is for — lives in
 
 | Module | From repo | One-line job | Watcher → suggestion |
 | --- | --- | --- | --- |
-| DockVac | `DockVac` (SwiftPM) | Docker disk reclaim | `docker system df` growth → "clean up?" |
+| DockVac | `DockVac` (SwiftPM) | Docker disk reclaim | Engine API disk-usage growth → "clean up?" |
 | RepoMen | `RepoMen` (.xcodeproj) | dev caches & build artifacts | cache growth → "12 GB of build products" |
 | BootCaptain | `BootCaptain` (Swift, GitHub-only) | startup items & boot failures | new/changed login items → "review what X added" |
 | DeviceControlDoctor | `DeviceControlDoctor` (SwiftPM) | TCC permission diagnostics | grant-vs-function drift → "re-check X" |

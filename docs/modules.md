@@ -41,8 +41,9 @@ needs HallPass marked inapplicable on those releases
 Docker disk-usage treemap with selective reclaim — deliberately not a broad
 `docker system prune`. Pure SwiftPM today.
 
-- **Migrates:** its core (df parsing, treemap model, reclaim set) as
-  `DockVacCore`; the treemap pane as its first real suite pane.
+- **Migrates:** `DockVacCore` (usage analysis, treemap model, reclaim set)
+  plus the `DockVacDocker` Engine API transport the scan service wraps; the
+  treemap pane as its first real suite pane.
 - **Watcher:** a slow-cadence scan through an observation-only Docker Engine
   service → "Docker is holding ~X GB" at a configurable threshold. An endpoint
   requiring interactive authentication is unavailable to background polls.

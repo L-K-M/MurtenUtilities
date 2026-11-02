@@ -61,9 +61,11 @@ click suggestion ──▶ deep link ──▶ module pane ──▶ explicit co
 ```
 
 - **Watchers** run on a cadence (per-module interval, coalesced). They must be
-  cheap and must not require privilege *to look*. `docker system df` is the
-  canonical example. A check that needs privilege is a tool action, not a
-  watcher.
+  cheap and must not require privilege *to look*. The canonical example is
+  DockVac's watcher reusing the Engine API client it inherits from the
+  standalone app: reading the local Docker socket needs no elevation, and
+  DockVac never shells out to the `docker` CLI. A check that needs privilege
+  is a tool action, not a watcher.
 - **Findings** carry a condition, target identity, observation time and typed
   evidence. Identity includes scope: two Docker endpoints or runner installs
   must not share a key merely because both report the same condition. A poll
