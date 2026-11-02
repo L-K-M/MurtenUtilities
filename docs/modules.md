@@ -84,16 +84,37 @@ with a verified safety copy and undo. **GitHub-only**.
 
 ### Obtainintosh — effort: port — phase 4
 
-Tracks applications and fonts installed through GitHub/Forgejo releases and
-compares them with what's installed. Currently Tauri — the logic is simple
-(release feeds + version compare), so a native port is small.
+Tracks applications and fonts distributed through GitHub or Forgejo
+releases, compares them with what is installed, downloads a matching asset
+and reveals it in the file manager. It does not install or replace
+anything. Tauri 2 and SvelteKit, shipped for macOS and Linux.
 
-- **Two shapes, decide at phase 4:** (a) a thin port of Obtainintosh as a
-  pane; (b) the suite's generic updater — "apps installed from GitHub
-  releases" regardless of fleet. Leaning (b): the suggestion "3 app updates
-  available" is only useful with the whole picture, and it makes the suite
-  the fleet's own update channel too.
-- **Watcher:** this *is* the watcher — release-feed polling is its nature.
+- **Size:** about 10,400 lines of Rust, 186 tests included, and 2,500 lines
+  of TypeScript/Svelte. A native port re-implements all of it.
+- **Scope is already generic:** users add any GitHub or Forgejo repository.
+  The repo's `GENERIC_SOURCES.md` designs arbitrary vendor download pages
+  behind an identity and SSRF contract. PLAN.md's open question is whether
+  the suite keeps, narrows or extends that.
+- **Installed-app identity** is the user-typed name matched against
+  `<name>.app` in `/Applications` and `~/Applications`
+  (`src-tauri/src/installer.rs`), not a bundle id. A count like "3 app
+  updates available" inherits that guess; the repo's `ANALYSIS.md` already
+  specifies bundle-id matching.
+- **State:** `~/Library/Application Support/Obtainintosh/apps.json` holds
+  the tracked list and GitHub and Forgejo tokens in plain text
+  (`src-tauri/src/models.rs`). A migration moves the tokens to the Keychain
+  rather than copying them.
+- **Platforms:** a Swift port is macOS-only. Linux users (deb, AppImage,
+  Flatpak) keep the Tauri app, so it stays maintained whatever the suite
+  does.
+- **Shapes, decide at phase 4:** (a) a pane that ports today's
+  download-and-reveal flow; (b) the suite's updater, which also needs the
+  verified install `ANALYSIS.md` specifies and does not exist yet (mount,
+  bundle id, signature, signer continuity) before "update" means more than
+  "download".
+- **Watcher:** checks run at launch and on demand; nothing polls today. The
+  suite's scheduler would supply the cadence, within GitHub's
+  unauthenticated rate limit unless the user adds a token.
 
 ### RunningMan — effort: cheap — phase 2
 
