@@ -78,6 +78,25 @@ public struct DockerEndpointLocator: Sendable {
     )
   }
 
+  /// The daemon `DOCKER_HOST` or the active Docker context names, if either does. An SSH
+  /// host here means `connect(to: .automatic)` talks to a remote machine.
+  public func configuredHost() -> (host: DockerHostSetting, origin: String)? {
+    DockerEndpointResolution.configuredHost(
+      environment: environment, activeContext: activeContext())
+  }
+
+  /// Whether `connect(to: .automatic)` has anything to try, decided without connecting: a
+  /// configured host, or a candidate socket that exists. Reads only the environment,
+  /// Docker's config files and file metadata, so it never prompts and never dials.
+  public func hasLocatableEndpoint() -> Bool {
+    if configuredHost() != nil {
+      return true
+    }
+    return candidates().candidates.contains {
+      FileManager.default.fileExists(atPath: $0.socketPath)
+    }
+  }
+
   /// Connects to the first candidate that answers `/_ping`.
   public func connect(to target: DockerConnectionTarget = .automatic) async throws
     -> DockerConnection

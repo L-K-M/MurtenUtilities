@@ -34,10 +34,11 @@ let suiteTargets: [Target] = [
 // bridge its driver tests spawn live in Tests/DockVacDockerTests/Scripts.
 let dockVacSwift6: [SwiftSetting] = [.swiftLanguageMode(.v6)]
 let dockVacTargets: [Target] = [
-    .target(name: "DockVacCore", swiftSettings: dockVacSwift6),
+    // MurtenCore only for the suggestion rule, which stays pure.
+    .target(name: "DockVacCore", dependencies: ["MurtenCore"], swiftSettings: dockVacSwift6),
     .target(name: "DockVacDocker", dependencies: ["DockVacCore"], swiftSettings: dockVacSwift6),
     .testTarget(
-        name: "DockVacCoreTests", dependencies: ["DockVacCore"],
+        name: "DockVacCoreTests", dependencies: ["DockVacCore", "MurtenCore"],
         resources: [.copy("Fixtures")], swiftSettings: dockVacSwift6),
     .testTarget(
         name: "DockVacDockerTests", dependencies: ["DockVacDocker", "DockVacCore"],
