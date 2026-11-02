@@ -13,9 +13,9 @@ import MurtenModuleKit
 ///   macOS 15.5 and the suite's floor is 26.
 @MainActor
 public final class HallPassProvider: SuiteModuleProvider {
-    public nonisolated static let moduleID = "hallpass"
+    public nonisolated static let identifier = "hallpass"
 
-    public let moduleID = HallPassProvider.moduleID
+    public let moduleID = HallPassProvider.identifier
     /// Owned here, not by the pane, so a draft survives navigating home.
     let model: HallPassModel
 

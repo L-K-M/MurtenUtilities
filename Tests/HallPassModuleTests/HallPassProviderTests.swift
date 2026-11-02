@@ -12,7 +12,7 @@ struct HallPassProviderTests {
     private let baseline = NetworkConfiguration(wifi: ["169.254.0.0/16"], ethernet: nil)
 
     @Test func matchesAnAvailableRegistryEntry() {
-        let descriptor = ModuleRegistry.all.first { $0.id == HallPassProvider.moduleID }
+        let descriptor = ModuleRegistry.all.first { $0.id == HallPassProvider.identifier }
         #expect(descriptor?.status == .available)
     }
 
@@ -20,7 +20,7 @@ struct HallPassProviderTests {
         let sandbox = Sandbox()
         defer { sandbox.cleanUp() }
         let provider = HallPassProvider(context: ModuleContext(
-            moduleID: HallPassProvider.moduleID, defaults: sandbox.defaults,
+            moduleID: HallPassProvider.identifier, defaults: sandbox.defaults,
             requestRecheck: {}, open: { _ in }))
 
         // AnyView and WatcherRegistration are not Equatable; compare outside #expect.
@@ -79,14 +79,14 @@ struct HallPassProviderTests {
         let provider = HallPassProvider(model: model)
 
         let loading = Task { await model.load() }
-        #expect(await eventually { await service.holding })
+        #expect(await service.waitForParkedCall())
         #expect(provider.interruptionWarning == "Reading the current exemptions")
         await service.release()
         await loading.value
 
         try model.add("192.168.1.0/24", interfaces: [.wifi])
         let applying = Task { await model.save() }
-        #expect(await eventually { await service.holding })
+        #expect(await service.waitForParkedCall())
         #expect(provider.interruptionWarning == "Applying changes")
         await service.release()
         await applying.value

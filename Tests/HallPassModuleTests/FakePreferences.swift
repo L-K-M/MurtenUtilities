@@ -4,7 +4,7 @@ import HallPassCore
 
 /// Stands in for the osascript service: no administrator prompt, no
 /// system preferences. Saves echo the desired configuration unless the
-/// test scripts a failure; `holding` parks calls until `release()`.
+/// test scripts a failure; `holdCalls` parks calls until `release()`.
 actor FakePreferences: PreferencesService {
     private let baseline: PreferencesSnapshot
     private let saveFailure: PreferencesServiceError?
@@ -19,7 +19,15 @@ actor FakePreferences: PreferencesService {
         self.holdCalls = holdCalls
     }
 
-    var holding: Bool { parked != nil }
+    /// Returns once a call is parked; gives up after five seconds so a
+    /// broken test fails instead of hanging.
+    func waitForParkedCall() async -> Bool {
+        let deadline = ContinuousClock.now + .seconds(5)
+        while parked == nil, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        return parked != nil
+    }
 
     func release() {
         parked?.resume()
@@ -72,14 +80,4 @@ struct Sandbox {
         defaults.removePersistentDomain(forName: suiteName)
         try? FileManager.default.removeItem(at: backups)
     }
-}
-
-/// Polls an actor-held condition without wall-clock sleeps.
-@MainActor
-func eventually(_ condition: () async -> Bool) async -> Bool {
-    for _ in 0..<10_000 {
-        if await condition() { return true }
-        await Task.yield()
-    }
-    return await condition()
 }
