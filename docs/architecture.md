@@ -23,7 +23,7 @@ Tests/
   <Tool>CoreTests/    each migrated core keeps its existing suite
 ```
 
-Two extension points everything hangs off:
+Current v0.1 scaffold contracts (not yet the full pipeline):
 
 ```swift
 public protocol Watcher: Sendable {
@@ -40,6 +40,11 @@ public struct Suggestion: Identifiable, Equatable, Sendable {
     public let detail: String
 }
 ```
+
+The scaffold's `poll() -> Suggestion?` skips the finding/rule boundary and
+returns at most one result. Phase 1 must separate observation from rules and
+support multiple findings before module watchers depend on this API. The
+following lifecycle is the acceptance contract, not implemented behavior.
 
 ## The suggestion pipeline
 
@@ -59,15 +64,57 @@ click suggestion ──▶ deep link ──▶ module pane ──▶ explicit co
   cheap and must not require privilege *to look*. `docker system df` is the
   canonical example. A check that needs privilege is a tool action, not a
   watcher.
-- **Rules** turn a finding into at most one suggestion per `key`. Thresholds
+- **Findings** carry a condition, target identity, observation time and typed
+  evidence. Identity includes scope: two Docker endpoints or runner installs
+  must not share a key merely because both report the same condition. A poll
+  can return multiple findings and must state which scopes completed.
+- **Rules** turn findings into at most one suggestion per `key`. Thresholds
   ("≥ 4 GB reclaimable", "≥ 1 runner offline ≥ 10 min") live with the module.
-- **SuggestionStore** dedupes by `key` (a repeated finding refreshes, never
-  stacks), applies per-category snoozes and a global rate limit, and persists
-  to `~/Library/Application Support/MurtenUtilities/suggestions.json`.
-- **Surfaces**: home-screen feed, menu-bar badge count, and — only where the
-  user opted in per category — `UNUserNotification`. Never modal.
-- **Deep links**: `murten://<moduleID>[/<action>]` inside the app; each pane
-  can register a payload (e.g. DockVac's "reclaimable set selected").
+  Use duration/hysteresis where values fluctuate; changing byte counts alone
+  must not create a new suggestion or notification.
+- **SuggestionStore** has one serialized owner. It dedupes by `key`, retains
+  snoozes/dismissals across refreshes and restarts, and persists to
+  `~/Library/Application Support/MurtenUtilities/suggestions.json`. Bound
+  retention. Rate-limit notification delivery, not collection of findings.
+- **Surfaces** show active suggestions and distinguish stale observations from
+  current ones. Only per-category opt-in permits `UNUserNotification`.
+  Refreshes and startup restoration never replay old notifications.
+- **Routes** identify a module, an allowlisted action and typed context, not a
+  command or an executable path. `murten://<moduleID>[/<action>]` is proposed
+  notation; the scaffold has neither a URL handler nor scheme registration.
+  Internal navigation does not require an externally registered URL scheme.
+  Decide external-link support separately and validate all supplied context.
+
+### Observation and suggestion lifecycle
+
+- A successful, complete observation can mark a condition active or resolved.
+  `nil` in the scaffold only means "nothing worth reporting"; it cannot also
+  encode unavailable, partial, stale or resolved state. Define those outcomes
+  in Phase 1. A failed/incomplete check never proves a condition resolved.
+- Record last success and failure separately. Permission denial, missing
+  tools, offline endpoints, parse errors and timeouts make the check
+  unavailable or its previous finding stale, not healthy. Show a non-modal
+  diagnostic; retry with bounded backoff, without repeated setup prompts.
+- Snoozing suppresses surfacing until its deadline; refreshes preserve it.
+  Dismissal suppresses the current condition episode. A verified resolution
+  followed by recurrence may create a new episode; ordinary value changes
+  may not. Define expiry and material-change rules with each module.
+- Clicking a suggestion only opens a pane. Re-scan and bind the selection to
+  the current endpoint/resource identity before presenting confirmation.
+  Changed, missing or newly in-use targets require a revised preview. A
+  restored suggestion or external link never authorizes a repair.
+
+### Poll ownership and opt-out
+
+- One coordinator owns scheduling, with at most one in-flight poll per
+  watcher. Coalesce wake events; bound concurrency, runtime and I/O per
+  watcher. Cancellation must stop child work, not just stop awaiting it.
+- Disabling a watcher or resident mode cancels background work and prevents
+  late results from surfacing or notifying. Snoozing affects presentation,
+  not consent to run checks. On-demand checks remain module actions.
+- Define battery, network and sleep/wake budgets before enabling the first
+  watcher. No polling merely because a view was constructed or a timer from
+  a standalone app survived migration.
 
 ## Privilege model
 
@@ -85,8 +132,11 @@ Merging tools into one binary must not union their privileges. The rules:
 
 ## Resident mode
 
-- `MenuBarExtra` is the resident face; it costs nothing when the window is
-  closed but does **not** launch at login by itself.
+- `MenuBarExtra` is the resident face; it does **not** launch at login by
+  itself. Closing a window does not stop the process or its watchers.
+- The scaffold inserts the menu extra unconditionally and has no resident
+  preference yet. Before watchers ship, resident mode must default off and
+  govern background work independently of launch-at-login and notifications.
 - Launch at login is an explicit Settings toggle →
   `SMAppService.mainApp.register()` / `.unregister()`.
 - Watchers pause sensibly (on battery? metered network? user "quiet hours"?) —
@@ -113,5 +163,8 @@ consume.
 - Each `<Tool>Core` keeps the test suite it brings with it.
 - Watcher behaviour is tested against fixture command output, never the real
   system (same boundary discipline as DeviceControlDoctor's `ProcessRunner`).
+  Fake clocks and services cover threshold oscillation, multiple targets,
+  snooze/restart, resolution/recurrence, partial/failing observations, timeout,
+  wake coalescing, opt-out during a poll, late results and stale deep links.
 - The privileged write paths stay manual-verification-only, exactly as in the
   standalone apps, and stay documented as such.
