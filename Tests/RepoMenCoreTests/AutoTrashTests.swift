@@ -56,6 +56,17 @@ final class AutoTrashTests: XCTestCase {
         XCTAssertEqual(fresh.map(\.result), [.trashed, .skipped(reason: "its anchor is gone")])
     }
 
+    func testOlderIncomingLogEntriesCannotEvictNewerOnes() {
+        let existing = [3.0, 2.0].map {
+            AutoTrashLogEntry(date: Date(timeIntervalSince1970: $0), path: "/new/\($0)",
+                              label: "new", bytes: 1, result: .trashed)
+        }
+        let older = AutoTrashLogEntry(date: Date(timeIntervalSince1970: 1), path: "/old",
+                                      label: "old", bytes: 1, result: .trashed)
+
+        XCTAssertEqual(AutoTrash.appending([older], to: existing, limit: 2), existing)
+    }
+
     func testRecordCountsOnlyWhatWasTrashed() {
         let candidates = [item("/a", bytes: 10), item("/b", bytes: 20)]
         let outcomes = [Reclaimer.Outcome(item: candidates[0], failure: nil),

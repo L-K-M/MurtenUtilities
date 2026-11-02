@@ -15,10 +15,11 @@ package enum ProtectedLocations {
         let inHome = ["Desktop", "Documents", "Downloads",
                       "Library/Mobile Documents", "Library/CloudStorage"]
             .map { home + "/" + $0 }
-        return inHome + inHome.map { dataVolume + $0 } + ["/Volumes"]
+        return inHome + inHome.map { dataVolume + $0 } + [volumesRoot, dataVolume + volumesRoot]
     }
 
     private static let dataVolume = "/System/Volumes/Data"
+    private static let volumesRoot = "/Volumes"
 
     /// The live roots for the current user.
     package static var current: [String] {

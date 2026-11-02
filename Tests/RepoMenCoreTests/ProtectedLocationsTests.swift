@@ -21,6 +21,19 @@ final class ProtectedLocationsTests: XCTestCase {
         }
     }
 
+    func testBothVolumeSpellingsAreRefusedBeforeAnyFileAccess() {
+        for root in ["/Volumes", "/System/Volumes/Data/Volumes"] {
+            var asked: [String] = []
+            let result = ProtectedLocations.classify(root + "/External/dev", roots: roots) { path in
+                asked.append(path)
+                return nil
+            }
+
+            XCTAssertEqual(result, .protected(root: root))
+            XCTAssertTrue(asked.isEmpty, "a protected volume must be refused before resolving links")
+        }
+    }
+
     func testContainmentFoldsCaseLikeAPFS() {
         XCTAssertTrue(ProtectedLocations.contains("/users/TEST/documents/app", roots: roots))
         XCTAssertTrue(ProtectedLocations.contains("/volumes/usb", roots: roots))
