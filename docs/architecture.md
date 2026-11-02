@@ -113,5 +113,13 @@ consume.
 - Each `<Tool>Core` keeps the test suite it brings with it.
 - Watcher behaviour is tested against fixture command output, never the real
   system (same boundary discipline as DeviceControlDoctor's `ProcessRunner`).
-- The privileged write paths stay manual-verification-only, exactly as in the
-  standalone apps, and stay documented as such.
+- Repair paths keep the automated tests they bring. The standalone apps
+  already test repair plans, request validation, journals, recovery and
+  deletes against fakes: HallPass `PreferencePlanTests` and
+  `HallPassModelTests`, BootCaptain `RequestValidatorTests`,
+  `MutationPolicyTests` and `FileJournalTests`, DockVac `FakeDaemonTests`,
+  DeviceControlDoctor `RepairPlanTests`. Only the live authorization prompt
+  and the real system write stay manual, and stay documented as such.
+- The suite's own path from a suggestion to a repair (deep link, confirm,
+  module action) gets fake-backed tests for denied authorization, cancel,
+  system state that changed between preview and write, and partial failure.
