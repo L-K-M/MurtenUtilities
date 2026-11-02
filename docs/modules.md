@@ -1,7 +1,8 @@
 # Modules
 
 Status of every candidate: what it does, where it comes from, what migration
-costs, and what it could watch for. Order follows PLAN.md's phases.
+costs, and what it could watch for. Order follows the home screen
+(`ModuleRegistry.all`); each heading names the module's phase.
 
 Legend — **effort**: cheap (SwiftPM core moves nearly unchanged) · medium
 (`.xcodeproj` port or not-yet-cloned) · port (non-Swift tech to re-implement).

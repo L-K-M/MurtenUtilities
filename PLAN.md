@@ -69,15 +69,17 @@ Per-module migration notes, satellites, and new-module ideas:
 0. **Scaffolding** (done): package, home screen listing the registry, Rigi
    wired end-to-end, CI/CD/release plumbing, this plan.
 1. **The spine**: `MurtenCore` contracts, the suggestion store
-   (dedupe/snooze/thresholds), the deep-link router, and **one module
+   (dedupe/snooze/thresholds), the deep-link router, the Settings section
+   for launch at login and watcher pauses (docs/architecture.md §Resident
+   mode wants it before the first watcher ships), and **one module
    end-to-end** — DockVac is the easiest proof (pure SwiftPM, cheap watcher).
 2. **SwiftPM migrations**: HallPass, DeviceControlDoctor, RunningMan — their
    `*Core` targets move in nearly unchanged.
 3. **Ports**: RepoMen and Coreography (`.xcodeproj` → SwiftPM cores);
    clone-and-migrate the GitHub-only apps (BootCaptain, Shortking,
    ZenBackupManager).
-4. **Obtainintosh** as the updater module — generic "apps installed from
-   GitHub/Forgejo releases" scope.
+4. **Obtainintosh** as the updater module. Its scope, fleet only or any
+   GitHub/Forgejo release, is still open (see Open questions).
 5. **Satellites & new modules** — deferred fleet candidates and greenfield
    tools from the ideas list.
 
