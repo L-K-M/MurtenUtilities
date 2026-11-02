@@ -112,6 +112,16 @@ final class SuggestionLedgerTests: XCTestCase {
         XCTAssertFalse(events.contains(.resolved(lowDisk.key)), "the scope still exists")
     }
 
+    func testExhaustiveCoverageIgnoresOtherModulesFindings() {
+        var ledger = SuggestionLedger()
+        ledger.apply(complete([reclaimable(8 * gigabyte, scope: sshScope)], scopes: [sshScope]), rule: rule)
+
+        let foreign = Finding(moduleID: "repomen", condition: "stale", scope: sshScope, observedAt: at(60))
+        let gone = WatchObservation(moduleID: dockvac, observedAt: at(60), findings: [foreign],
+                                    completedScopes: [], failures: [], coverage: .exhaustive)
+        XCTAssertEqual(ledger.apply(gone, rule: rule), [.resolved(reclaimable(0, scope: sshScope).key)])
+    }
+
     func testExhaustiveCoverageKeepsFailedScopesStale() {
         var ledger = SuggestionLedger()
         ledger.apply(complete([reclaimable(8 * gigabyte, scope: sshScope)], scopes: [sshScope]), rule: rule)
