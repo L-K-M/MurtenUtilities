@@ -285,7 +285,7 @@ final class AppModel: ObservableObject {
                 isRunning: { running.contains($0) })
             guard !Task.isCancelled else { return }
 
-            let discovered = found + caches
+            let discovered = CleanableItem.mergingDiscoveries(found + caches)
             await MainActor.run { [weak self] in
                 guard let self, self.scanGeneration == generation else { return }
                 self.items = discovered + self.items.filter(\.isSystemArea)

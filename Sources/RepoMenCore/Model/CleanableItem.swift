@@ -46,6 +46,24 @@ package struct CleanableItem: Identifiable, Hashable, Sendable {
         self.isSystemArea = isSystemArea
     }
 
+    /// Keep one row per path; catalog matches retain their reclaim policy and warnings.
+    package static func mergingDiscoveries(_ items: [CleanableItem]) -> [CleanableItem] {
+        var merged: [CleanableItem] = []
+        var indexByID: [String: Int] = [:]
+
+        for item in items {
+            guard let index = indexByID[item.id] else {
+                indexByID[item.id] = merged.count
+                merged.append(item)
+                continue
+            }
+            if item.isKnownCache && !merged[index].isKnownCache {
+                merged[index] = item
+            }
+        }
+        return merged
+    }
+
     package var id: String { path }
     package var url: URL { URL(fileURLWithPath: path) }
     package var category: ArtifactCategory { kind.category }
