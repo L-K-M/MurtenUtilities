@@ -97,7 +97,7 @@ public struct SuggestionLedger: Codable, Equatable, Sendable {
 
     /// Folds one observation into the ledger and reports what changed.
     @discardableResult
-    public mutating func apply(_ observation: Observation, rule: any SuggestionRule) -> [Event] {
+    public mutating func apply(_ observation: WatchObservation, rule: any SuggestionRule) -> [Event] {
         let moduleID = observation.moduleID
         recordHealth(of: observation)
 
@@ -157,7 +157,7 @@ public struct SuggestionLedger: Codable, Equatable, Sendable {
         return .opened(key)
     }
 
-    private mutating func recordHealth(of observation: Observation) {
+    private mutating func recordHealth(of observation: WatchObservation) {
         var entry = health[observation.moduleID] ?? WatchHealth()
         if observation.outcome != .unavailable { entry.lastSuccessAt = observation.observedAt }
         if let failure = observation.failures.first {

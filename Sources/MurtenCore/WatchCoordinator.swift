@@ -29,7 +29,7 @@ public struct SystemWatchClock: WatchClock {
 ///     poll: observe ─race─ timeout → generation still current? → sink
 public actor WatchCoordinator {
     public typealias Gate = @Sendable (WatchResources) async -> WatchGate
-    public typealias Sink = @Sendable (Observation, WatcherRegistration) async -> Void
+    public typealias Sink = @Sendable (WatchObservation, WatcherRegistration) async -> Void
 
     public static let maximumConcurrentPolls = 2
 
@@ -157,7 +157,7 @@ public actor WatchCoordinator {
         }
     }
 
-    private func finish(_ registration: WatcherRegistration, generation: Int, observation: Observation) async {
+    private func finish(_ registration: WatcherRegistration, generation: Int, observation: WatchObservation) async {
         let moduleID = registration.moduleID
         // A disabled watcher's result is discarded, even if it completed.
         guard generations[moduleID, default: 0] == generation, enabled.contains(moduleID) else { return }
@@ -172,11 +172,11 @@ public actor WatchCoordinator {
 
     /// Races the watcher against its timeout. Cancellation reaches the
     /// watcher's own work through structured concurrency.
-    private static func observe(_ watcher: any Watcher, clock: any WatchClock) async -> Observation {
+    private static func observe(_ watcher: any Watcher, clock: any WatchClock) async -> WatchObservation {
         let timeout = watcher.cadence.timeout
         let started = clock.now()
 
-        return await withTaskGroup(of: Observation?.self) { group in
+        return await withTaskGroup(of: WatchObservation?.self) { group in
             group.addTask { await watcher.observe() }
             group.addTask {
                 try? await clock.sleep(until: started.addingTimeInterval(timeout))

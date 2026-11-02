@@ -41,7 +41,7 @@ public protocol Watcher: Sendable {
     /// One cheap check. Never throws: a failed or partial check is reported
     /// in the observation, because "could not look" is not "nothing found".
     /// Must honor task cancellation; a disabled watcher's work is cancelled.
-    func observe() async -> Observation
+    func observe() async -> WatchObservation
 }
 
 /// A module's watcher with the rule that turns its findings into suggestions.

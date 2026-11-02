@@ -3,9 +3,9 @@ import XCTest
 
 /// Records sink deliveries.
 private actor Inbox {
-    private(set) var observations: [Observation] = []
+    private(set) var observations: [WatchObservation] = []
 
-    func add(_ observation: Observation) {
+    func add(_ observation: WatchObservation) {
         observations.append(observation)
     }
 }
@@ -41,7 +41,7 @@ private final class GatedWatcher: Watcher, @unchecked Sendable {
         lock.lock(); started += 1; lock.unlock()
     }
 
-    func observe() async -> Observation {
+    func observe() async -> WatchObservation {
         recordStart()
 
         await withTaskCancellationHandler {

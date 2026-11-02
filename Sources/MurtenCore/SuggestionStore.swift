@@ -66,7 +66,7 @@ public actor SuggestionStore {
 
     /// Records a watcher result and returns the ledger events it caused.
     @discardableResult
-    public func record(_ observation: Observation, rule: any SuggestionRule, at now: Date) -> [SuggestionLedger.Event] {
+    public func record(_ observation: WatchObservation, rule: any SuggestionRule, at now: Date) -> [SuggestionLedger.Event] {
         guard knownModules.contains(observation.moduleID) else { return [] }
 
         let events = ledger.apply(observation, rule: rule)

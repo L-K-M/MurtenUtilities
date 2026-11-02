@@ -122,7 +122,7 @@ final class SuggestionLedgerTests: XCTestCase {
         var ledger = SuggestionLedger()
         ledger.apply(complete([reclaimable(8 * gigabyte), reclaimable(6 * gigabyte, scope: sshScope)],
                               scopes: [socketScope, sshScope]), rule: rule)
-        let partial = Observation(
+        let partial = WatchObservation(
             moduleID: dockvac, observedAt: at(60), findings: [reclaimable(8 * gigabyte, at: at(60))],
             completedScopes: [socketScope],
             failures: [ObservationFailure(kind: .unreachable, scope: sshScope, message: "host down")])
