@@ -43,7 +43,7 @@ public enum ModuleRegistry {
         SuiteModule(
             id: "repomen", name: "RepoMen",
             summary: "Hunt down build artifacts and caches that eat your disk.",
-            systemImage: "externaldrive", sourceRepository: "RepoMen"),
+            systemImage: "externaldrive", status: .available, sourceRepository: "RepoMen"),
         SuiteModule(
             id: "bootcaptain", name: "BootCaptain",
             summary: "Inventory startup items and investigate boot failures.",
