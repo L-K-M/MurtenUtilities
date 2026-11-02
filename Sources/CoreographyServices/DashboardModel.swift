@@ -232,14 +232,17 @@ public final class DashboardModel {
     public private(set) var askState: AskState = .idle
     /// Why history is not being recorded, when it is not.
     public private(set) var historyProblem: String?
+    /// Where settings are kept: the standard domain for the standalone app,
+    /// the module's own store inside Murten Utilities.
+    @ObservationIgnored public let preferences: UserDefaults
     public var recordsHistory: Bool { historyRecorder != nil }
     /// Why the stored part of a long range is missing, when it is.
     public private(set) var storedHistoryProblem: String?
     /// How long history is kept; saved, and applied to the store's next write.
-    public var historyRetention = HistoryRetention.saved() {
+    public var historyRetention: HistoryRetention {
         didSet {
             guard historyRetention != oldValue else { return }
-            historyRetention.save()
+            historyRetention.save(in: preferences)
             applyRetention()
             dropStoredHistory()
             if timeRange.reachesStoredHistory { refreshStoredHistory() }
@@ -276,7 +279,7 @@ public final class DashboardModel {
     @ObservationIgnored private var liveAssertions: CapturedAssertions?
     @ObservationIgnored private let trafficMonitor: ProcessTrafficMonitor?
     @ObservationIgnored private var liveTraffic: CapturedTraffic?
-    @ObservationIgnored private var filterStore = SavedFilters(defaults: .standard)
+    @ObservationIgnored private var filterStore: SavedFilters
     private var sessionRecording: SessionRecording?
     @ObservationIgnored private let sessionArchive: SessionArchive?
     @ObservationIgnored private let sampler: ProcessSampler?
@@ -312,7 +315,7 @@ public final class DashboardModel {
     @ObservationIgnored private var sleepImport: Task<Void, Never>?
     @ObservationIgnored private var wakeImports = WakeImportSpacing()
     @ObservationIgnored private var alertEngine = AlertEngine(rules: AlertRules.shipped)
-    @ObservationIgnored private var customAlertStore = CustomAlertRules(defaults: .standard)
+    @ObservationIgnored private var customAlertStore: CustomAlertRules
     @ObservationIgnored private let accounts = AccountDirectory()
     /// Names for the by-user view, looked up off the main actor: a directory
     /// service can take a moment for a UID it has not answered before.
@@ -328,7 +331,7 @@ public final class DashboardModel {
     @ObservationIgnored private var alertCooldown = AlertCooldown()
     /// Shortcut runs have their own cooldown, so a flapping rule cannot loop one.
     @ObservationIgnored private var shortcutCooldown = AlertCooldown()
-    @ObservationIgnored private var shortcutStore = AlertShortcuts(defaults: .standard)
+    @ObservationIgnored private var shortcutStore: AlertShortcuts
     @ObservationIgnored private let shortcutRunner: ShortcutLauncher?
     @ObservationIgnored private var runningShortcuts: Set<String> = []
     @ObservationIgnored private let volumeReader: VolumeMonitor?
@@ -368,7 +371,22 @@ public final class DashboardModel {
     /// - Parameter notifier: system notifications for actionable alerts; nil
     ///   (as in command-line hosts) keeps alerts to tints and markers.
     ///   History is recorded only when the app supplies a recorder.
-    public init(notifier: AlertDelivery? = nil, history: (recorder: HistoryRecorder?, error: String?) = (nil, nil)) {
+    /// - Parameter preferences: where settings are kept; the suite passes
+    ///   the module's own store instead of the standard domain.
+    public init(
+        notifier: AlertDelivery? = nil, history: (recorder: HistoryRecorder?, error: String?) = (nil, nil),
+        preferences: UserDefaults = .standard
+    ) {
+        self.preferences = preferences
+        historyRetention = HistoryRetention.saved(in: preferences)
+        processCPUScale = ProcessCPUScale.saved(in: preferences)
+        laneLayout = LaneLayout.saved(in: preferences)
+        menuBarItems = MenuBarLayout.saved(in: preferences)
+        dockIcon = DockIconStyle.saved(in: preferences)
+        samplingRate = SamplingRate.saved(in: preferences)
+        filterStore = SavedFilters(defaults: preferences)
+        customAlertStore = CustomAlertRules(defaults: preferences)
+        shortcutStore = AlertShortcuts(defaults: preferences)
         controller = ProcessController()
         askService = AskService()
         self.notifier = notifier
@@ -447,8 +465,18 @@ public final class DashboardModel {
         responsivenessMonitor: ResponsivenessMonitor? = nil, exitWatcher: ProcessExitWatcher? = nil,
         maintenanceProvider: MaintenanceStatusProvider? = nil,
         shortcutRunner: ShortcutLauncher? = nil, volumeReader: VolumeMonitor? = nil,
-        energyMode: EnergyModeMonitor? = nil
+        energyMode: EnergyModeMonitor? = nil, preferences: UserDefaults = .standard
     ) {
+        self.preferences = preferences
+        historyRetention = HistoryRetention.saved(in: preferences)
+        processCPUScale = ProcessCPUScale.saved(in: preferences)
+        laneLayout = LaneLayout.saved(in: preferences)
+        menuBarItems = MenuBarLayout.saved(in: preferences)
+        dockIcon = DockIconStyle.saved(in: preferences)
+        samplingRate = SamplingRate.saved(in: preferences)
+        filterStore = SavedFilters(defaults: preferences)
+        customAlertStore = CustomAlertRules(defaults: preferences)
+        shortcutStore = AlertShortcuts(defaults: preferences)
         self.energyMode = energyMode
         self.shortcutRunner = shortcutRunner
         self.volumeReader = volumeReader
@@ -1685,8 +1713,8 @@ public final class DashboardModel {
     public private(set) var liveSampleTime: Date?
 
     /// Per-process CPU in whole-machine shares or one core = 100 %; saved.
-    public var processCPUScale = ProcessCPUScale.saved() {
-        didSet { if processCPUScale != oldValue { processCPUScale.save() } }
+    public var processCPUScale: ProcessCPUScale {
+        didSet { if processCPUScale != oldValue { processCPUScale.save(in: preferences) } }
     }
 
     /// The multiplier from a process's whole-machine share to the chosen scale.
@@ -1697,16 +1725,16 @@ public final class DashboardModel {
     public var processCPUScaleInEffect: ProcessCPUScale { latest == nil ? .machine : processCPUScale }
 
     /// Lane order, hidden lanes and sizes; saved as they change.
-    public var laneLayout = LaneLayout.saved() {
-        didSet { if laneLayout != oldValue { laneLayout.save() } }
+    public var laneLayout: LaneLayout {
+        didSet { if laneLayout != oldValue { laneLayout.save(in: preferences) } }
     }
 
     /// The menu bar extra's items; saved, at most three.
-    public var menuBarItems = MenuBarLayout.saved() {
+    public var menuBarItems: [MenuBarItem] {
         didSet {
             let normalized = MenuBarLayout.normalized(menuBarItems)
             if normalized != menuBarItems { menuBarItems = normalized; return }
-            if menuBarItems != oldValue { MenuBarLayout.save(menuBarItems) }
+            if menuBarItems != oldValue { MenuBarLayout.save(menuBarItems, in: preferences) }
         }
     }
 
@@ -1744,8 +1772,8 @@ public final class DashboardModel {
     }
 
     /// What the Dock icon shows; saved.
-    public var dockIcon = DockIconStyle.saved() {
-        didSet { if dockIcon != oldValue { dockIcon.save() } }
+    public var dockIcon: DockIconStyle {
+        didSet { if dockIcon != oldValue { dockIcon.save(in: preferences) } }
     }
 
     /// The Dock graph's last minute of live samples, even while the window is held;
@@ -2191,8 +2219,8 @@ public final class DashboardModel {
     public private(set) var samplingCadence: SamplingCadence = .normal
 
     /// The person's choice; the next sample follows it.
-    public var samplingRate = SamplingRate.saved() {
-        didSet { samplingRate.save() }
+    public var samplingRate: SamplingRate {
+        didSet { samplingRate.save(in: preferences) }
     }
 
     /// Seconds between whole-machine samples at the current cadence.

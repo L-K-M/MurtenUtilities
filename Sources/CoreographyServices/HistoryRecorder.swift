@@ -59,8 +59,9 @@ public actor HistoryRecorder {
     /// Take the batch out before writing: records arriving while the write
     /// awaits go to the next batch instead of being cleared with this one.
     /// A failed batch goes back in front, within the buffer limits, except
-    /// what a deletion during the write covered.
-    func flush(now: Date = Date()) async {
+    /// what a deletion during the write covered. Public so a host that
+    /// cannot delay quitting (Murten Utilities) can write the buffer itself.
+    public func flush(now: Date = Date()) async {
         lastFlush = now
         guard !buffer.isEmpty || !ledgerBuffer.isEmpty else { return }
         let samples = buffer

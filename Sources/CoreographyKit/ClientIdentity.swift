@@ -31,17 +31,26 @@ public struct ClientIdentityResolver: Sendable {
     private static let launchdPID: Int32 = 1
     private static let bundleSuffix = ".app"
     private let reader: any PeerProcessReading
-    /// Coreography's own bundle, whose CLI is the bridge and never the client.
-    private let ownBundle: String?
+    /// Bundles whose CLI is the bridge and never the client: Coreography's
+    /// own, and inside Murten Utilities also the standalone app, whose
+    /// `coreo` is the only bridge (the suite does not ship the CLI).
+    private let bridgeBundles: [String]
 
-    public init() {
+    /// - Parameter bridgeBundles: further bundles to treat as the bridge;
+    ///   the host's own bundle always is one.
+    public init(bridgeBundles: [String] = []) {
         let bundle = Bundle.main.bundlePath
-        self.init(reader: PeerProcessDriver(), ownBundle: bundle.hasSuffix(Self.bundleSuffix) ? bundle : nil)
+        let own = bundle.hasSuffix(Self.bundleSuffix) ? [bundle] : []
+        self.init(reader: PeerProcessDriver(), bridgeBundles: own + bridgeBundles)
     }
 
     init(reader: any PeerProcessReading, ownBundle: String? = nil) {
+        self.init(reader: reader, bridgeBundles: ownBundle.map { [$0] } ?? [])
+    }
+
+    init(reader: any PeerProcessReading, bridgeBundles: [String]) {
         self.reader = reader
-        self.ownBundle = ownBundle
+        self.bridgeBundles = bridgeBundles
     }
 
     /// The peer's launching app, or nil when its tree cannot be read. An app
@@ -50,7 +59,7 @@ public struct ClientIdentityResolver: Sendable {
         guard let peer = reader.process(pid) else { return nil }
         // Paths compare without case: APFS ignores it, so the kernel's spelling may differ from the bundle's.
         if let path = peer.path, let bundle = Self.outermostBundle(path),
-           ownBundle.map({ bundle.caseInsensitiveCompare($0) != .orderedSame }) ?? true {
+           bridgeBundles.allSatisfy({ bundle.caseInsensitiveCompare($0) != .orderedSame }) {
             return appIdentity(bundle: bundle)
         }
         var current = peer.parentPID

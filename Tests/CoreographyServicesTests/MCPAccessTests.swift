@@ -61,6 +61,23 @@ final class MCPAccessTests: XCTestCase {
         )
     }
 
+    /// Inside Murten Utilities the bridge is the standalone app's coreo; it
+    /// must still name the app behind it, not Coreography.
+    func testStandaloneBridgeIsNeverTheClientInsideTheSuite() {
+        let tree = Tree([
+            50: RawPeerProcess(pid: 50, parentPID: 30, uid: 501, path: "/Applications/Coreography.app/Contents/Helpers/coreo"),
+            30: RawPeerProcess(pid: 30, parentPID: 1, uid: 501, path: "/Applications/Claude.app/Contents/MacOS/Claude")
+        ], signing: ["/Applications/Claude.app": CodeSigning(signature: .otherSigner, identifier: "com.anthropic.claude", teamID: "Q6L2SF6YDW")])
+        let suite = ClientIdentityResolver(
+            reader: tree, bridgeBundles: ["/Applications/MurtenUtilities.app", "/Applications/Coreography.app"]
+        )
+        XCTAssertEqual(suite.identity(ofPeer: 50)?.key, "team:Q6L2SF6YDW/com.anthropic.claude")
+
+        let suiteOnly = ClientIdentityResolver(reader: tree, bridgeBundles: ["/Applications/MurtenUtilities.app"])
+        XCTAssertEqual(suiteOnly.identity(ofPeer: 50)?.displayName, "Coreography",
+                       "without the standalone bundle listed, its CLI would be taken for the client")
+    }
+
     /// Approvals answered together must not open more sessions than the cap.
     @MainActor
     func testApprovalsWaitingTogetherStillRespectTheSessionCap() async throws {

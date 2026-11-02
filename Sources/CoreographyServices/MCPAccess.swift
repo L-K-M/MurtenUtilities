@@ -73,10 +73,17 @@ public final class MCPAccess {
     @ObservationIgnored private var lastUseSaved: Date?
     private static let lastUseSaveInterval: TimeInterval = 60
 
-    public convenience init(version: String, snapshot: @escaping @MainActor @Sendable () -> DiagnosticSnapshot) {
+    /// - Parameters:
+    ///   - defaults: where the switch and grants are kept.
+    ///   - bridgeBundles: app bundles whose `coreo` is the bridge, never
+    ///     the client; the host's own bundle is always one of them.
+    public convenience init(
+        version: String, snapshot: @escaping @MainActor @Sendable () -> DiagnosticSnapshot,
+        defaults: UserDefaults = .standard, bridgeBundles: [String] = []
+    ) {
         self.init(
-            version: version, snapshot: snapshot, socketPath: MCPEndpoint.defaultPath, defaults: .standard,
-            resolver: ClientIdentityResolver(), currentUser: UInt32(getuid())
+            version: version, snapshot: snapshot, socketPath: MCPEndpoint.defaultPath, defaults: defaults,
+            resolver: ClientIdentityResolver(bridgeBundles: bridgeBundles), currentUser: UInt32(getuid())
         )
     }
 
@@ -93,6 +100,12 @@ public final class MCPAccess {
         isEnabled = defaults.bool(forKey: Self.enabledKey)
         grants = (defaults.data(forKey: Self.grantsKey)).flatMap { try? JSONDecoder().decode([MCPGrant].self, from: $0) } ?? []
         if isEnabled { startListening() }
+    }
+
+    /// Whether access was left on, read without starting a listener, so a
+    /// host can decide to create the model behind it at launch.
+    public static func isEnabled(in defaults: UserDefaults) -> Bool {
+        defaults.bool(forKey: enabledKey)
     }
 
     /// Turning access off closes every session and refuses further requests.

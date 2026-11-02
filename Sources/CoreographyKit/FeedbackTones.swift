@@ -15,7 +15,9 @@ public final class FeedbackTones {
     /// Synthesized once per cue: each is the same every time.
     private var cache: [String: [Float]] = [:]
 
-    public convenience init() { self.init(output: AudioToneDriver(), defaults: .standard) }
+    /// - Parameter defaults: holds the app's own switch; its search list
+    ///   must include the global domain, where macOS keeps its own.
+    public convenience init(defaults: UserDefaults = .standard) { self.init(output: AudioToneDriver(), defaults: defaults) }
 
     init(output: any TonePlaying, defaults: UserDefaults) {
         self.output = output

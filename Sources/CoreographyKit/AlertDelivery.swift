@@ -9,8 +9,6 @@ public actor AlertDelivery {
     private let poster: any NotificationPosting
     private var permitted: Bool?
 
-    public init() { self.init(poster: UserNotificationDriver()) }
-
     init(poster: any NotificationPosting) { self.poster = poster }
 
     /// Returns false when permission is denied or posting fails; alerts still tint and mark.
