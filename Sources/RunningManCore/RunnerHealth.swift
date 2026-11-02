@@ -101,8 +101,11 @@ public enum RunnerHealthCheck {
     /// - Parameters:
     ///   - snapshots: every runner discovery found, with its process and launchd state.
     ///   - skippedDirectories: runner folders the check may not read (privacy-protected).
+    ///   - discoveryComplete: discovery read every candidate it found, so `snapshots` are all
+    ///     the runners there are and a suggestion for any other runner can resolve.
     ///   - memory: updated with this look; the caller keeps it for the next one.
     public static func observation(of snapshots: [RunnerSnapshot], skippedDirectories: [URL] = [],
+                                   discoveryComplete: Bool = false,
                                    memory: inout RunnerHealthMemory, at now: Date) -> WatchObservation {
         memory.record(snapshots, at: now)
 
@@ -138,8 +141,11 @@ public enum RunnerHealthCheck {
                 message: "\(directory.lastPathComponent) is in a folder macOS protects, so the background check skips it. Open RunningMan to check it."))
         }
 
+        // Skipped folders and unreadable runners are listed as failures, so they count as
+        // existing; only runners discovery no longer finds resolve.
         return WatchObservation(moduleID: moduleID, observedAt: now, findings: findings,
-                                completedScopes: completed, failures: failures)
+                                completedScopes: completed, failures: failures,
+                                coverage: discoveryComplete ? .exhaustive : .listed)
     }
 
     /// System services are left out: RunningMan only observes them and cannot restart them.

@@ -11,10 +11,14 @@ public struct RunnerStateReading: Sendable {
     public var snapshots: [RunnerSnapshot]
     /// Candidate runner folders left unread because macOS protects them.
     public var skippedDirectories: [URL]
+    /// Discovery read every candidate it found (no unreadable runner settings, no folder
+    /// listing cut short), so `snapshots` are all the runners there are.
+    public var discoveryComplete: Bool
 
-    public init(snapshots: [RunnerSnapshot], skippedDirectories: [URL] = []) {
+    public init(snapshots: [RunnerSnapshot], skippedDirectories: [URL] = [], discoveryComplete: Bool = false) {
         self.snapshots = snapshots
         self.skippedDirectories = skippedDirectories
+        self.discoveryComplete = discoveryComplete
     }
 }
 
@@ -56,7 +60,8 @@ public struct RunnerHealthProbe: RunnerStateProbing {
     public func read(additionalDirectories: [URL]) async -> RunnerStateReading {
         let found = await discovery.discover(additionalDirectories: additionalDirectories)
         let snapshots = await controller.snapshots(for: found.runners, allowRemoteActivity: false)
-        return RunnerStateReading(snapshots: snapshots, skippedDirectories: found.skippedDirectories)
+        return RunnerStateReading(snapshots: snapshots, skippedDirectories: found.skippedDirectories,
+                                  discoveryComplete: found.warnings.isEmpty)
     }
 }
 

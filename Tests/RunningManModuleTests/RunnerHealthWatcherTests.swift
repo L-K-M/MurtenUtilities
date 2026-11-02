@@ -59,6 +59,29 @@ final class RunnerHealthWatcherTests: XCTestCase {
         XCTAssertEqual(observation.completedScopes, [FindingScope(online.id)])
     }
 
+    func testACompleteReadingRetiresSuggestionsOfRunnersThatAreGone() async {
+        let probe = FixtureProbe()
+        let clock = FixtureClock(start)
+        var ledger = SuggestionLedger()
+        let removed = snapshot("removed", status: .stopped, startsAtLogin: true)
+        let first = makeWatcher(probe, memory: RunnerHealthMemoryStore(), clock: clock)
+        probe.set([removed])
+        _ = await first.observe()
+        clock.advance(by: 15 * 60)
+        let opened = await first.observe()
+        ledger.apply(opened, rule: RunnerOfflineRule())
+
+        // A relaunch starts with empty memory; the runner was deleted meanwhile.
+        let relaunched = makeWatcher(probe, memory: RunnerHealthMemoryStore(), clock: clock)
+        probe.set([], complete: true)
+        clock.advance(by: 15 * 60)
+        let after = await relaunched.observe()
+        ledger.apply(after, rule: RunnerOfflineRule())
+
+        let key = SuggestionKey(moduleID: "runningman", condition: "runner-offline", scope: FindingScope(removed.id))
+        XCTAssertEqual(ledger.records[key]?.isActive, false)
+    }
+
     func testImportedFoldersAreReadOnEveryCheck() async {
         let probe = FixtureProbe()
         let folder = URL(fileURLWithPath: "/Users/example/Elsewhere/runner")
@@ -119,8 +142,10 @@ final class FixtureProbe: RunnerStateProbing, @unchecked Sendable {
     private var requests: [[URL]] = []
     var delay: Duration?
 
-    func set(_ snapshots: [RunnerSnapshot], skipped: [URL] = []) {
-        lock.withLock { reading = RunnerStateReading(snapshots: snapshots, skippedDirectories: skipped) }
+    func set(_ snapshots: [RunnerSnapshot], skipped: [URL] = [], complete: Bool = false) {
+        lock.withLock {
+            reading = RunnerStateReading(snapshots: snapshots, skippedDirectories: skipped, discoveryComplete: complete)
+        }
     }
 
     var requestedDirectories: [[URL]] { lock.withLock { requests } }

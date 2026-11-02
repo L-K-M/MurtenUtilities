@@ -133,8 +133,7 @@ struct RunnerMenuView: View {
     }
 
     @Environment(AppModel.self) private var model
-    @Environment(\.openWindow) private var openWindow
-    /// Opens a RunningMan route in the suite's window.
+    /// Opens a RunningMan route in the suite's window and brings that window forward.
     let open: @MainActor (ModuleRoute) -> Void
 
     var body: some View {
@@ -206,9 +205,6 @@ struct RunnerMenuView: View {
         model.show(runnerID: runnerID)
         open(runnerID.map(RunnerOfflineRule.route(forRunner:))
              ?? ModuleRoute(moduleID: RunnerHealthCheck.moduleID, action: RunnerOfflineRule.routeAction))
-        // The module context opens the pane but cannot bring a closed window back.
-        openWindow(id: ShellWindow.homeID)
-        NSApp.activate()
     }
 
     /// Only facts worth acting on: a queue count appears when it is known and not zero,
@@ -236,12 +232,6 @@ struct RunnerMenuView: View {
         default: return snapshot.status.title
         }
     }
-}
-
-/// The suite shell's home window. Modules do not depend on the shell, so its scene id is
-/// repeated here; the menu section needs it to bring a closed window back.
-enum ShellWindow {
-    static let homeID = "home"
 }
 
 /// A runner action from the menu that needs confirmation (interrupting a job, removing a

@@ -134,6 +134,34 @@ final class RunnerHealthTests: XCTestCase {
         XCTAssertEqual(observation.outcome, .unavailable)
     }
 
+    func testACompleteDiscoveryListsEveryRunnerThereIs() {
+        var memory = RunnerHealthMemory()
+        let runner = snapshot("builder", status: .idle, processID: 3)
+        XCTAssertEqual(RunnerHealthCheck.observation(of: [runner], memory: &memory, at: start).coverage, .listed)
+        XCTAssertEqual(RunnerHealthCheck.observation(of: [runner], discoveryComplete: true, memory: &memory, at: start).coverage,
+                       .exhaustive)
+    }
+
+    /// After a relaunch the memory is empty, so only an exhaustive look can retire the
+    /// suggestion of a runner that was removed while the suite was not running.
+    func testASuggestionForARemovedRunnerResolvesAfterARelaunch() {
+        var ledger = SuggestionLedger()
+        var memory = RunnerHealthMemory()
+        let removed = snapshot("removed", status: .stopped, startsAtLogin: true)
+        let kept = snapshot("kept", status: .idle, processID: 3)
+        _ = RunnerHealthCheck.observation(of: [removed, kept], memory: &memory, at: start)
+        ledger.apply(RunnerHealthCheck.observation(of: [removed, kept], memory: &memory, at: start + 900), rule: rule)
+        let key = SuggestionKey(moduleID: "runningman", condition: RunnerHealthCheck.condition, scope: FindingScope(removed.id))
+        XCTAssertEqual(ledger.records[key]?.isActive, true)
+
+        var relaunched = RunnerHealthMemory()
+        ledger.apply(RunnerHealthCheck.observation(of: [kept], memory: &relaunched, at: start + 1800), rule: rule)
+        XCTAssertEqual(ledger.records[key]?.isActive, true, "A partial look proves nothing about the removed runner")
+        ledger.apply(RunnerHealthCheck.observation(of: [kept], discoveryComplete: true, memory: &relaunched, at: start + 2700),
+                     rule: rule)
+        XCTAssertEqual(ledger.records[key]?.isActive, false)
+    }
+
     // MARK: - Rule
 
     func testRuleOpensAtTenMinutesAndNamesTheRunner() throws {

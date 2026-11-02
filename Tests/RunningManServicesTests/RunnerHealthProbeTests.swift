@@ -31,6 +31,7 @@ final class RunnerHealthProbeTests: XCTestCase {
         XCTAssertEqual(reading.snapshots.first?.status, .stopped)
         XCTAssertEqual(reading.snapshots.first?.startsAtLogin, true)
         XCTAssertEqual(reading.skippedDirectories.map(\.path), [protected.path])
+        XCTAssertTrue(reading.discoveryComplete)
 
         let commands = await fake.recorded()
         XCTAssertFalse(commands.isEmpty)
@@ -54,6 +55,18 @@ final class RunnerHealthProbeTests: XCTestCase {
 
         XCTAssertEqual(reading.snapshots.first?.processID, 4242)
         XCTAssertEqual(reading.snapshots.first.map(RunnerHealthState.init), .online)
+    }
+
+    func testUnreadableRunnerSettingsMakeTheReadingIncomplete() async throws {
+        let broken = home.appendingPathComponent("actions-runners/broken-mac")
+        try writeGitHubRunner(at: broken, label: label)
+        try Data("not json".utf8).write(to: broken.appendingPathComponent(".runner"))
+        let probe = RunnerHealthProbe(homeDirectory: home, systemDaemonsDirectory: nil, executor: FakeExecutor(), userID: getuid())
+
+        let reading = await probe.read(additionalDirectories: [])
+
+        XCTAssertTrue(reading.snapshots.isEmpty)
+        XCTAssertFalse(reading.discoveryComplete, "A runner that could not be read may still exist")
     }
 
     func testNoRunnersRunNoCommands() async {

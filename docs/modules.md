@@ -324,7 +324,9 @@ SwiftPM.
   RunningMan. Disabled runners, system services and runners stopped from the
   pane are not reported; unreadable state and skipped folders are reported as
   not checked. Evidence: the time it was first seen offline (memory only, so
-  after a relaunch the count starts at the first check).
+  after a relaunch the count starts at the first check). When discovery read
+  every candidate, the observation is exhaustive, so a suggestion for a runner
+  removed in the meantime resolves.
 - **Rule:** offline for 10 minutes or more → "<runner> has been offline for N
   min — restart?"; the suggestion stays until the runner is online again.
   Route: `runningman/runner?id=<runner folder>`.
@@ -335,8 +337,9 @@ SwiftPM.
   `com.runningman.forgejo-api` and the launchd labels
   `ch.lkmc.RunningMan.forgejo.*` are read in place and shared with the
   standalone app. Preferences use the suite's module store under their old
-  keys and start at their defaults: imported runner folders and the Forgejo
-  server list are not carried over from the standalone app.
+  keys. While that store has no imported runner folders and no Forgejo
+  servers, the pane offers once to import both from the standalone app's
+  domain (`ch.lkmc.RunningMan`); the standalone domain is only read.
 
 ### Coreography — effort: medium — phase 3
 

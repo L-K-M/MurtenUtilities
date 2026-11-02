@@ -19,7 +19,7 @@ actor RunnerHealthMemoryStore {
 
     func observation(of reading: RunnerStateReading, at date: Date) -> WatchObservation {
         RunnerHealthCheck.observation(of: reading.snapshots, skippedDirectories: reading.skippedDirectories,
-                                      memory: &memory, at: date)
+                                      discoveryComplete: reading.discoveryComplete, memory: &memory, at: date)
     }
 
     var entries: [String: RunnerHealthMemory.Entry] { memory.entries }
