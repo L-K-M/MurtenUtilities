@@ -62,7 +62,14 @@ let obtainintoshTargets: [Target] = []
 let obtainintoshModule: [Target.Dependency] = []
 
 // MARK: RunningMan
-let runningManTargets: [Target] = []
+// Core and Services keep the standalone app's names and Swift 5 mode; the
+// app target became RunningManModule (docs/modules.md, RunningMan).
+let runningManTargets: [Target] = [
+    .target(name: "RunningManCore", dependencies: ["MurtenCore"]),
+    .target(name: "RunningManServices", dependencies: ["RunningManCore"]),
+    .testTarget(name: "RunningManCoreTests", dependencies: ["RunningManCore", "MurtenCore"]),
+    .testTarget(name: "RunningManServicesTests", dependencies: ["RunningManCore", "RunningManServices"])
+]
 let runningManModule: [Target.Dependency] = []
 
 // MARK: Coreography
