@@ -31,6 +31,9 @@ public actor SuggestionStore {
 
     /// The last save failure, if any. The store keeps working in memory.
     public private(set) var persistenceError: String?
+    /// Set when an unreadable file could not be moved aside: saving would
+    /// overwrite it, so the store stays in memory for this session.
+    private var savingSuspended = false
 
     public init(persistence: any SuggestionPersisting, knownModules: Set<String>,
                 retention: RetentionPolicy = .standard, throttle: NotificationThrottle = .standard) {
@@ -52,8 +55,14 @@ public actor SuggestionStore {
             outcome = .restored(records: saved.records.count)
         } catch {
             ledger = SuggestionLedger()
-            let quarantined = try? persistence.quarantine()
-            outcome = .recovered(quarantinedAt: quarantined, reason: String(describing: error))
+            do {
+                let quarantined = try persistence.quarantine()
+                outcome = .recovered(quarantinedAt: quarantined, reason: String(describing: error))
+            } catch let moveError {
+                savingSuspended = true
+                persistenceError = "The unreadable suggestions file could not be moved aside (\(moveError)); changes are not saved."
+                outcome = .recovered(quarantinedAt: nil, reason: String(describing: error))
+            }
         }
 
         ledger.prune(at: now, policy: retention, throttle: throttle, knownModules: knownModules)
@@ -136,6 +145,7 @@ public actor SuggestionStore {
     }
 
     private func persist() {
+        guard !savingSuspended else { return }
         do {
             try persistence.save(ledger)
             persistenceError = nil
@@ -203,9 +213,10 @@ public struct JSONFileSuggestionPersistence: SuggestionPersisting {
     public func quarantine() throws -> URL? {
         guard FileManager.default.fileExists(atPath: fileURL.path) else { return nil }
 
+        // Timestamp for people, UUID so two recoveries never collide.
         let stamp = Int(Date().timeIntervalSince1970)
         let destination = fileURL.deletingLastPathComponent()
-            .appendingPathComponent("suggestions.unreadable-\(stamp).json")
+            .appendingPathComponent("suggestions.unreadable-\(stamp)-\(UUID().uuidString.prefix(8)).json")
         try FileManager.default.moveItem(at: fileURL, to: destination)
         return destination
     }

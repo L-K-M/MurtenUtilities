@@ -34,7 +34,9 @@ public struct RootView: View {
         }
         .frame(minWidth: 880, minHeight: 600)
         .background(WindowFronting(requests: model.windowRequests))
-        .task { await model.start() }
+        // Normally the app delegate has started the model already. An
+        // unstructured task, so closing the window cannot cancel start-up.
+        .onAppear { Task { await model.start() } }
     }
 }
 

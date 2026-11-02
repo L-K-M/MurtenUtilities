@@ -25,6 +25,9 @@ public struct WatchSchedule: Sendable {
         public var nextDue: Date
         public var consecutiveFailures = 0
         public var inFlight = false
+        /// Asked to poll again while a poll was running; the running poll
+        /// may have read state from before the change.
+        public var expediteAfterFlight = false
     }
 
     public private(set) var entries: [String: Entry] = [:]
@@ -72,6 +75,10 @@ public struct WatchSchedule: Sendable {
             let delay = min(entry.interval * factor, max(Self.maximumBackoff, entry.interval))
             entry.nextDue = now.addingTimeInterval(delay)
         }
+        if entry.expediteAfterFlight {
+            entry.expediteAfterFlight = false
+            entry.nextDue = now
+        }
         entries[moduleID] = entry
     }
 
@@ -83,7 +90,12 @@ public struct WatchSchedule: Sendable {
 
     /// Requests a prompt poll, e.g. after the user acted in the module's pane.
     public mutating func expedite(_ moduleID: String, at now: Date) {
-        guard let entry = entries[moduleID], entry.nextDue > now else { return }
+        guard let entry = entries[moduleID] else { return }
+        if entry.inFlight {
+            entries[moduleID]?.expediteAfterFlight = true
+            return
+        }
+        guard entry.nextDue > now else { return }
         entries[moduleID]?.nextDue = now
     }
 

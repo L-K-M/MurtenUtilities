@@ -12,7 +12,7 @@ private actor Inbox {
 
 /// A watcher whose polls the test releases one at a time.
 private final class GatedWatcher: Watcher, @unchecked Sendable {
-    let moduleID = dockvac
+    let moduleID: String
     let cadence: WatchCadence
     private let clock: ManualClock
     private let lock = NSLock()
@@ -20,7 +20,8 @@ private final class GatedWatcher: Watcher, @unchecked Sendable {
     private var cancelled = 0
     private var pending: [CheckedContinuation<Void, Never>] = []
 
-    init(clock: ManualClock, timeout: TimeInterval = 60) {
+    init(clock: ManualClock, timeout: TimeInterval = 60, moduleID: String = dockvac) {
+        self.moduleID = moduleID
         self.clock = clock
         cadence = WatchCadence(interval: 30 * 60, timeout: timeout)
     }
@@ -37,6 +38,19 @@ private final class GatedWatcher: Watcher, @unchecked Sendable {
         waiting.forEach { $0.resume() }
     }
 
+    /// Resumes at once when cancellation already happened, so a cancel that
+    /// lands before registration cannot strand the poll.
+    private func enqueue(_ continuation: CheckedContinuation<Void, Never>) {
+        lock.lock()
+        if Task.isCancelled {
+            lock.unlock()
+            continuation.resume()
+            return
+        }
+        pending.append(continuation)
+        lock.unlock()
+    }
+
     private func recordStart() {
         lock.lock(); started += 1; lock.unlock()
     }
@@ -46,7 +60,7 @@ private final class GatedWatcher: Watcher, @unchecked Sendable {
 
         await withTaskCancellationHandler {
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                lock.lock(); pending.append(continuation); lock.unlock()
+                enqueue(continuation)
             }
         } onCancel: {
             self.lock.lock(); self.cancelled += 1; self.lock.unlock()
@@ -55,6 +69,40 @@ private final class GatedWatcher: Watcher, @unchecked Sendable {
 
         return .complete(moduleID: moduleID, at: clock.now(),
                          findings: [Finding(moduleID: moduleID, condition: "reclaimable", observedAt: clock.now())])
+    }
+}
+
+/// A watcher that ignores cancellation until the test releases it.
+private final class StubbornWatcher: Watcher, @unchecked Sendable {
+    let moduleID = "stubborn"
+    let cadence = WatchCadence(interval: 30 * 60, timeout: 60)
+    private let clock: ManualClock
+    private let lock = NSLock()
+    private var started = 0
+    private var pending: [CheckedContinuation<Void, Never>] = []
+
+    init(clock: ManualClock) {
+        self.clock = clock
+    }
+
+    var startedCount: Int { lock.lock(); defer { lock.unlock() }; return started }
+    var waitingCount: Int { lock.lock(); defer { lock.unlock() }; return pending.count }
+
+    func release() {
+        lock.lock()
+        let waiting = pending
+        pending = []
+        lock.unlock()
+        waiting.forEach { $0.resume() }
+    }
+
+    private func enqueue(_ continuation: CheckedContinuation<Void, Never>) {
+        lock.lock(); started += 1; pending.append(continuation); lock.unlock()
+    }
+
+    func observe() async -> WatchObservation {
+        await withCheckedContinuation { enqueue($0) }
+        return .complete(moduleID: moduleID, at: clock.now())
     }
 }
 
@@ -169,6 +217,106 @@ final class WatchCoordinatorTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 50_000_000)
 
         XCTAssertEqual(watcher.startedCount, 0)
+        await coordinator.setEnabled([])
+    }
+
+    func testWaitsQuietlyWhileEveryPollSlotIsBusy() async {
+        let clock = ManualClock()
+        let watchers = ["a", "b", "c"].map { GatedWatcher(clock: clock, timeout: 24 * 3600, moduleID: $0) }
+        let inbox = Inbox()
+        let coordinator = WatchCoordinator(
+            registrations: watchers.map { WatcherRegistration(watcher: $0, rule: AlwaysRule()) },
+            clock: clock, gate: { _ in .open }, sink: { observation, _ in await inbox.add(observation) })
+
+        await coordinator.setEnabled(["a", "b", "c"])
+        _ = await eventually { clock.sleeperCount >= 1 }
+        clock.advance(by: WatchSchedule.initialDelay)
+        let twoRunning = await eventually { watchers.map(\.waitingCount).reduce(0, +) == WatchCoordinator.maximumConcurrentPolls }
+        XCTAssertTrue(twoRunning)
+
+        // The third poll is due but has no slot: the loop must wait, not spin.
+        let callsBefore = clock.sleepCalls
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertLessThan(clock.sleepCalls - callsBefore, 5)
+
+        // A finished poll frees a slot for the waiting one.
+        watchers.first { $0.waitingCount == 1 }?.releaseAll()
+        let thirdStarted = await eventually { watchers.allSatisfy { $0.startedCount == 1 } }
+        XCTAssertTrue(thirdStarted)
+        await coordinator.setEnabled([])
+    }
+
+    func testTimeoutFreesTheSlotEvenIfTheWatcherIgnoresCancellation() async {
+        let clock = ManualClock()
+        let stubborn = StubbornWatcher(clock: clock)
+        let inbox = Inbox()
+        let coordinator = WatchCoordinator(
+            registrations: [WatcherRegistration(watcher: stubborn, rule: AlwaysRule())],
+            clock: clock, gate: { _ in .open }, sink: { observation, _ in await inbox.add(observation) })
+
+        await coordinator.setEnabled(["stubborn"])
+        _ = await eventually { clock.sleeperCount >= 1 }
+        clock.advance(by: WatchSchedule.initialDelay)
+        _ = await eventually { stubborn.waitingCount == 1 }
+
+        clock.advance(by: 60)
+        let timedOut = await eventually { await inbox.observations.first?.failures.first?.kind == .timedOut }
+        XCTAssertTrue(timedOut, "the timeout must report even when the watcher keeps running")
+        let inFlight = await coordinator.pollsInFlight
+        XCTAssertTrue(inFlight.isEmpty, "the slot is free again")
+
+        // Its next turn comes, but the abandoned poll is still running: no overlap.
+        clock.advance(by: 30 * 60)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(stubborn.startedCount, 1)
+
+        // Once the abandoned poll ends, the watcher runs again.
+        stubborn.release()
+        _ = await eventually { await coordinator.pollsAbandoned.isEmpty }
+        clock.advance(by: WatchSchedule.pauseRecheckInterval)
+        let restarted = await eventually { stubborn.startedCount == 2 }
+        XCTAssertTrue(restarted)
+        stubborn.release()
+        await coordinator.setEnabled([])
+    }
+
+    func testExpediteDuringAPollRunsAgainRightAfter() async {
+        let clock = ManualClock()
+        let watcher = GatedWatcher(clock: clock, timeout: 24 * 3600)
+        let inbox = Inbox()
+        let coordinator = makeCoordinator(watcher: watcher, clock: clock, inbox: inbox)
+
+        await coordinator.setEnabled([dockvac])
+        _ = await eventually { clock.sleeperCount >= 1 }
+        clock.advance(by: WatchSchedule.initialDelay)
+        _ = await eventually { watcher.waitingCount == 1 }
+
+        // A repair happened while the poll was reading the old state.
+        await coordinator.expedite(dockvac)
+        watcher.releaseAll()
+        let again = await eventually { watcher.startedCount == 2 }
+        XCTAssertTrue(again)
+        watcher.releaseAll()
+        await coordinator.setEnabled([])
+    }
+
+    func testReenablingRightAfterDisablingStillWakesOnSignals() async {
+        let clock = ManualClock()
+        let watcher = GatedWatcher(clock: clock)
+        let inbox = Inbox()
+        let coordinator = makeCoordinator(watcher: watcher, clock: clock, inbox: inbox)
+
+        await coordinator.setEnabled([dockvac])
+        _ = await eventually { clock.sleeperCount >= 1 }
+        await coordinator.setEnabled([])
+        await coordinator.setEnabled([dockvac])
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        // Expedite must wake the new loop rather than wait out the 15 min idle sleep.
+        await coordinator.expedite(dockvac)
+        let polled = await eventually { watcher.waitingCount == 1 }
+        XCTAssertTrue(polled)
+        watcher.releaseAll()
         await coordinator.setEnabled([])
     }
 

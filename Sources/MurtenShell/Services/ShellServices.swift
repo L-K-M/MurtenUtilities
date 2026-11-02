@@ -22,6 +22,9 @@ public protocol SuggestionNotifying: AnyObject {
     var onOpen: ((URL) -> Void)? { get set }
     func requestAuthorization() async -> NotificationAuthorization
     func deliver(_ suggestion: Suggestion, moduleName: String)
+    /// Withdraws delivered notifications of these modules, so none outlives
+    /// the user turning them (or the companion) off.
+    func withdraw(modules moduleIDs: Set<String>)
 }
 
 /// Samples power, network and time for the watch gate.
