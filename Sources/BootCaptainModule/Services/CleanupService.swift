@@ -157,8 +157,12 @@ final class CleanupService: ObservableObject {
 
     private func removeLoginItem(_ candidate: CleanupPlanner.Candidate) async {
         guard let path = candidate.sourcePath else { return }
-        let script = "tell application \"System Events\" to delete (every login item whose path is \"\(path)\")"
-        let outcome = await runAppleScript(script,
+        guard let arguments = LoginItemScript.removal(path: path) else {
+            recordResult(candidate, inverse: nil, outcome: ActionOutcome(
+                status: .aborted, message: "The login item's path is not absolute; nothing was changed."))
+            return
+        }
+        let outcome = await runAppleScript(arguments,
             success: "Removed the login item. Undo re-adds it.",
             failure: "Could not remove the login item (System Events automation may need approval).")
         let inverse = ActionRequest(operation: .restoreFromVault, itemID: candidate.itemID,
@@ -170,15 +174,17 @@ final class CleanupService: ObservableObject {
         guard let path else {
             return ActionOutcome(status: .aborted, message: "No path recorded.")
         }
-        let script = "tell application \"System Events\" to make login item at end with properties {path:\"\(path)\", hidden:false}"
-        return await runAppleScript(script,
+        guard let arguments = LoginItemScript.restoration(path: path) else {
+            return ActionOutcome(status: .aborted, message: "The recorded path is not absolute; nothing was changed.")
+        }
+        return await runAppleScript(arguments,
             success: "Login item restored.",
             failure: "Could not restore the login item.")
     }
 
-    private func runAppleScript(_ script: String, success: String, failure: String) async -> ActionOutcome {
+    private func runAppleScript(_ arguments: [String], success: String, failure: String) async -> ActionOutcome {
         await Task.detached(priority: .userInitiated) {
-            let result = ProcessRunner().run("/usr/bin/osascript", ["-e", script], timeout: 20)
+            let result = ProcessRunner().run(LoginItemScript.executable, arguments, timeout: 20)
             return result.succeeded
                 ? ActionOutcome(status: .committed, message: success)
                 : ActionOutcome(status: .indeterminate,
