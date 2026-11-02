@@ -191,7 +191,11 @@ public struct ActivityEvent: Identifiable, Codable, Hashable, Sendable {
 public struct DiscoveryResult: Sendable {
     public var runners: [InstalledRunner]
     public var warnings: [String]
-    public init(runners: [InstalledRunner] = [], warnings: [String] = []) { self.runners = runners; self.warnings = warnings }
+    /// Candidate folders inside the discovery's excluded folders, left unread.
+    public var skippedDirectories: [URL]
+    public init(runners: [InstalledRunner] = [], warnings: [String] = [], skippedDirectories: [URL] = []) {
+        self.runners = runners; self.warnings = warnings; self.skippedDirectories = skippedDirectories
+    }
 }
 
 public struct LogScanResult: Sendable {

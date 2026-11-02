@@ -17,14 +17,21 @@ public actor RunnerDiscovery {
     private let homeDirectory: URL
     private let systemDaemonsDirectory: URL?
     private let userName: String
+    /// Folders whose contents this discovery never touches; see `init`.
+    private let excludedFolders: [URL]
     private let fileManager = FileManager.default
     /// System services are opt-in, so a synthetic home directory never picks up
     /// the machine's real LaunchDaemons. The app passes `systemDaemonsDirectory`.
+    /// A background check passes `excludedFolders`, e.g. Documents: a candidate
+    /// inside one is reported in `skippedDirectories` without reading anything in
+    /// it, because a read there can make macOS ask for access.
     public init(homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
-                systemDaemonsDirectory: URL? = nil, userName: String = NSUserName()) {
+                systemDaemonsDirectory: URL? = nil, userName: String = NSUserName(),
+                excludedFolders: [URL] = []) {
         self.homeDirectory = homeDirectory.standardizedFileURL
         self.systemDaemonsDirectory = systemDaemonsDirectory?.standardizedFileURL
         self.userName = userName
+        self.excludedFolders = excludedFolders.map(\.standardizedFileURL)
     }
 
     public func discover(additionalDirectories: [URL] = []) -> DiscoveryResult {
@@ -59,7 +66,7 @@ public actor RunnerDiscovery {
             includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]) {
             for file in limitedListing(files.filter({ $0.pathExtension == "plist" }), of: agents, kind: .services, warnings: &warnings) {
                 guard let plist = Self.plist(at: file), let label = plist["Label"] as? String else { continue }
-                if let forgejo = Self.forgejoService(plist) {
+                if let forgejo = Self.forgejoService(plist, excludedFolders: excludedFolders) {
                     candidates.insert(forgejo.directory)
                     forgejoServices[forgejo.directory] = forgejo
                     continue
@@ -90,7 +97,8 @@ public actor RunnerDiscovery {
             includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]) {
             for file in limitedListing(files.filter({ $0.pathExtension == "plist" }), of: systemDaemonsDirectory, kind: .services, warnings: &warnings) {
                 guard let plist = Self.plist(at: file), plist["UserName"] as? String == userName,
-                      var forgejo = Self.forgejoService(plist), systemServices[forgejo.directory] == nil else { continue }
+                      var forgejo = Self.forgejoService(plist, excludedFolders: excludedFolders),
+                      systemServices[forgejo.directory] == nil else { continue }
                 forgejo.serviceDomain = .system
                 candidates.insert(forgejo.directory)
                 systemServices[forgejo.directory] = forgejo
@@ -98,8 +106,11 @@ public actor RunnerDiscovery {
         }
         var runners: [InstalledRunner] = []
         var resolved = Set<String>()
+        var skipped: [URL] = []
         for directory in candidates.sorted(by: { $0.path < $1.path }) {
+            guard !Self.isInside(directory, excludedFolders) else { skipped.append(directory); continue }
             let canonical = directory.resolvingSymlinksInPath().standardizedFileURL
+            guard !Self.isInside(canonical, excludedFolders) else { skipped.append(directory); continue }
             guard !resolved.contains(canonical.path) else { continue }
             let descriptorURL = canonical.appendingPathComponent(RunnerInstallationDescriptor.fileName)
             if fileManager.fileExists(atPath: descriptorURL.path) {
@@ -173,7 +184,14 @@ public actor RunnerDiscovery {
                 warnings.append("Could not read runner settings in \(directory.lastPathComponent): \(error.localizedDescription)")
             }
         }
-        return DiscoveryResult(runners: runners.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }, warnings: warnings)
+        return DiscoveryResult(runners: runners.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }, warnings: warnings,
+                               skippedDirectories: skipped)
+    }
+
+    /// Path comparison only: deciding must not touch the folder itself.
+    private static func isInside(_ url: URL, _ folders: [URL]) -> Bool {
+        let path = url.standardizedFileURL.path
+        return folders.contains { path == $0.path || path.hasPrefix($0.path + "/") }
     }
 
     /// Returns at most `listingLimit` entries in name order, so the inspected subset
@@ -199,7 +217,7 @@ public actor RunnerDiscovery {
         return (folder.hasPrefix("/") ? URL(fileURLWithPath: folder) : directory.appendingPathComponent(folder)).standardizedFileURL
     }
 
-    private static func forgejoService(_ plist: [String: Any]) -> InstalledRunner? {
+    private static func forgejoService(_ plist: [String: Any], excludedFolders: [URL] = []) -> InstalledRunner? {
         guard let label = plist["Label"] as? String,
               let arguments = plist["ProgramArguments"] as? [String], let first = arguments.first,
               first.hasPrefix("/"), let configPath = ForgejoDaemonCommand.parse(arguments: arguments) else { return nil }
@@ -210,7 +228,9 @@ public actor RunnerDiscovery {
         let config: URL?
         if configPath.hasPrefix("/") { config = URL(fileURLWithPath: configPath).standardizedFileURL }
         else { config = working?.appendingPathComponent(configPath).standardizedFileURL }
-        let directory = (working ?? config?.deletingLastPathComponent() ?? executable.deletingLastPathComponent()).resolvingSymlinksInPath().standardizedFileURL
+        let unresolved = (working ?? config?.deletingLastPathComponent() ?? executable.deletingLastPathComponent()).standardizedFileURL
+        // Resolving links reads the folder; an excluded one stays as written and is skipped later.
+        let directory = isInside(unresolved, excludedFolders) ? unresolved : unresolved.resolvingSymlinksInPath().standardizedFileURL
         let diagnosticURLs = ["StandardOutPath", "StandardErrorPath"].compactMap { plist[$0] as? String }.compactMap { value -> URL? in
             guard value.hasPrefix("/"), URL(fileURLWithPath: value).pathExtension.lowercased() == "log" else { return nil }
             return URL(fileURLWithPath: value).standardizedFileURL
