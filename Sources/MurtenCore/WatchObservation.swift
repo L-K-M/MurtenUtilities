@@ -37,7 +37,7 @@ public struct ObservationFailure: Hashable, Codable, Sendable, Error {
 ///     endpoint A: completed, reclaimable 8 GB   → finding, scope completed
 ///     endpoint B: completed, nothing to report  → scope completed, no finding
 ///     endpoint C: socket refused                → failure for scope C
-public struct Observation: Sendable {
+public struct WatchObservation: Sendable {
     public enum Outcome: Equatable, Sendable {
         case complete
         case partial
@@ -62,15 +62,15 @@ public struct Observation: Sendable {
     /// Every listed scope was checked; findings may be empty.
     public static func complete(moduleID: String, at date: Date,
                                 scopes: Set<FindingScope> = [.local],
-                                findings: [Finding] = []) -> Observation {
-        Observation(moduleID: moduleID, observedAt: date, findings: findings,
+                                findings: [Finding] = []) -> WatchObservation {
+        WatchObservation(moduleID: moduleID, observedAt: date, findings: findings,
                     completedScopes: scopes, failures: [])
     }
 
     /// Nothing could be checked.
     public static func unavailable(moduleID: String, at date: Date,
-                                   _ failure: ObservationFailure) -> Observation {
-        Observation(moduleID: moduleID, observedAt: date, findings: [],
+                                   _ failure: ObservationFailure) -> WatchObservation {
+        WatchObservation(moduleID: moduleID, observedAt: date, findings: [],
                     completedScopes: [], failures: [failure])
     }
 

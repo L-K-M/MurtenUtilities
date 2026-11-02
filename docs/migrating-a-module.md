@@ -96,7 +96,7 @@ Remove these from the migrated code; the suite has exactly one of each:
 - A watcher never writes, never needs privilege and never prompts. A check
   that needs any of those is a pane action.
 - Report every scope it checked; report failures as failures, not as
-  "nothing found" (`Observation`).
+  "nothing found" (`WatchObservation`).
 - Pick a cadence of at least 15 minutes and declare `.network` when the
   check talks to a remote host.
 

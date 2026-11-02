@@ -143,7 +143,7 @@ struct FakeWatcher: Watcher {
     let clock: TestClock
     let bytes: Int64
 
-    func observe() async -> Observation {
+    func observe() async -> WatchObservation {
         let finding = Finding(moduleID: moduleID, condition: "reclaimable", observedAt: clock.now(),
                               evidence: ["bytes": .bytes(bytes)])
         return .complete(moduleID: moduleID, at: clock.now(), findings: [finding])
