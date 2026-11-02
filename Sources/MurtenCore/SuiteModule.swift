@@ -67,7 +67,7 @@ public enum ModuleRegistry {
         SuiteModule(
             id: "obtainintosh", name: "Obtainintosh",
             summary: "Track updates for apps and fonts installed from releases.",
-            systemImage: "arrow.down.circle", sourceRepository: "Obtainintosh"),
+            systemImage: "arrow.down.circle", status: .available, sourceRepository: "Obtainintosh"),
         SuiteModule(
             id: "runningman", name: "RunningMan",
             summary: "Keep self-hosted CI runners alive and signed in.",

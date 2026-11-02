@@ -112,8 +112,30 @@ let zenBackupManagerTargets: [Target] = [
 let zenBackupManagerModule: [Target.Dependency] = ["ZenBackupManagerModule"]
 
 // MARK: Obtainintosh
-let obtainintoshTargets: [Target] = []
-let obtainintoshModule: [Target.Dependency] = []
+// A native port of the Tauri app (docs/modules.md, Obtainintosh).
+let obtainintoshTargets: [Target] = [
+    .target(name: "ObtainintoshCore", dependencies: ["MurtenCore"]),
+    .target(name: "ObtainintoshServices", dependencies: ["ObtainintoshCore", "MurtenCore"]),
+    .target(
+        name: "ObtainintoshModule",
+        dependencies: ["ObtainintoshCore", "ObtainintoshServices", "MurtenCore", "MurtenModuleKit"]
+    ),
+    .testTarget(
+        name: "ObtainintoshCoreTests",
+        dependencies: ["ObtainintoshCore", "MurtenCore"],
+        resources: [.copy("Fixtures")]
+    ),
+    .testTarget(
+        name: "ObtainintoshServicesTests",
+        dependencies: ["ObtainintoshServices", "ObtainintoshCore", "MurtenCore"]
+    ),
+    .testTarget(
+        name: "ObtainintoshModuleTests",
+        dependencies: ["ObtainintoshModule", "ObtainintoshServices", "ObtainintoshCore", "MurtenCore",
+                       "MurtenModuleKit"]
+    )
+]
+let obtainintoshModule: [Target.Dependency] = ["ObtainintoshModule"]
 
 // MARK: RunningMan
 let runningManTargets: [Target] = []
