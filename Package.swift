@@ -61,10 +61,15 @@ let zenBackupManagerModule: [Target.Dependency] = []
 // A native port of the Tauri app (docs/modules.md, Obtainintosh).
 let obtainintoshTargets: [Target] = [
     .target(name: "ObtainintoshCore", dependencies: ["MurtenCore"]),
+    .target(name: "ObtainintoshServices", dependencies: ["ObtainintoshCore", "MurtenCore"]),
     .testTarget(
         name: "ObtainintoshCoreTests",
         dependencies: ["ObtainintoshCore", "MurtenCore"],
         resources: [.copy("Fixtures")]
+    ),
+    .testTarget(
+        name: "ObtainintoshServicesTests",
+        dependencies: ["ObtainintoshServices", "ObtainintoshCore", "MurtenCore"]
     )
 ]
 let obtainintoshModule: [Target.Dependency] = []
