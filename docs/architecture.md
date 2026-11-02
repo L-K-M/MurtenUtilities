@@ -56,9 +56,10 @@ click suggestion ──▶ deep link ──▶ module pane ──▶ explicit co
 ```
 
 - **Watchers** run on a cadence (per-module interval, coalesced). They must be
-  cheap and must not require privilege *to look*. `docker system df` is the
-  canonical example. A check that needs privilege is a tool action, not a
-  watcher.
+  cheap and must not require privilege *to look*. DockVac's check is the
+  canonical example: it reads the Docker Engine API over the local Unix socket
+  or an SSH tunnel, reusing the module's own client rather than shelling out.
+  A check that needs privilege is a tool action, not a watcher.
 - **Rules** turn a finding into at most one suggestion per `key`. Thresholds
   ("≥ 4 GB reclaimable", "≥ 1 runner offline ≥ 10 min") live with the module.
 - **SuggestionStore** dedupes by `key` (a repeated finding refreshes, never
