@@ -186,6 +186,10 @@ public final class AppModel {
         providers[moduleID]?.makeSettings()
     }
 
+    public func window(for request: ModuleWindowRequest) -> AnyView? {
+        providers[request.moduleID]?.makeWindow(request)
+    }
+
     public func defaults(for moduleID: String) -> UserDefaults {
         moduleDefaults[moduleID] ?? .standard
     }

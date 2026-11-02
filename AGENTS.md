@@ -15,14 +15,20 @@ window lists the planned modules, none migrated yet.
 
 ## Tech Stack
 
-- **Language:** Swift 6 toolchain (`swift-tools-version: 6.0`,
-  `swiftLanguageModes: .v5`), macOS 14+ deployment.
+- **Language:** Swift 6 toolchain (`swift-tools-version: 6.2`,
+  `swiftLanguageModes: .v5`), macOS 26+ deployment.
 - **Layout:** `Package.swift` at the root (no `.xcodeproj`):
-  - `Sources/MurtenCore/` — pure logic: `SuiteModule`, `ModuleRegistry`,
-    `Suggestion`, `Watcher`. Everything testable lives here; no AppKit, no
-    process spawning, no privilege.
-  - `Sources/MurtenUtilities/` — the app: SwiftUI scenes (`WindowGroup` home
-    window + `MenuBarExtra` companion) and `NSViewRepresentable` bridges.
+  - `Sources/MurtenCore/` — pure logic: registry, findings, rules, the
+    suggestion ledger and store, routes, settings, the watch coordinator.
+    No AppKit, no process spawning, no privilege; builds on Linux.
+  - `Sources/MurtenModuleKit/` — `SuiteModuleProvider`, the contract every
+    migrated module implements.
+  - `Sources/MurtenShell/` — the app as a testable library: `AppModel`,
+    live services, scenes (`Window` home + opt-in `MenuBarExtra`), views.
+  - `Sources/MurtenUtilities/` — the executable: `@main` and the module
+    catalog (one file per module under `Catalog/`).
+  - `Sources/<Tool>…` — one block of targets per migrated module
+    ([docs/migrating-a-module.md](docs/migrating-a-module.md)).
 - **UI chrome:** [Rigi](https://github.com/L-K-M/Rigi) `RigiUI` — the classic
   AppKit controls shared with Lucerne and Sion — pinned to an **immutable
   commit** in `Package.swift` (Rigi has no tags; bump deliberately). Modules'

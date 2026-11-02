@@ -60,6 +60,10 @@ public protocol SuiteModuleProvider: AnyObject {
     /// The module's own settings tab, or nil when it has none.
     func makeSettings() -> AnyView?
 
+    /// Content for an auxiliary window the pane opened with
+    /// `openWindow(module:)`; nil for an unknown kind.
+    func makeWindow(_ request: ModuleWindowRequest) -> AnyView?
+
     /// Non-nil while quitting would interrupt work, e.g. "A cleanup is still
     /// running." The shell asks before quitting.
     var interruptionWarning: String? { get }
@@ -70,6 +74,7 @@ public extension SuiteModuleProvider {
     var watch: WatcherRegistration? { nil }
     func applicability() async -> Applicability { .applicable }
     func makeSettings() -> AnyView? { nil }
+    func makeWindow(_ request: ModuleWindowRequest) -> AnyView? { nil }
     var interruptionWarning: String? { nil }
 }
 

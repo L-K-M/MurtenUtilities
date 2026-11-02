@@ -25,7 +25,7 @@ jobs:
   build-test:
     name: Build, Test & Package
     runs-on: macos-26
-    timeout-minutes: 30   # a wedged build shouldn't burn the 6h default job limit
+    timeout-minutes: 60   # a wedged build shouldn't burn the 6h default job limit
     steps:
       # Actions are pinned to immutable commit SHAs: a mutable tag like @v4 can be
       # repointed at tampered code after the fact, a commit SHA cannot. Same

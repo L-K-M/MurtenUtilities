@@ -7,7 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The suite spine: findings and rules, a persisted suggestion ledger
+  (episodes, snooze, dismissal, staleness, throttled opt-in notifications),
+  the watch coordinator (cadence, timeouts, back-off, pauses, cancellation),
+  validated `murten://` routes, and the `SuiteModuleProvider` contract.
+- Home window with the suggestion feed, opt-in menu-bar companion, Settings
+  (background checks, per-module notifications, pauses, launch at login,
+  update checks off by default), Tool menu and module windows.
+
 ### Changed
+
+- Deployment floor raised to macOS 26.
 
 - Locked the app's appearance to light (`NSRequiresAquaSystemAppearance`) —
   a documented product decision, not a missing feature; dark mode would be a

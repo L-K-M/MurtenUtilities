@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import MurtenCore
+import MurtenModuleKit
 
 /// The suite's two faces plus Settings, for the executable's `App`:
 /// one home window, an opt-in menu-bar companion.
@@ -20,6 +21,18 @@ public struct SuiteScenes: Scene {
             RootView(model: model)
         }
         .defaultSize(width: 1040, height: 720)
+        .commands {
+            ToolCommands()
+            // One home window; "New Window" would only duplicate it.
+            CommandGroup(replacing: .newItem) {}
+        }
+
+        // Modules' auxiliary windows (a test pad, a job log), one per request.
+        WindowGroup(id: ModuleWindowRequest.windowGroupID, for: ModuleWindowRequest.self) { $request in
+            if let request, let content = model.window(for: request) {
+                content.defaultAppStorage(model.defaults(for: request.moduleID))
+            }
+        }
 
         Settings {
             SettingsView(model: model)
@@ -76,5 +89,24 @@ public final class SuiteAppDelegate: NSObject, NSApplicationDelegate {
         alert.addButton(withTitle: "Keep Working")
         alert.addButton(withTitle: "Quit Anyway")
         return alert.runModal() == .alertSecondButtonReturn ? .terminateNow : .terminateCancel
+    }
+}
+
+/// The focused pane's commands, with their shortcuts, in a Tool menu.
+struct ToolCommands: Commands {
+    @FocusedValue(\.moduleCommands) private var commands
+
+    var body: some Commands {
+        CommandMenu("Tool") {
+            if let commands, !commands.isEmpty {
+                ForEach(commands) { command in
+                    Button(command.title) { command.action() }
+                        .keyboardShortcut(command.shortcut)
+                        .disabled(!command.isEnabled)
+                }
+            } else {
+                Text("Open a tool to see its commands")
+            }
+        }
     }
 }
