@@ -113,6 +113,12 @@ Per-module migration notes, satellites, and new-module ideas:
 - **Obtainintosh scope.** Generic "anything installed from a GitHub/Forgejo
   release" updater, or just the fleet? Leaning generic — the suggestion is
   only useful with the full picture.
+- **Suite updates.** One update check for the suite bundle replaces the
+  modules' own (docs/architecture.md §Module packaging). On by default keeps
+  ad-hoc-signed installs current, but contacts GitHub without the user
+  opting in; off by default matches "opt-in, never nagware" and leaves
+  installs stale. Sparkle would be a second dependency. A fleet-scoped
+  Obtainintosh could own this check.
 - **Name.** `MurtenUtilities` is the repo and bundle id; the *displayed* name
   can stay "Murten Utilities" or take a friendlier one later.
 - **Signing.** Ad-hoc now; Developer ID + notarization later is a distribution
