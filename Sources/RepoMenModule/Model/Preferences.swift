@@ -29,7 +29,10 @@ final class Preferences: ObservableObject {
 
     /// Folders whose trees are deep-scanned for project artifacts (absolute paths).
     @Published var scanRoots: [String] {
-        didSet { defaults.set(scanRoots, forKey: Key.scanRoots) }
+        didSet {
+            defaults.set(scanRoots, forKey: Key.scanRoots)
+            retire(scopesBefore: oldValue + watchedFolders.map(\.path))
+        }
     }
 
     /// Paths the user told us to never suggest again (absolute paths).
@@ -66,7 +69,7 @@ final class Preferences: ObservableObject {
     @Published var watchedFolders: [WatchedFolder] {
         didSet {
             defaults.set(try? JSONEncoder().encode(watchedFolders), forKey: Key.watchedFolders)
-            retire(removedFrom: oldValue)
+            retire(scopesBefore: scanRoots + oldValue.map(\.path))
         }
     }
 
@@ -80,7 +83,7 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(try? JSONEncoder().encode(lastWatchRun), forKey: Key.lastWatchRun) }
     }
 
-    /// Paths of watched folders the user removed, newest last. The background
+    /// Scan and watched folders the user removed, newest last. The background
     /// check reports them as checked so their suggestions resolve.
     @Published private(set) var retiredWatchFolders: [String] {
         didSet { defaults.set(retiredWatchFolders, forKey: Key.retiredWatchFolders) }
@@ -100,13 +103,17 @@ final class Preferences: ObservableObject {
 
     /// The settings the background check reads, snapshotted for one poll.
     var watchSettings: StaleWatchSettings {
-        StaleWatchSettings(folders: watchedFolders, retiredPaths: retiredWatchFolders,
-                           excludedPaths: Set(excludedPaths), enabledKinds: enabledKinds)
+        StaleWatchSettings(folders: watchedFolders, scanRoots: scanRoots, scanRootIdleDays: idleDays,
+                           retiredPaths: retiredWatchFolders, excludedPaths: Set(excludedPaths),
+                           enabledKinds: enabledKinds)
     }
 
-    private func retire(removedFrom previous: [WatchedFolder]) {
-        let current = Set(watchedFolders.map(\.path))
-        let removed = previous.map(\.path).filter { !current.contains($0) }
+    /// Remembers paths that were a background-check scope (a scan or watched
+    /// folder) before a change and are neither now.
+    private func retire(scopesBefore previous: [String]) {
+        let current = Set(scanRoots + watchedFolders.map(\.path))
+        var seen = Set<String>()
+        let removed = previous.filter { !current.contains($0) && seen.insert($0).inserted }
         let kept = retiredWatchFolders.filter { !current.contains($0) && !removed.contains($0) }
         let updated = Array((kept + removed).suffix(Self.retiredWatchFolderLimit))
         if updated != retiredWatchFolders { retiredWatchFolders = updated }

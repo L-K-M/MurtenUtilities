@@ -28,6 +28,16 @@ final class WatchSettingsSnapshotTests: XCTestCase {
         XCTAssertTrue(preferences.watchSettings.retiredPaths.isEmpty)
     }
 
+    func testRemovedScanFoldersAreRetiredToo() {
+        let (preferences, _) = makePreferences()
+        preferences.scanRoots = ["/Users/x/code", "/Users/x/dev"]
+        preferences.watchFolder(path: "/Users/x/dev")
+
+        preferences.scanRoots = []
+        XCTAssertEqual(preferences.watchSettings.retiredPaths, ["/Users/x/code"],
+                       "a path still watched is not retired")
+    }
+
     func testRetiredFoldersAreBounded() {
         let (preferences, _) = makePreferences()
         for index in 0..<(Preferences.retiredWatchFolderLimit + 5) {
@@ -39,12 +49,16 @@ final class WatchSettingsSnapshotTests: XCTestCase {
                        "/Users/x/\(Preferences.retiredWatchFolderLimit + 4)")
     }
 
-    func testSnapshotCarriesExclusionsAndEnabledKinds() {
+    func testSnapshotCarriesFoldersExclusionsAndEnabledKinds() {
         let (preferences, _) = makePreferences()
+        preferences.scanRoots = ["/Users/x/code"]
+        preferences.idleDays = 21
         preferences.excludedPaths = ["/Users/x/dev/keep"]
         preferences.setEnabled(false, kind: .nodeModules)
 
         let settings = preferences.watchSettings
+        XCTAssertEqual(settings.scanRoots, ["/Users/x/code"])
+        XCTAssertEqual(settings.scanRootIdleDays, 21)
         XCTAssertEqual(settings.excludedPaths, ["/Users/x/dev/keep"])
         XCTAssertFalse(settings.enabledKinds.contains(.nodeModules))
         XCTAssertTrue(settings.enabledKinds.contains(.rustTarget))

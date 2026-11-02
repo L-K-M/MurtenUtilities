@@ -12,9 +12,11 @@ struct WatchSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("""
-                RepoMen's background check looks at these folders every 6 hours and suggests \
-                a clean-up once artifacts idle past a folder's threshold reach 5 GB. Turn it \
-                on in Settings › Background Checks. It never removes anything.
+                RepoMen's background check looks at your scan folders and these watched \
+                folders every 6 hours and suggests a clean-up once artifacts idle past a \
+                folder's threshold reach 5 GB. Turn it on in Settings › Background Checks. \
+                It never removes anything, and it skips folders in Desktop, Documents, \
+                Downloads, iCloud Drive or on external volumes.
                 """)
                 .font(.caption)
                 .foregroundStyle(.secondary)

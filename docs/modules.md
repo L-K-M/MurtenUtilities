@@ -66,16 +66,20 @@ DerivedData, Homebrew caches — and reclaims them by age and size.
   only) and `RepoMenModule` (the pane, the osascript and `tmutil` runners,
   the watcher, auto-trash). The source's tests moved with the code, except the
   update checker's.
-- **Watcher:** every 6 hours (timeout 30 minutes), scans each enabled watched
-  folder (Settings › RepoMen › Watch; none by default) and reports the bytes of
-  build artifacts idle past that folder's threshold (30 days unless changed),
+- **Watcher:** every 6 hours (timeout 30 minutes), scans the pane's scan
+  folders (Settings › RepoMen › Folders, idle after the pane's 30-day
+  default) and the enabled watched folders (Settings › RepoMen › Watch, each
+  with its own threshold; a path in both follows its watched entry), and
+  reports the bytes of build artifacts idle past the threshold per folder,
   scope = the folder's path. Rule: suggest at ≥ 5 GB, resolve below 4 GB.
   Folders in Desktop, Documents, Downloads, iCloud Drive, File Provider
   storage or under `/Volumes` are not scanned and are reported unavailable
   (`permissionDenied`); the user scans them in the pane. A scanned folder
   walks around those locations and does not follow Git worktree
   registrations into them. Removed and paused folders count as checked, so
-  their suggestions resolve.
+  their suggestions resolve. The scan folders' defaults often sit in
+  `~/Documents`, so for many users part of the check is unavailable until
+  they add folders elsewhere.
 - **Auto-trash (user-armed):** armed per watched folder, off by default; the
   standalone `watchAutoTrash` switch is not imported. Every 6 hours, only
   while `backgroundWorkAllowed()` (checked again before trashing), it moves the

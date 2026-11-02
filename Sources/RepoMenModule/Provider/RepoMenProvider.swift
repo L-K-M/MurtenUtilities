@@ -69,15 +69,17 @@ final class RepoMenProvider: SuiteModuleProvider {
     }
 
     /// Re-runs the background check soon after something it reports on changed:
-    /// a reclaim in the pane, or the watched folders themselves.
+    /// a reclaim in the pane, or the folders and threshold it surveys.
     private func observeChanges() {
         let recheck = context.requestRecheck
         model.$summary
             .compactMap { $0 }
             .sink { _ in recheck() }
             .store(in: &cancellables)
-        preferences.$watchedFolders
-            .dropFirst()
+        let folders = preferences.$watchedFolders.dropFirst().map { _ in () }
+        let roots = preferences.$scanRoots.dropFirst().map { _ in () }
+        let idleDays = preferences.$idleDays.dropFirst().map { _ in () }
+        Publishers.Merge3(folders, roots, idleDays)
             .debounce(for: .seconds(2), scheduler: DispatchQueue.main)
             .sink { _ in recheck() }
             .store(in: &cancellables)

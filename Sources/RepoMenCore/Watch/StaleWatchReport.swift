@@ -2,22 +2,50 @@ import Foundation
 import MurtenCore
 
 /// What the background check needs from RepoMen's settings, snapshotted on the
-/// main actor before a poll.
+/// main actor before a poll. It covers the folders the pane scans (Settings ›
+/// Folders, idle after `scanRootIdleDays`) and the watched folders (Settings ›
+/// Watch, each with its own threshold); a path in both follows its watched entry.
 package struct StaleWatchSettings: Equatable, Sendable {
     /// Every watched folder; disabled ones are not scanned.
     package var folders: [WatchedFolder]
-    /// Folders the user stopped watching. Reported as checked, so a suggestion
-    /// about one resolves instead of lingering.
+    /// The pane's scan folders.
+    package var scanRoots: [String]
+    /// The pane's idle threshold ("Select Idle"), applied to the scan folders.
+    package var scanRootIdleDays: Int
+    /// Folders no longer scanned or watched. Reported as checked, so a
+    /// suggestion about one resolves instead of lingering.
     package var retiredPaths: [String]
     package var excludedPaths: Set<String>
     package var enabledKinds: Set<ArtifactKind>
 
-    package init(folders: [WatchedFolder], retiredPaths: [String] = [],
-                 excludedPaths: Set<String> = [], enabledKinds: Set<ArtifactKind> = Set(ArtifactKind.allCases)) {
+    package init(folders: [WatchedFolder], scanRoots: [String] = [], scanRootIdleDays: Int = 30,
+                 retiredPaths: [String] = [], excludedPaths: Set<String> = [],
+                 enabledKinds: Set<ArtifactKind> = Set(ArtifactKind.allCases)) {
         self.folders = folders
+        self.scanRoots = scanRoots
+        self.scanRootIdleDays = scanRootIdleDays
         self.retiredPaths = retiredPaths
         self.excludedPaths = excludedPaths
         self.enabledKinds = enabledKinds
+    }
+
+    /// The folders a background check surveys, each with its idle threshold:
+    /// enabled watched folders, then scan folders not already watched.
+    package var surveyedFolders: [WatchedFolder] {
+        let watched = Set(folders.map(\.path))
+        var seen = Set<String>()
+        let scanned = scanRoots
+            .filter { !watched.contains($0) && seen.insert($0).inserted }
+            .map { WatchedFolder(path: $0, maxIdleDays: scanRootIdleDays) }
+        return folders.filter(\.isEnabled) + scanned
+    }
+
+    /// Paused watched folders and retired paths that are not surveyed.
+    package var unsurveyedPaths: [String] {
+        let surveyed = Set(surveyedFolders.map(\.path))
+        var seen = Set<String>()
+        return (folders.filter { !$0.isEnabled }.map(\.path) + retiredPaths)
+            .filter { !surveyed.contains($0) && seen.insert($0).inserted }
     }
 }
 
@@ -29,7 +57,7 @@ package enum WatchRootStatus: Equatable, Sendable {
 
 /// Turns a survey into the suite's `WatchObservation`: one finding per scanned
 /// folder, one failure per folder that could not be scanned, and the folders no
-/// longer watched as completed scopes without findings.
+/// longer surveyed as completed scopes without findings.
 package enum StaleWatchReport {
 
     package static func observation(settings: StaleWatchSettings,
@@ -45,9 +73,8 @@ package enum StaleWatchReport {
         var findings: [Finding] = []
         var completed = Set<FindingScope>()
         var failures: [ObservationFailure] = []
-        let enabled = settings.folders.filter(\.isEnabled)
 
-        for folder in enabled {
+        for folder in settings.surveyedFolders {
             let scope = FindingScope(folder.path)
             switch statuses[folder.path] {
             case .surveyed(let totals)?:
@@ -67,11 +94,9 @@ package enum StaleWatchReport {
             }
         }
 
-        // Not watched (any more): nothing there is RepoMen's to report, so the
+        // Not surveyed (any more): nothing there is RepoMen's to report, so the
         // scope counts as checked and an old suggestion for it resolves.
-        let watched = Set(enabled.map(\.path))
-        let unwatched = settings.folders.filter { !$0.isEnabled }.map(\.path) + settings.retiredPaths
-        for path in unwatched where !watched.contains(path) {
+        for path in settings.unsurveyedPaths {
             completed.insert(FindingScope(path))
         }
 

@@ -105,7 +105,7 @@ final class AutoTrashController: ObservableObject {
         while !Task.isCancelled {
             let due = AutoTrash.nextRun(lastRun: preferences.lastWatchRun?.date, earliest: earliest)
             do {
-                try await sleep(max(0, due.timeIntervalSince(now())))
+                try await self.sleep(max(0, due.timeIntervalSince(now())))
             } catch {
                 return
             }

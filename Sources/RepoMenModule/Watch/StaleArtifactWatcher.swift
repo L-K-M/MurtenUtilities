@@ -6,7 +6,7 @@ import RepoMenCore
 /// returns totals. It has no way to trash, delete or prompt; the pane and armed
 /// auto-trash hold those powers, not this.
 protocol StaleArtifactObserving: Sendable {
-    /// One status per enabled folder in `settings`; nil when cancelled.
+    /// One status per surveyed folder in `settings`; nil when cancelled.
     func survey(_ settings: StaleWatchSettings, now: Date) async -> [String: WatchRootStatus]?
 }
 
@@ -15,9 +15,10 @@ protocol StaleArtifactObserving: Sendable {
 struct LiveStaleArtifactObserver: StaleArtifactObserving {
     func survey(_ settings: StaleWatchSettings, now: Date) async -> [String: WatchRootStatus]? {
         let protectedRoots = ProtectedLocations.current
-        let (admitted, refused) = StaleArtifactSurvey.admit(settings.folders, protectedRoots: protectedRoots)
+        let folders = settings.surveyedFolders
+        let (admitted, refused) = StaleArtifactSurvey.admit(folders, protectedRoots: protectedRoots)
         guard let stale = await StaleArtifactSurvey.staleItems(
-            in: admitted, governedBy: settings.folders.filter(\.isEnabled),
+            in: admitted, governedBy: folders,
             excludedPaths: settings.excludedPaths, enabledKinds: settings.enabledKinds,
             protectedRoots: protectedRoots, now: now) else { return nil }
 
@@ -30,9 +31,9 @@ struct LiveStaleArtifactObserver: StaleArtifactObserving {
 }
 
 /// RepoMen's background check: every 6 hours (the standalone app's watch
-/// interval), how many bytes of build artifacts in each watched folder are idle
-/// past that folder's threshold. It only looks; acting on the result is the
-/// pane's job, or armed auto-trash's on its own schedule.
+/// interval), how many bytes of build artifacts in each scan folder and watched
+/// folder are idle past that folder's threshold. It only looks; acting on the
+/// result is the pane's job, or armed auto-trash's on its own schedule.
 struct StaleArtifactWatcher: Watcher {
     /// A walk 16 levels deep that sizes every artifact can take minutes on a
     /// large tree, so the timeout is far above the suite's 60 s default.
