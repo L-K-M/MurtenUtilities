@@ -12,7 +12,10 @@ final class ProcessInspectorTests: XCTestCase {
         XCTAssertEqual(ProcessArguments.parse(block), ["tool", "--token=abc"])
 
         XCTAssertNil(ProcessArguments.parse([1, 0]), "shorter than argc")
-        let truncated = withUnsafeBytes(of: Int32(3)) { Array($0) } + Array("/x".utf8) + [0, 0] + Array("x".utf8) + [0]
+        // Built in steps: as one expression it exceeds CI's type-check limit.
+        var truncated: [UInt8] = withUnsafeBytes(of: Int32(3)) { Array($0) }
+        truncated += Array("/x".utf8) + [0, 0]
+        truncated += Array("x".utf8) + [0]
         XCTAssertNil(ProcessArguments.parse(truncated), "fewer arguments than argc is malformed")
     }
 
