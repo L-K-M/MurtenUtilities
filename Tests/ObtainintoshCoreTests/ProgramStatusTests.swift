@@ -35,7 +35,7 @@ final class ProgramStatusTests: XCTestCase {
         // A cached older version gives way to the download of the newer one.
         XCTAssertEqual(ProgramAction(app(current: "1.0", latest: "2.1", downloaded: "2.0")), .downloadUpdate)
         XCTAssertEqual(ProgramAction(app(latest: "2.0")), .download)
-        XCTAssertEqual(ProgramAction(app(current: "2.0", latest: "2.0")), .none)
+        XCTAssertEqual(ProgramAction(app(current: "2.0", latest: "2.0")), .nothing)
     }
 
     func testSortingByStatusPutsUpdatesFirstAndTiesByName() {

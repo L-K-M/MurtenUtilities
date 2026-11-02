@@ -58,8 +58,11 @@ public final class URLSessionTransport: NSObject, HTTPTransport, URLSessionDataD
 
     // MARK: - URLSessionDataDelegate
 
-    public func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
-                           completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+    // The async forms of the delegate methods that take completion handlers
+    // are used, so their signatures cannot drift from the SDK's.
+
+    public func urlSession(_ session: URLSession, dataTask: URLSessionDataTask,
+                           didReceive response: URLResponse) async -> URLSession.ResponseDisposition {
         let head = lock.withLock { () -> CheckedContinuation<HTTPURLResponse, Error>? in
             let head = pending[dataTask.taskIdentifier]?.head
             pending[dataTask.taskIdentifier]?.head = nil
@@ -67,11 +70,10 @@ public final class URLSessionTransport: NSObject, HTTPTransport, URLSessionDataD
         }
         guard let http = response as? HTTPURLResponse else {
             head?.resume(throwing: URLError(.badServerResponse))
-            completionHandler(.cancel)
-            return
+            return .cancel
         }
         head?.resume(returning: http)
-        completionHandler(.allow)
+        return .allow
     }
 
     public func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
@@ -90,14 +92,14 @@ public final class URLSessionTransport: NSObject, HTTPTransport, URLSessionDataD
     }
 
     public func urlSession(_ session: URLSession, task: URLSessionTask,
-                           willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
-                           completionHandler: @escaping (URLRequest?) -> Void) {
+                           willPerformHTTPRedirection response: HTTPURLResponse,
+                           newRequest request: URLRequest) async -> URLRequest? {
         var next = request
         let origin = task.originalRequest?.url?.absoluteString ?? ""
         if let target = request.url?.absoluteString, !RepositoryURL.sameOrigin(target, origin) {
             next.setValue(nil, forHTTPHeaderField: "Authorization")
         }
-        completionHandler(next)
+        return next
     }
 }
 #endif

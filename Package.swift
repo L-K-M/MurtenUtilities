@@ -62,6 +62,10 @@ let zenBackupManagerModule: [Target.Dependency] = []
 let obtainintoshTargets: [Target] = [
     .target(name: "ObtainintoshCore", dependencies: ["MurtenCore"]),
     .target(name: "ObtainintoshServices", dependencies: ["ObtainintoshCore", "MurtenCore"]),
+    .target(
+        name: "ObtainintoshModule",
+        dependencies: ["ObtainintoshCore", "ObtainintoshServices", "MurtenCore", "MurtenModuleKit"]
+    ),
     .testTarget(
         name: "ObtainintoshCoreTests",
         dependencies: ["ObtainintoshCore", "MurtenCore"],
@@ -70,9 +74,14 @@ let obtainintoshTargets: [Target] = [
     .testTarget(
         name: "ObtainintoshServicesTests",
         dependencies: ["ObtainintoshServices", "ObtainintoshCore", "MurtenCore"]
+    ),
+    .testTarget(
+        name: "ObtainintoshModuleTests",
+        dependencies: ["ObtainintoshModule", "ObtainintoshServices", "ObtainintoshCore", "MurtenCore",
+                       "MurtenModuleKit"]
     )
 ]
-let obtainintoshModule: [Target.Dependency] = []
+let obtainintoshModule: [Target.Dependency] = ["ObtainintoshModule"]
 
 // MARK: RunningMan
 let runningManTargets: [Target] = []

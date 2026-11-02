@@ -8,7 +8,7 @@ public enum ProgramAction: Equatable, Sendable {
     case downloadUpdate
     /// Not installed: download the program.
     case download
-    case none
+    case nothing
 
     public init(_ app: TrackedApp) {
         // The cached file stands in for the download button only while it
@@ -20,7 +20,7 @@ public enum ProgramAction: Equatable, Sendable {
         } else if ProgramStatus.nonEmpty(app.currentVersion) == nil {
             self = .download
         } else {
-            self = .none
+            self = .nothing
         }
     }
 
@@ -29,7 +29,7 @@ public enum ProgramAction: Equatable, Sendable {
         case .revealDownload: return "This version's file is already downloaded — show it in Finder"
         case .downloadUpdate: return "Download and save the update for this program"
         case .download: return "Download this program"
-        case .none: return nil
+        case .nothing: return nil
         }
     }
 }
