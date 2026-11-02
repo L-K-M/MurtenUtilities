@@ -129,12 +129,14 @@ public enum RunnerHealthCheck {
             }
         }
 
-        // Runners removed since the last look were checked and are absent.
-        let present = Set(snapshots.map(\.id))
-        for runnerID in memory.entries.keys where !present.contains(runnerID) {
-            completed.insert(FindingScope(runnerID))
+        // Only complete discovery proves a runner was removed; skipped folders still exist.
+        if discoveryComplete {
+            let present = Set(snapshots.map(\.id)).union(skippedDirectories.map(\.path))
+            for runnerID in memory.entries.keys where !present.contains(runnerID) {
+                completed.insert(FindingScope(runnerID))
+            }
+            memory.forget(allExcept: present)
         }
-        memory.forget(allExcept: present)
 
         for directory in skippedDirectories {
             failures.append(ObservationFailure(kind: .permissionDenied, scope: FindingScope(directory.path),

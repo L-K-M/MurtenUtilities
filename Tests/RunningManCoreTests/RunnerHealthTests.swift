@@ -117,10 +117,44 @@ final class RunnerHealthTests: XCTestCase {
         let removed = snapshot("removed", status: .stopped, startsAtLogin: true)
         _ = RunnerHealthCheck.observation(of: [removed], memory: &memory, at: start)
 
-        let observation = RunnerHealthCheck.observation(of: [], memory: &memory, at: start + 900)
+        let observation = RunnerHealthCheck.observation(of: [], discoveryComplete: true, memory: &memory, at: start + 900)
 
         XCTAssertEqual(observation.completedScopes, [FindingScope(removed.id)])
         XCTAssertTrue(memory.entries.isEmpty)
+    }
+
+    func testIncompleteDiscoveryKeepsAnOfflineSuggestionAndItsHistory() {
+        var ledger = SuggestionLedger()
+        var memory = RunnerHealthMemory()
+        let runner = snapshot("builder", status: .stopped, startsAtLogin: true)
+        _ = RunnerHealthCheck.observation(of: [runner], memory: &memory, at: start)
+        ledger.apply(RunnerHealthCheck.observation(of: [runner], memory: &memory, at: start + 900), rule: rule)
+        let key = SuggestionKey(moduleID: "runningman", condition: RunnerHealthCheck.condition, scope: FindingScope(runner.id))
+
+        let incomplete = RunnerHealthCheck.observation(of: [], memory: &memory, at: start + 1800)
+        ledger.apply(incomplete, rule: rule)
+
+        XCTAssertFalse(incomplete.completedScopes.contains(key.scope))
+        XCTAssertEqual(ledger.records[key]?.isActive, true)
+        XCTAssertEqual(memory.entries[runner.id]?.offlineSince, start)
+    }
+
+    func testSkippedRunnerStaysStaleInsteadOfResolving() {
+        var ledger = SuggestionLedger()
+        var memory = RunnerHealthMemory()
+        let runner = snapshot("builder", status: .stopped, startsAtLogin: true)
+        _ = RunnerHealthCheck.observation(of: [runner], memory: &memory, at: start)
+        ledger.apply(RunnerHealthCheck.observation(of: [runner], memory: &memory, at: start + 900), rule: rule)
+        let key = SuggestionKey(moduleID: "runningman", condition: RunnerHealthCheck.condition, scope: FindingScope(runner.id))
+
+        let skipped = RunnerHealthCheck.observation(of: [], skippedDirectories: [runner.runner.directory],
+                                                    discoveryComplete: true, memory: &memory, at: start + 1800)
+        ledger.apply(skipped, rule: rule)
+
+        XCTAssertFalse(skipped.completedScopes.contains(key.scope))
+        XCTAssertEqual(ledger.records[key]?.isActive, true)
+        XCTAssertEqual(ledger.records[key]?.staleSince, start + 1800)
+        XCTAssertEqual(memory.entries[runner.id]?.offlineSince, start)
     }
 
     func testSkippedFoldersAreReportedAsNotChecked() {

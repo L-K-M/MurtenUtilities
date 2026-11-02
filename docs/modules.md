@@ -360,7 +360,8 @@ SwiftPM.
   not checked. Evidence: the time it was first seen offline (memory only, so
   after a relaunch the count starts at the first check). When discovery read
   every candidate, the observation is exhaustive, so a suggestion for a runner
-  removed in the meantime resolves.
+  removed in the meantime resolves. Incomplete reads and skipped folders retain
+  existing suggestions and their offline history.
 - **Rule:** offline for 10 minutes or more → "<runner> has been offline for N
   min — restart?"; the suggestion stays until the runner is online again.
   Route: `runningman/runner?id=<runner folder>`.
