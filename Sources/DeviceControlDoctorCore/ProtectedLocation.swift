@@ -40,7 +40,18 @@ public enum ProtectedLocation {
     /// path the walk may pass, because the safe folders sit inside it.
     public static func readablePath(_ path: String, home: String,
                                     linkDestination: (String) -> String?) -> String? {
-        let home = normalized(home)
+        // Home goes through the same links, so both compare in one namespace:
+        // on macOS /var and /tmp are links into /private.
+        guard let home = walk(home, linkDestination: linkDestination, refusing: { _ in false }) else { return nil }
+        return walk(path, linkDestination: linkDestination) { candidate in
+            candidate != home && contains(candidate, home: home)
+        }
+    }
+
+    /// Resolves `path` component by component; nil on a link loop or as soon
+    /// as a component is `refusing`, before that component is looked at.
+    private static func walk(_ path: String, linkDestination: (String) -> String?,
+                             refusing: (String) -> Bool) -> String? {
         var components = lexicalComponents(of: path)
         var resolved = ""
         var index = 0
@@ -48,7 +59,7 @@ public enum ProtectedLocation {
 
         while index < components.count {
             let candidate = resolved + "/" + components[index]
-            if candidate != home && contains(candidate, home: home) { return nil }
+            if refusing(candidate) { return nil }
 
             guard let destination = linkDestination(candidate) else {
                 resolved = candidate

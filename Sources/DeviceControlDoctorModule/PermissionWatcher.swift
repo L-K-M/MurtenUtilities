@@ -100,7 +100,7 @@ struct PermissionWatcher: Watcher {
         // every read, so a link added later cannot lead a read into one.
         guard let path = ProtectedLocation.readablePath(app.path, home: home, linkDestination: Self.linkDestination) else {
             return .skipped(.permissionDenied,
-                            "It is in a folder macOS protects, so it is checked only when you open DeviceControlDoctor.")
+                            "It is in, or linked into, a folder macOS protects, so it is checked only when you open DeviceControlDoctor.")
         }
         let clientIdentifier = app.canReset ? nil : app.bundleID
         guard let current = AppCatalog.app(at: URL(fileURLWithPath: path), clientIdentifier: clientIdentifier) else {
@@ -142,7 +142,7 @@ struct PermissionWatcher: Watcher {
 
     /// The target of `path` when that one entry is a symbolic link (`lstat`,
     /// then `readlink`); nil otherwise. Never follows the link.
-    private static func linkDestination(_ path: String) -> String? {
+    static func linkDestination(_ path: String) -> String? {
         let attributes = try? FileManager.default.attributesOfItem(atPath: path)
         guard attributes?[.type] as? FileAttributeType == .typeSymbolicLink else { return nil }
         return try? FileManager.default.destinationOfSymbolicLink(atPath: path)

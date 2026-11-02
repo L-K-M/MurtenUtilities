@@ -210,7 +210,7 @@ final class PermissionWatcherTests: XCTestCase {
         let observation = try await observeWithoutWriting()
 
         XCTAssertEqual(observation.outcome, .complete)
-        XCTAssertTrue(runner.calls.contains { $0.first == SystemTool.codesign && $0.last == real.path })
+        XCTAssertTrue(runner.calls.contains { $0.first == SystemTool.codesign && $0.last == FixtureMac.physical(real.path) })
     }
 
     // MARK: - The watch list

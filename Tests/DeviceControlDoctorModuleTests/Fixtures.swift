@@ -61,7 +61,10 @@ final class FakeProcessRunner: ProcessRunning, @unchecked Sendable {
                 with: CommandResult(output: output, exitCode: exitCode, timedOut: timedOut))
     }
 
+    /// Signs the app at `path`, as codesign sees it at its physical location
+    /// (the watcher reads apps there, after resolving links).
     func sign(_ path: String, team: String = FixtureMac.team, valid: Bool = true) {
+        let path = FixtureMac.physical(path)
         let display = """
             Executable=\(path)/Contents/MacOS/Example
             Identifier=com.example.App
@@ -81,24 +84,36 @@ final class FakeProcessRunner: ProcessRunning, @unchecked Sendable {
 }
 
 /// A temporary folder standing in for the Mac: app bundles, a home folder
-/// and the watch list file.
+/// and the watch list file. The root is reached through a symbolic link on
+/// every platform, as macOS reaches temporary folders through /var, so
+/// stored, home and physical paths differ the way they do on a Mac.
 final class FixtureMac {
     static let team = "TEAMID1234"
 
     let root: URL
     let home: URL
     let watchList: URL
+    private let physicalRoot: URL
 
     init() throws {
-        let base = FileManager.default.temporaryDirectory.appendingPathComponent("DeviceControlDoctorModuleTests-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
-        root = base.resolvingSymlinksInPath()
+        let name = "DeviceControlDoctorModuleTests-\(UUID().uuidString)"
+        let temporary = FileManager.default.temporaryDirectory
+        physicalRoot = temporary.appendingPathComponent(name + "-real")
+        try FileManager.default.createDirectory(at: physicalRoot, withIntermediateDirectories: true)
+        root = temporary.appendingPathComponent(name)
+        try FileManager.default.createSymbolicLink(at: root, withDestinationURL: physicalRoot)
         home = root.appendingPathComponent("home")
         watchList = home.appendingPathComponent("Library/Application Support/DeviceControlDoctor/watchlist.json")
     }
 
     func remove() {
         try? FileManager.default.removeItem(at: root)
+        try? FileManager.default.removeItem(at: physicalRoot)
+    }
+
+    /// Where `path` physically is, every link resolved.
+    static func physical(_ path: String) -> String {
+        ProtectedLocation.readablePath(path, home: "/nonexistent-home", linkDestination: PermissionWatcher.linkDestination) ?? path
     }
 
     /// Writes `<folder>/<name>.app` with an Info.plist and returns it as the

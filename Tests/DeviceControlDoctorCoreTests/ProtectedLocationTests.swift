@@ -49,7 +49,8 @@ final class ProtectedLocationTests: XCTestCase {
     func testPathWithoutLinksIsReturnedAsIs() {
         let result = resolve("/Applications/Tool.app", links: [:])
         XCTAssertEqual(result.path, "/Applications/Tool.app")
-        XCTAssertEqual(result.looked, ["/Applications", "/Applications/Tool.app"])
+        XCTAssertEqual(result.looked, ["/Users", "/Users/example", "/Applications", "/Applications/Tool.app"],
+                       "home's own components, then the path's, one at a time")
         XCTAssertEqual(resolve("/Users/example/Applications/Tool.app", links: [:]).path,
                        "/Users/example/Applications/Tool.app", "home itself may be passed on the way to a safe folder")
     }
@@ -68,6 +69,15 @@ final class ProtectedLocationTests: XCTestCase {
     func testLinksBetweenSafeFoldersResolve() {
         let links = ["/Applications/Tool.app": "../opt/tools/Tool.app", "/opt": "/private/opt"]
         XCTAssertEqual(resolve("/Applications/Tool.app", links: links).path, "/private/opt/tools/Tool.app")
+    }
+
+    func testHomeBehindALinkIsComparedAfterResolving() {
+        // macOS: /var is a link to /private/var.
+        let links = ["/var": "private/var"]
+        let downloads = ProtectedLocation.readablePath("/private/var/u/Downloads/T.app", home: "/var/u") { links[$0] }
+        XCTAssertNil(downloads)
+        let applications = ProtectedLocation.readablePath("/var/u/Applications/T.app", home: "/var/u") { links[$0] }
+        XCTAssertEqual(applications, "/private/var/u/Applications/T.app")
     }
 
     func testLinkLoopsAreRefused() {
