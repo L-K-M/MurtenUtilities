@@ -114,7 +114,8 @@ public struct TrackedApp: Codable, Equatable, Identifiable, Sendable {
         try container.encodeIfPresent(lastCheckAttempt, forKey: .lastCheckAttempt)
         try container.encodeIfPresent(downloaded, forKey: .downloaded)
         try container.encodeIfPresent(username, forKey: .username)
-        try container.encodeIfPresent(accessToken, forKey: .accessToken)
+        // `accessToken` is decoded, to read the standalone app's file, but
+        // never encoded: whatever writes this record, the key stays out.
         try container.encodeIfPresent(bundleID, forKey: .bundleID)
         if hasStoredAccessToken { try container.encode(true, forKey: .hasStoredAccessToken) }
     }

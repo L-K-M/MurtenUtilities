@@ -105,7 +105,8 @@ struct ObtainintoshPane: View {
     }
 
     private var commands: [ModuleCommand] {
-        let idle = !model.isBusy
+        // A shortcut must not replace a sheet or the removal question.
+        let idle = !model.isBusy && sheet == nil && removal == nil
         return [
             ModuleCommand("Add Program…", shortcut: KeyboardShortcut("n"), isEnabled: idle) { sheet = .add },
             ModuleCommand("Check All", shortcut: KeyboardShortcut("r"), isEnabled: idle) {

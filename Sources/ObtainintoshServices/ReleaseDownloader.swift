@@ -80,9 +80,14 @@ public struct ReleaseDownloader: Sendable {
             if !published { Self.discardPartial(layout) }
         }
 
-        guard FileManager.default.createFile(atPath: layout.partial.path, contents: nil),
-              let handle = try? FileHandle(forWritingTo: layout.partial) else {
+        guard FileManager.default.createFile(atPath: layout.partial.path, contents: nil) else {
             throw ObtainintoshError("Failed to create download file")
+        }
+        let handle: FileHandle
+        do {
+            handle = try FileHandle(forWritingTo: layout.partial)
+        } catch {
+            throw ObtainintoshError("Failed to open download file: \(error.localizedDescription)")
         }
         defer { try? handle.close() }
 

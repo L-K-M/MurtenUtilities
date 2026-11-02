@@ -59,6 +59,9 @@ final class ObtainintoshModel {
     private(set) var isChecking = false
     private(set) var checkProgress: CheckProgress?
     private(set) var downloadProgress: DownloadProgress?
+    /// From the click until the download ends, including the release lookup
+    /// before the first byte, when `downloadProgress` is still nil.
+    private(set) var isDownloading = false
     private(set) var notices: [Notice] = []
     /// A problem with the list itself, shown above the table.
     var errorBanner: String?
@@ -72,6 +75,8 @@ final class ObtainintoshModel {
 
     @ObservationIgnored private var store: TrackedListStore?
     @ObservationIgnored private var downloadTask: Task<Void, Never>?
+    /// Bumped per download, so a late progress report of an earlier one is dropped.
+    @ObservationIgnored private var downloadGeneration = 0
     @ObservationIgnored private var hasCheckedThisSession = false
     @ObservationIgnored private var finished: [Bool] = []
 
@@ -89,11 +94,11 @@ final class ObtainintoshModel {
         self.requestRecheck = requestRecheck
     }
 
-    var isBusy: Bool { isChecking || downloadProgress != nil }
+    var isBusy: Bool { isChecking || isDownloading }
 
     /// Why quitting now would lose work.
     var interruptionWarning: String? {
-        if downloadProgress != nil { return "A download is still running." }
+        if isDownloading { return "A download is still running." }
         if isChecking { return "An update check is still running." }
         return nil
     }
@@ -117,6 +122,10 @@ final class ObtainintoshModel {
     /// the system cleared from the temporary folder is forgotten, so the
     /// row offers the download again.
     func load() {
+        // A failed open leaves no store and is retried here; its banner must
+        // not outlive a retry that succeeds. A recovery banner set while
+        // opening stays.
+        if store == nil { errorBanner = nil }
         do {
             let store = try openStore()
             let vanished = store.apps.filter { app in
@@ -358,11 +367,15 @@ final class ObtainintoshModel {
             post(error.localizedDescription, .error)
             return
         }
+        isDownloading = true
+        downloadGeneration += 1
+        let generation = downloadGeneration
         downloadTask = Task {
-            await self.runDownload(app, store: store)
+            await self.runDownload(app, store: store, generation: generation)
             lease.release()
             self.downloadProgress = nil
             self.downloadTask = nil
+            self.isDownloading = false
         }
     }
 
@@ -370,7 +383,7 @@ final class ObtainintoshModel {
         downloadTask?.cancel()
     }
 
-    private func runDownload(_ app: TrackedApp, store: TrackedListStore) async {
+    private func runDownload(_ app: TrackedApp, store: TrackedListStore, generation: Int) async {
         do {
             var credentials = LookupCredentials()
             if app.sourceType == .github { credentials.gitHubToken = await readToken(.gitHub) }
@@ -384,7 +397,10 @@ final class ObtainintoshModel {
                                                 total: release.fileSize ?? 0)
 
             let file = try await environment.downloader.download(release, auth: auth, appKey: app.id) { done, total in
-                Task { @MainActor [weak self] in self?.showDownloadProgress(done, of: total) }
+                Task { @MainActor [weak self] in
+                    guard let self, self.downloadGeneration == generation else { return }
+                    self.showDownloadProgress(done, of: total)
+                }
             }
 
             let revealed = environment.revealer.reveal(file)
@@ -535,12 +551,15 @@ final class ObtainintoshModel {
             return
         }
 
-        if let token = data.settings.githubToken?.trimmingCharacters(in: .whitespacesAndNewlines), !token.isEmpty,
-           await readToken(.gitHub) == nil {
+        if let token = data.settings.githubToken?.trimmingCharacters(in: .whitespacesAndNewlines), !token.isEmpty {
+            // A token the Keychain would not hand over is still a token: it
+            // is kept, not replaced by the standalone app's.
             do {
-                try await environment.vault.setToken(token, for: .gitHub)
+                if try await environment.vault.token(.gitHub) == nil {
+                    try await environment.vault.setToken(token, for: .gitHub)
+                }
             } catch {
-                post("The GitHub token could not be saved in the Keychain: \(error.localizedDescription)", .error)
+                post("The GitHub token was not imported: \(error.localizedDescription)", .error)
             }
         }
 

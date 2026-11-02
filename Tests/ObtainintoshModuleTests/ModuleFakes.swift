@@ -71,17 +71,22 @@ final class MemorySecrets: SecretStoring, @unchecked Sendable {
     private let lock = NSLock()
     private var values: [String: String]
     private var readCount = 0
+    private var readsFail = false
 
     init(_ values: [String: String] = [:]) {
         self.values = values
     }
 
     var reads: Int { lock.withLock { readCount } }
+
+    /// Makes every read fail, as when the user denies the Keychain prompt.
+    func failReads() { lock.withLock { readsFail = true } }
     var stored: [String: String] { lock.withLock { values } }
 
     func read(account: String) throws -> String? {
-        lock.withLock {
+        try lock.withLock {
             readCount += 1
+            if readsFail { throw ObtainintoshError("The Keychain refused the read.") }
             return values[account]
         }
     }

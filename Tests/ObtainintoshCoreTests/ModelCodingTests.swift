@@ -71,6 +71,11 @@ final class ModelCodingTests: XCTestCase {
 
         XCTAssertFalse(json.contains("key123"), json)
         XCTAssertFalse(json.contains("ghp_secret"), json)
+        // Encoding itself never writes a secret, whichever path saves.
+        let unstripped = String(decoding: try JSONEncoder().encode(data), as: UTF8.self)
+        XCTAssertFalse(unstripped.contains("key123"), unstripped)
+        XCTAssertFalse(unstripped.contains("ghp_secret"), unstripped)
+        XCTAssertTrue(unstripped.contains("\"github_token\":null"), unstripped)
         let decoded = try decode(json)
         XCTAssertTrue(decoded.apps[0].hasStoredAccessToken)
         XCTAssertEqual(decoded.apps[0].bundleID, "org.example.private")

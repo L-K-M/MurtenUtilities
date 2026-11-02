@@ -78,9 +78,11 @@ public struct StoredSettings: Codable, Equatable, Sendable {
         gitlabToken = try container.decodeIfPresent(String.self, forKey: .gitlabToken)
     }
 
+    /// The standalone shape, with both tokens always null: they are read
+    /// from the standalone app's file but never written anywhere.
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(githubToken, forKey: .githubToken)
-        try container.encode(gitlabToken, forKey: .gitlabToken)
+        try container.encodeNil(forKey: .githubToken)
+        try container.encodeNil(forKey: .gitlabToken)
     }
 }

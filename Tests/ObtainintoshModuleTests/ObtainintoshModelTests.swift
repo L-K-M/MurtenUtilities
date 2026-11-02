@@ -154,6 +154,40 @@ final class ObtainintoshModelTests: XCTestCase {
         XCTAssertEqual(ProgramAction(model.apps[0]), .revealDownload)
     }
 
+    func testADownloadIsBusyFromTheClickUntilItEnds() async throws {
+        let fixture = Fixture()
+        fixture.lookup.releases["https://github.com/o/tool"] = release("2.0")
+        let model = fixture.model()
+        try await model.add(SourceInput(url: "https://github.com/o/tool", name: "Tool"))
+
+        // Before the release lookup answers, nothing has been fetched yet.
+        model.download(id: try XCTUnwrap(model.apps.first?.id))
+        XCTAssertTrue(model.isBusy)
+        XCTAssertEqual(model.interruptionWarning, "A download is still running.")
+
+        for _ in 0..<200 where model.isBusy {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertFalse(model.isBusy)
+        XCTAssertNil(model.interruptionWarning)
+    }
+
+    func testABannerFromAFailedOpenClearsWhenARetrySucceeds() throws {
+        let fixture = Fixture()
+        // A file where the list's folder belongs makes opening fail.
+        let folder = fixture.listURL.deletingLastPathComponent()
+        XCTAssertTrue(FileManager.default.createFile(atPath: folder.path, contents: Data()))
+        let model = fixture.model()
+
+        model.load()
+        XCTAssertNotNil(model.errorBanner)
+
+        try FileManager.default.removeItem(at: folder)
+        model.load()
+        XCTAssertNil(model.errorBanner)
+        XCTAssertTrue(model.isLoaded)
+    }
+
     func testAVanishedDownloadIsForgotten() async throws {
         let fixture = Fixture()
         let model = fixture.model()
@@ -194,6 +228,19 @@ final class ObtainintoshModelTests: XCTestCase {
         // Once decided, the offer does not come back.
         model.refreshStandaloneOffer()
         XCTAssertNil(model.standaloneOffer)
+    }
+
+    func testAnUnreadableGitHubTokenIsNotReplacedByTheStandaloneOne() async throws {
+        let fixture = Fixture(secrets: ["github-token": "mine"])
+        fixture.secrets.failReads()
+        fixture.writeStandalone(#"{"apps":[],"settings":{"github_token":"theirs"}}"#)
+        let model = fixture.model()
+
+        await model.importStandaloneList()
+
+        XCTAssertEqual(fixture.secrets.stored["github-token"], "mine")
+        XCTAssertEqual(model.notices.filter { $0.kind == .error }.map(\.text),
+                       ["The GitHub token was not imported: The Keychain refused the read."])
     }
 
     func testDecliningTheStandaloneListImportsNothing() {
