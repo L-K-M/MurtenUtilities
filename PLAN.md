@@ -27,7 +27,7 @@ The confirmed roster — and what each tool is for — lives in
 - **Suggestion feed** — on the home screen and in the menu. Every suggestion
   deep-links into the relevant pane with a safe default preselected. Example:
   the watcher sees ~8 GB of untagged image leftovers and unused build cache →
-  "Docker is holding ~8 GB you can rebuild. Clean up?" → opens DockVac with
+  "Docker is holding ~8 GB you can re-pull or rebuild. Clean up?" → opens DockVac with
   exactly that set selected. The module defines what "safe" means
   (docs/modules.md, *What a suggestion may preselect*). Nothing repairs
   without a click.
@@ -95,11 +95,15 @@ Per-module migration notes, satellites, and new-module ideas:
   `*Core`-style target plus its pane. SwiftPM has no app, extension or XPC
   product type, so `scripts/build-app.sh` assembles every bundle part by hand,
   as RunningMan's script already does for its widget extension and
-  Shortking's for its probe executable. Two things it cannot produce: App
+  Shortking's for its probe executable. One thing it cannot produce is App
   Intents metadata, which only the Xcode build extracts
-  ([Apple DTS](https://developer.apple.com/forums/thread/759160)), and
-  compiled asset catalogs. Coreography's Shortcuts actions depend on the
-  first, so they stay out of the suite or this decision gains an exception.
+  ([Apple DTS](https://developer.apple.com/forums/thread/759160)).
+  Asset catalogs do compile — SwiftPM runs actool for any `.xcassets` in a
+  target's resources — but the resulting `.car` lands in that target's
+  resource bundle, so `scripts/build-app.sh` must hoist or recompile it
+  into the app bundle. Coreography's Shortcuts actions depend on that
+  extractor, so they stay out of the suite or this decision gains an
+  exception.
 - **Migrate code in**, don't depend on the tool repos as packages. The suite
   becomes the home of each core; standalone apps keep working from their own
   history. Revisit if standalones stay alive long-term (docs/architecture.md
