@@ -64,6 +64,45 @@ click suggestion ──▶ deep link ──▶ module pane ──▶ explicit co
 - **SuggestionStore** dedupes by `key` (a repeated finding refreshes, never
   stacks), applies per-category snoozes and a global rate limit, and persists
   to `~/Library/Application Support/MurtenUtilities/suggestions.json`.
+
+## SuggestionStore
+
+The `SuggestionStore` is the central coordinator for the suggestion pipeline. It:
+
+- Deduplicates suggestions by `key` (a repeated finding refreshes the existing suggestion instead of stacking).
+- Applies per-category snooze rules (e.g., "don't show this again for 24 hours").
+- Enforces a global rate limit (e.g., ≤ 3 suggestions per hour) to prevent spam.
+- Persists active suggestions to `~/Library/Application Support/MurtenUtilities/suggestions.json` (JSON format, one record per suggestion).
+- Loads persisted suggestions on app launch and prunes expired snoozes.
+- Emits notifications when the suggestion feed changes (e.g., for the menu-bar badge).
+
+### Persistence format
+
+```json
+{
+  "suggestions": [
+    {
+      "key": "dockvac.reclaimable",
+      "moduleID": "dockvac",
+      "title": "Docker is holding ~8 GB",
+      "detail": "Unused images and build cache.",
+      "lastUpdated": "2024-06-05T12:00:00Z",
+      "snoozeUntil": "2024-06-06T12:00:00Z"
+    }
+  ]
+}
+```
+
+### Error handling
+
+- If persistence fails (e.g., disk full), the store logs the error and continues in-memory.
+- If a watcher fails, the store marks the suggestion as "stale" and removes it after a timeout.
+- If a module is uninstalled, its suggestions are pruned.
+
+### Testing
+
+- Unit tests for dedupe, snooze, and rate-limiting logic.
+- Integration tests for persistence and deep-link routing.
 - **Surfaces**: home-screen feed, menu-bar badge count, and — only where the
   user opted in per category — `UNUserNotification`. Never modal.
 - **Deep links**: `murten://<moduleID>[/<action>]` inside the app; each pane
@@ -79,9 +118,13 @@ Merging tools into one binary must not union their privileges. The rules:
   HallPass module keeps its osascript write boundary; the DeviceControlDoctor
   module keeps its confirmed `tccutil reset`; DockVac keeps its Docker socket
   use scoped to the delete action.
-- If a module ever needs a privileged helper (it shouldn't, for the confirmed
-  roster), it ships an `SMAppService`-registered helper for that module only —
-  never a suite-wide root daemon.
+- Two confirmed modules already ship a privileged helper: BootCaptain's
+  code-signing-pinned XPC helper (Mach service `ch.lkmc.bootcaptain.helper`)
+  and Coreography's XPC daemon (`CoreographyHelper`, registered through
+  `SMAppService.daemon`). Each keeps its own helper and install path — SMJobBless
+  or a bundled daemon plist, not the login-item `SMAppService` above — and never
+  a suite-wide root daemon. Their code-signing requirements pin a real Team ID,
+  so they also settle the signing question (see PLAN.md).
 
 ## Resident mode
 
