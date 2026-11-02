@@ -80,8 +80,8 @@ not a notification center bolted on.
 
 ## Accessibility acceptance
 
-Before the first module ships, verify the home window, suggestion feed, menu
-and pane together on macOS:
+Before the first module ships, verify the home window, suggestion feed,
+menu-bar companion (`MenuBarView`) and pane together on macOS:
 
 - Keyboard-only: reach every action, open a suggestion, cancel confirmation
   and return to the originating control. Check focus after a feed refresh and
@@ -98,9 +98,9 @@ and pane together on macOS:
 
 Add a macOS UI smoke flow for home → suggestion → pane → cancel/back, with a
 fake observation/repair service. Check keyboard activation and accessible
-labels. Keep a documented VoiceOver/Full Keyboard Access pass and visual
-checks for contrast, scaling and light appearance. Build success and a
-screenshot alone do not prove accessibility; Rigi's own
+labels. Record the VoiceOver/Full Keyboard Access pass and visual checks for
+contrast, scaling and light appearance in the shipping module's PR.
+Build success and a screenshot alone do not prove accessibility; Rigi's own
 [verification guide](https://github.com/L-K-M/Rigi/blob/dcfc91e3b72aee612b2b48aed4a744397b78dc77/docs/verification.md)
 makes the same distinction.
 
