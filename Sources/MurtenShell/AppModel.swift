@@ -109,7 +109,8 @@ public final class AppModel {
             let context = ModuleContext(
                 moduleID: moduleID, defaults: moduleDefaults,
                 requestRecheck: { weakSelf()?.recheck(moduleID) },
-                open: { _ = weakSelf()?.open($0) },
+                // present, not open: a menu-bar section has no window to show it in.
+                open: { weakSelf()?.present($0) },
                 backgroundWorkAllowed: { weakSelf()?.allowsBackgroundWork(moduleID) ?? false })
             let provider = factory.make(context)
             built[moduleID] = provider

@@ -9,8 +9,9 @@ Legend — **effort**: cheap (SwiftPM core moves nearly unchanged) · medium
 
 ## Platform floors
 
-The suite declares macOS 14 (`Package.swift`, `LSMinimumSystemVersion`). The
-source repos declare these floors (checked 2026-11-02 against each `main`):
+The suite declares macOS 26 (`Package.swift`, `LSMinimumSystemVersion`;
+PLAN.md, *Deployment floor*). The source repos declare these floors
+(checked 2026-11-02 against each `main`):
 
 | Module | Declared floor | Declared in | What needs it |
 | --- | --- | --- | --- |
@@ -25,15 +26,9 @@ source repos declare these floors (checked 2026-11-02 against each `main`):
 | Coreography | 26 | `Package.swift`, `.xcodeproj` | A product decision in its own plan (`docs/plan.md`, decision 1), not an API gate: the tree has no `#available` checks. Its private NetworkStatistics keys are verified only "as the framework publishes them on macOS 26". |
 | Obtainintosh | Tauri app | `tauri.conf.json` | a port; no Swift floor yet |
 
-Two modules sit above the suite floor, so "moves in nearly unchanged" holds
-for their pure cores at most, not their panes or samplers. Either the suite
-floor rises, or both modules run below the floor they were built for:
-HallPass's pane needs availability fallbacks, and Coreography's private
-framework reads run on releases they were never verified on. CI covers
-neither (`ci.yml` tests only on `macos-26`). Any floor below 15.5 also
-needs HallPass marked inapplicable on those releases
-([architecture.md](architecture.md#module-applicability)). The choice is open
-(PLAN.md, *Deployment floor*).
+Every module's floor is at or below the suite's, so no module needs an
+availability fallback or an OS applicability check, and CI (`macos-26`)
+tests the only supported release.
 
 ## Confirmed roster
 
@@ -208,10 +203,32 @@ privileged osascript with baseline re-check and rollback.
 ### Zen Backup Manager — effort: medium — phase 3
 
 Inspects browser tabs and Spaces on a timeline of session backups; restores
-with a verified safety copy and undo. **GitHub-only**.
+with a verified safety copy and undo.
 
-- **Migrates:** the backup-timeline/restore core and its pane.
-- **Watcher:** backup freshness → "last session snapshot is 9 days old".
+- **Status:** available. The `.xcodeproj` is ported to SwiftPM:
+  `ZenBackupManagerCore` (session decoding, timeline, restore with safety
+  copies, the rule) and `ZenBackupManagerModule` (pane, provider, watcher).
+  The source's 23 tests moved to `ZenBackupManagerCoreTests`.
+- **Provenance:** ZenBackupManager@14efe4434430e453b5a53e79434d2ea828ad70ba
+- **Applicability:** a profile listed in Zen's `profiles.ini`; otherwise
+  "Zen Browser is not installed".
+- **Watcher:** hourly, unprivileged and metadata only: `profiles.ini`, then
+  the dates of each profile's session files (current state,
+  `zen-sessions-backup/`, `sessionstore-backups/`; never the safety copies).
+  One finding per profile, scoped by its folder path. At 7 days or more:
+  "Zen has not saved a session in N days", opening
+  `murten://zenbackupmanager/timeline?profile=<path>`. A restore rewrites the
+  current session file, so it counts as a save.
+- **Preselection:** the profile only. The pane re-scans it and selects its
+  current state, never a backup to restore; restoring still takes the
+  confirmation sheet, which offers to quit Zen.
+- **State:** safety copies stay in
+  `~/Library/Application Support/ZenBackupManager/Safety Copies` and are read
+  in place, so undo sees the standalone app's copies too. No preferences
+  migrate: the standalone app's only ones belonged to its update checker,
+  which is removed. Quitting during a restore asks first.
+- **Coexistence:** both apps take Zen's profile lock while restoring, so a
+  restore in one is refused while the other is writing.
 - **Source facts:** Zen Browser only. Zen writes the session snapshots; the
   app reads them and writes safety copies around restores. A stale snapshot
   means Zen has not saved a session (unused, or crashing), not an overdue
