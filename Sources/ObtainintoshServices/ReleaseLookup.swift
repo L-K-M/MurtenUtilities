@@ -1,27 +1,6 @@
 import Foundation
 import ObtainintoshCore
 
-/// The credentials a lookup may send: the GitHub token for GitHub, the
-/// program's own Forgejo credentials for Forgejo.
-public struct LookupCredentials: Sendable {
-    public var gitHubToken: String?
-    public var forge: ForgeCredentials
-
-    public init(gitHubToken: String? = nil, forge: ForgeCredentials = ForgeCredentials()) {
-        self.gitHubToken = gitHubToken
-        self.forge = forge
-    }
-}
-
-/// Finds a tracked program's latest release on its forge. Only reads: the
-/// pane and the background check share it.
-public protocol ReleaseLooking: Sendable {
-    func latestRelease(of app: TrackedApp, credentials: LookupCredentials, budget: RequestBudget?) async throws -> Release
-    func releasePrograms(for input: SourceInput, credentials: LookupCredentials) async throws -> ReleasePrograms
-    /// What the asset download must authenticate with, nil when nothing.
-    func downloadAuth(for app: TrackedApp, credentials: LookupCredentials) throws -> DownloadAuth?
-}
-
 /// Dispatches to the forge's client.
 public struct ReleaseLookup: ReleaseLooking {
     static let gitLabUnsupported = "GitLab support not yet implemented"

@@ -1,30 +1,6 @@
 import Foundation
 import ObtainintoshCore
 
-/// How a check finds where a font is installed.
-public enum FontLookup: Equatable, Sendable {
-    /// The lookup named the font's file, so the font folders are searched.
-    case named(String)
-    /// The lookup failed; the copy found last time is read again, so the
-    /// installed version stays known while the forge cannot be reached.
-    case lastFoundAt(String)
-}
-
-/// The outcome of one font lookup.
-public enum FontDetection: Equatable, Sendable {
-    /// Not a font: the program detection stands.
-    case notAFont
-    case installed(InstalledVersion)
-    case notInstalled
-}
-
-/// Finds installed copies of tracked programs and fonts. Only reads the file
-/// system; never prompts.
-public protocol InstalledVersionDetecting: Sendable {
-    func detectPrograms(_ apps: [TrackedApp]) async -> [InstalledVersion?]
-    func detectFonts(_ lookups: [FontLookup?]) async -> [FontDetection]
-}
-
 public struct InstalledVersionDetector: InstalledVersionDetecting {
     private let applicationFolders: [URL]
     private let fontFolders: [URL]
