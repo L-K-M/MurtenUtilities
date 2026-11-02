@@ -82,6 +82,11 @@ let coreographyTargets: [Target] = [
     ),
     .target(name: "CoreographyKit", dependencies: ["CoreographyDrivers"], swiftSettings: coreographySwift6),
     .target(name: "CoreographyServices", dependencies: ["CoreographyKit"], swiftSettings: coreographySwift6),
+    // The suite-facing core: the watcher's observation-only interface,
+    // its CPU and pressure bookkeeping, and the pure suggestion rule.
+    .target(name: "CoreographyCore", dependencies: ["MurtenCore"], swiftSettings: coreographySwift6),
+    .testTarget(name: "CoreographyCoreTests", dependencies: ["CoreographyCore", "MurtenCore"],
+                swiftSettings: coreographySwift6),
     .testTarget(
         name: "CoreographyKitTests",
         dependencies: ["CoreographyKit", "CoreographyDrivers"],
