@@ -32,7 +32,7 @@ struct AskPanel: View {
                     }
                     answer
                 } else {
-                    Text("Add an Anthropic API key in Settings to ask questions in plain language.")
+                    Text("Add an Anthropic API key in Settings > Coreography to ask questions in plain language.")
                     SettingsLink { Text("Open Settings…") }
                 }
                 Text(sharingNotice).font(.caption).foregroundStyle(.secondary)
@@ -93,14 +93,15 @@ private enum AskText {
     }
 }
 
-/// Settings: the provider key lives only in the Keychain.
+/// Coreography's tab in the suite's Settings; the provider key lives only
+/// in the Keychain. The standalone app's Updates, Menu bar, Dock and
+/// Briefing widget sections have no counterpart here: the suite owns its
+/// update check, menu-bar item and Dock icon, and there are no widgets.
 struct SettingsView: View {
     @Bindable var model: DashboardModel
     let mcpAccess: MCPAccess
     @Bindable var hud: HUDController
-    let updates: UpdateChecker
     let helperAccess: HelperAccess
-    let briefing: BriefingController
     @State private var key = ""
     @State private var message: String?
     @State private var confirmingDelete = false
@@ -140,7 +141,6 @@ struct SettingsView: View {
                     }
             }
             MCPAccessSection(access: mcpAccess)
-            UpdatesSection(updates: updates)
             HelperSection(access: helperAccess)
             Section("Alerts") {
                 ForEach(model.alertRules) { rule in
@@ -155,8 +155,10 @@ struct SettingsView: View {
                     }
                 }
                 Text(model.shortcutsUnlisted
-                     ? "Shortcuts could not be listed; rules still tint their lane and notify."
+                     ? "Shortcuts could not be listed; rules still tint their lane."
                      : "A rule runs its Shortcut when it is raised, at most once every 15 minutes.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Text("Rules are checked while Coreography samples: while its pane or menu section shows, the HUD is up, or a recording runs. Suggestions and notifications come from Murten Utilities' background check instead.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Your alert rules") {
@@ -192,13 +194,6 @@ struct SettingsView: View {
                 Text("Only for your own gestures, and only while macOS plays interface sound effects.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            Section("Menu bar") {
-                ForEach(0..<MenuBarLayout.maximumItems, id: \.self) { slot in
-                    MenuBarSlot(model: model, slot: slot)
-                }
-                Text("Up to three readings, each a value, a one-minute graph or both.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
             Section("HUD") {
                 Picker("Shows", selection: $hud.settings.density) {
                     Text("One value").tag(HUDDensity.single)
@@ -216,16 +211,8 @@ struct SettingsView: View {
                 Slider(value: $hud.settings.textScale, in: HUDSettings.textScaleRange) { Text("Text size") }
                 Toggle("Dark backing behind text", isOn: $hud.settings.scrim)
                 Toggle("Let clicks pass through", isOn: $hud.settings.clickThrough)
-                Text("Turn click-through off to drag the HUD; it remembers where you put it on each display. Control-Command-H shows it, Control-Command-J changes what it shows. Frame rate needs macOS 27.")
+                Text("Turn click-through off to drag the HUD; it remembers where you put it on each display. With Coreography's pane in front, Control-Command-H shows it and Control-Command-J changes what it shows; the menu section shows it too. Frame rate needs macOS 27.")
                     .font(.caption).foregroundStyle(.secondary)
-            }
-            Section("Dock") {
-                Picker("Dock icon", selection: $model.dockIcon) {
-                    Text("App icon").tag(DockIconStyle.appIcon)
-                    Text("CPU graph").tag(DockIconStyle.cpu)
-                    Text("Memory graph").tag(DockIconStyle.memory)
-                }
-                Text("A graph redraws the Dock icon with every sample.").font(.caption).foregroundStyle(.secondary)
             }
             Section("Data sources") {
                 ForEach(model.dataSources, id: \.metric) { source in
@@ -258,10 +245,9 @@ struct SettingsView: View {
                 if let message { Text(message).font(.caption) }
                 Text(sharingNotice).font(.caption).foregroundStyle(.secondary)
             }
-            BriefingSection(briefing: briefing, hasAnthropicKey: model.hasProviderKey)
         }
         .formStyle(.grouped)
-        .frame(width: 460)
+        .frame(minHeight: 480, idealHeight: 640)
         .task {
             await model.refreshShortcuts()
             await model.refreshProviderKey()
@@ -270,7 +256,9 @@ struct SettingsView: View {
     }
 }
 
-/// One of the person's rules: what it watches, when it raises and clears, and whether it notifies.
+/// One of the person's rules: what it watches, when it raises and clears.
+/// The standalone app could also notify; the suite's notifications come
+/// only from its background check.
 private struct CustomAlertEditor: View {
     @Binding var rule: CustomAlertRule
     let delete: () -> Void
@@ -301,7 +289,6 @@ private struct CustomAlertEditor: View {
                 Text("s")
             }
             HStack {
-                Toggle("Notify", isOn: $rule.notifies)
                 Spacer()
                 Button("Delete", role: .destructive, action: delete)
             }
@@ -321,170 +308,5 @@ private enum RetentionText {
         let cap = ByteCountFormatter.string(fromByteCount: HistoryRetention.sizeCap, countStyle: .file)
         // Live pages only: freed pages and the write-ahead log can make the file itself larger.
         return String(localized: "Now \(used) of history; never more than \(cap)")
-    }
-}
-
-/// One menu bar slot: a reading (the first slot always has one) and its style.
-private struct MenuBarSlot: View {
-    @Bindable var model: DashboardModel
-    let slot: Int
-
-    var body: some View {
-        HStack {
-            Picker("Item \(slot + 1)", selection: metric) {
-                if slot > 0 { Text("None").tag(MenuBarMetric?.none) }
-                ForEach(MenuBarMetric.allCases) { metric in Text(MenuBarText.name(metric)).tag(MenuBarMetric?.some(metric)) }
-            }
-            // Slots fill in order, so a slot after an empty one waits.
-            .disabled(slot > model.menuBarItems.count)
-            if slot < model.menuBarItems.count {
-                Picker("Style", selection: style) {
-                    Text("Value").tag(MenuBarStyle.value)
-                    Text("Graph").tag(MenuBarStyle.graph)
-                    Text("Both").tag(MenuBarStyle.both)
-                }
-                .labelsHidden()
-                .frame(width: 100)
-            }
-        }
-    }
-
-    private var metric: Binding<MenuBarMetric?> {
-        Binding(
-            get: { slot < model.menuBarItems.count ? model.menuBarItems[slot].metric : nil },
-            set: { model.menuBarItems = MenuBarLayout.choosing($0, at: slot, in: model.menuBarItems) }
-        )
-    }
-
-    private var style: Binding<MenuBarStyle> {
-        Binding(
-            get: { slot < model.menuBarItems.count ? model.menuBarItems[slot].style : .value },
-            set: { style in
-                guard slot < model.menuBarItems.count else { return }
-                model.menuBarItems[slot].style = style
-            }
-        )
-    }
-}
-
-private enum MenuBarText {
-    static func name(_ metric: MenuBarMetric) -> String {
-        switch metric {
-        case .cpu: String(localized: "CPU")
-        case .memory: String(localized: "Memory")
-        case .gpu: String(localized: "GPU")
-        case .download: String(localized: "Download")
-        case .upload: String(localized: "Upload")
-        case .temperature: String(localized: "Temperature")
-        }
-    }
-}
-
-/// Settings > Briefing widget. Off until turned on, because it sends
-/// readings on a schedule rather than when you ask.
-private struct BriefingSection: View {
-    let briefing: BriefingController
-    let hasAnthropicKey: Bool
-    @State private var baseURL = ""
-    @State private var model = ""
-    @State private var key = ""
-    @State private var message: String?
-
-    var body: some View {
-        Section("Briefing widget") {
-            Toggle("Write a briefing every 15 minutes", isOn: setting(\.isEnabled))
-            Picker("Provider", selection: setting(\.provider)) {
-                Text("Anthropic").tag(BriefingProvider.anthropic)
-                Text("OpenAI-compatible").tag(BriefingProvider.compatible)
-            }
-            switch briefing.settings.provider {
-            case .anthropic:
-                Picker("Model", selection: setting(\.anthropicModel)) {
-                    Text("Claude Haiku 5.5").tag(BriefingSettings.anthropicModels[0])
-                    Text("Claude Sonnet 5.5").tag(BriefingSettings.anthropicModels[1])
-                }
-                Text(hasAnthropicKey ? "Uses the key saved under Ask Coreography." : "Save an Anthropic key under Ask Coreography first.")
-                    .font(.caption)
-            case .compatible:
-                compatibleFields
-            }
-            HStack {
-                status
-                Spacer()
-                Button("Write Now") { Task { await briefing.writeNow() } }
-                    .disabled(!briefing.settings.isEnabled || briefing.status == .writing)
-            }
-            if let problem = briefing.problem { Text(problem).font(.caption).foregroundStyle(.red) }
-            Text("Each briefing sends five minutes of readings (resource use, app and process names, never executable paths or arguments) to the provider above, a few thousand tokens each time. Nothing is sent while this is off. Without a fresh briefing, the widget shows a hint from its own sample.")
-                .font(.caption).foregroundStyle(.secondary)
-        }
-        .task {
-            baseURL = briefing.settings.compatibleBaseURL
-            model = briefing.settings.compatibleModel
-            await briefing.refreshKeys()
-        }
-    }
-
-    @ViewBuilder private var compatibleFields: some View {
-        TextField("Base URL", text: $baseURL, prompt: Text(verbatim: "https://api.deepseek.com"))
-        TextField("Model", text: $model, prompt: Text(verbatim: "deepseek-chat"))
-        // Typed values take effect only on Apply, so a half-typed address never receives the key.
-        Button("Apply") {
-            var settings = briefing.settings
-            settings.compatibleBaseURL = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
-            settings.compatibleModel = model.trimmingCharacters(in: .whitespacesAndNewlines)
-            briefing.update(settings)
-        }
-        .disabled(baseURL == briefing.settings.compatibleBaseURL && model == briefing.settings.compatibleModel)
-        if !briefing.settings.compatibleBaseURL.isEmpty, BriefingSettings.baseURL(briefing.settings.compatibleBaseURL) == nil {
-            Text("Use an HTTPS address; plain HTTP is allowed only to this Mac.").font(.caption).foregroundStyle(.red)
-        }
-        SecureField("API key", text: $key)
-        HStack {
-            Button("Save key") {
-                Task {
-                    // Keep the typed key after a failed save, so it can be retried.
-                    if let failure = await briefing.saveCompatibleKey(key) {
-                        message = failure
-                    } else {
-                        message = String(localized: "Key saved in the Keychain.")
-                        key = ""
-                    }
-                }
-            }
-            .disabled(key.trimmingCharacters(in: .whitespaces).isEmpty)
-            Button("Remove key", role: .destructive) {
-                Task { message = await briefing.removeCompatibleKey() ?? String(localized: "Key removed.") }
-            }
-            .disabled(!briefing.hasCompatibleKey)
-        }
-        Text(briefing.hasCompatibleKey ? "A key is stored, separate from the Anthropic key." : "No key is stored.")
-            .font(.caption)
-        if let message { Text(message).font(.caption) }
-    }
-
-    private var status: Text {
-        switch briefing.status {
-        case .off: return Text("Off.")
-        case .collecting: return Text("Waiting for five minutes of readings.")
-        case .writing: return Text("Writing…")
-        case .written(let written):
-            let time = written.windowEnd.formatted(date: .omitted, time: .shortened)
-            switch written.outcome {
-            case .text(let text): return Text("\(time): \(text)")
-            case .failed(let problem): return Text("Failed at \(time): \(problem)")
-            }
-        }
-    }
-
-    private func setting<Value>(_ keyPath: WritableKeyPath<BriefingSettings, Value>) -> Binding<Value> {
-        Binding(
-            get: { briefing.settings[keyPath: keyPath] },
-            set: {
-                var settings = briefing.settings
-                settings[keyPath: keyPath] = $0
-                briefing.update(settings)
-            }
-        )
     }
 }

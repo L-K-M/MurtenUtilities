@@ -87,6 +87,14 @@ let coreographyTargets: [Target] = [
     .target(name: "CoreographyCore", dependencies: ["MurtenCore"], swiftSettings: coreographySwift6),
     .testTarget(name: "CoreographyCoreTests", dependencies: ["CoreographyCore", "MurtenCore"],
                 swiftSettings: coreographySwift6),
+    // The Xcode app shell's views plus the provider, session and live
+    // watcher reads: the pane, the menu section and Settings.
+    .target(
+        name: "CoreographyModule",
+        dependencies: ["MurtenCore", "MurtenModuleKit", "CoreographyCore", "CoreographyServices",
+                       "CoreographyKit", "CoreographyDrivers"],
+        swiftSettings: coreographySwift6
+    ),
     .testTarget(
         name: "CoreographyKitTests",
         dependencies: ["CoreographyKit", "CoreographyDrivers"],
@@ -96,9 +104,14 @@ let coreographyTargets: [Target] = [
         name: "CoreographyServicesTests",
         dependencies: ["CoreographyServices", "CoreographyKit", "CoreographyDrivers"],
         swiftSettings: coreographySwift6
+    ),
+    .testTarget(
+        name: "CoreographyModuleTests",
+        dependencies: ["CoreographyModule", "CoreographyCore", "MurtenCore", "MurtenModuleKit"],
+        swiftSettings: coreographySwift6
     )
 ]
-let coreographyModule: [Target.Dependency] = []
+let coreographyModule: [Target.Dependency] = ["CoreographyModule"]
 
 // MARK: - Assembly
 

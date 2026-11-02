@@ -13,12 +13,14 @@ struct CommandPaletteView: View {
     let confirm: (ProcessActionRequest) -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openSettings) private var openSettings
+    /// Spindump runs only in the privileged helper.
+    @Environment(\.coreographyHelperUnavailable) private var helperUnavailable
     @State private var query = ""
     @State private var highlighted: PaletteEntry.ID?
     @FocusState private var fieldFocused: Bool
 
     var body: some View {
-        let results = CommandPalette.matches(query, in: model.paletteEntries)
+        let results = CommandPalette.matches(query, in: entries)
         VStack(spacing: 0) {
             TextField("Type a command", text: $query)
                 .textFieldStyle(.plain)
@@ -58,6 +60,14 @@ struct CommandPaletteView: View {
         .onAppear { fieldFocused = true }
         .onChange(of: query) { highlighted = nil }
         .onExitCommand { dismiss() }
+    }
+
+    private var entries: [PaletteEntry] {
+        guard let helperUnavailable else { return model.paletteEntries }
+        return model.paletteEntries.map { entry in
+            guard entry.action == .spindumpSelected, entry.unavailableReason == nil else { return entry }
+            return PaletteEntry(title: entry.title, action: entry.action, unavailableReason: helperUnavailable)
+        }
     }
 
     private func move(_ step: Int, in results: [PaletteEntry]) -> KeyPress.Result {

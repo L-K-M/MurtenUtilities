@@ -18,22 +18,32 @@ final class HUDController {
     private static let lineWidth: CGFloat = 430
     private static let positionsKey = "hud.positions"
 
-    private(set) var isShown = false
-    var settings = HUDSettings.saved() {
+    private(set) var isShown = false {
+        didSet { if isShown != oldValue { onVisibilityChange?() } }
+    }
+    var settings: HUDSettings {
         didSet {
             guard settings != oldValue else { return }
-            settings.save()
+            settings.save(in: preferences)
             if settings.corner != oldValue.corner { forgetDraggedPosition() }
             if isShown, let panel { configure(panel) }
         }
     }
     @ObservationIgnored private var panel: NSPanel?
     @ObservationIgnored private let model: DashboardModel
+    @ObservationIgnored private let preferences: UserDefaults
+    /// Showing the HUD keeps sampling running with the window closed;
+    /// the session listens here to start or stop it.
+    @ObservationIgnored var onVisibilityChange: (() -> Void)?
     @ObservationIgnored private var moveObserver: NSObjectProtocol?
     /// Set while the HUD moves itself, so only a person's drag is remembered.
     @ObservationIgnored private var isPlacing = false
 
-    init(model: DashboardModel) { self.model = model }
+    init(model: DashboardModel, preferences: UserDefaults) {
+        self.model = model
+        self.preferences = preferences
+        settings = HUDSettings.saved(in: preferences)
+    }
 
     func toggle() {
         if isShown { hide() } else { show() }
@@ -127,15 +137,15 @@ final class HUDController {
         guard !isPlacing, !settings.clickThrough, let panel, let screen = panel.screen else { return }
         var all = positions()
         all[Self.key(screen)] = [panel.frame.origin.x, panel.frame.origin.y]
-        UserDefaults.standard.set(all, forKey: Self.positionsKey)
+        preferences.set(all, forKey: Self.positionsKey)
     }
 
     private func forgetDraggedPosition() {
-        UserDefaults.standard.removeObject(forKey: Self.positionsKey)
+        preferences.removeObject(forKey: Self.positionsKey)
     }
 
     private func positions() -> [String: [Double]] {
-        UserDefaults.standard.dictionary(forKey: Self.positionsKey) as? [String: [Double]] ?? [:]
+        preferences.dictionary(forKey: Self.positionsKey) as? [String: [Double]] ?? [:]
     }
 
     /// Displays are told apart by their number, which survives rearranging.

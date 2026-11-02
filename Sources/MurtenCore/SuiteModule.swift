@@ -75,6 +75,6 @@ public enum ModuleRegistry {
         SuiteModule(
             id: "coreography", name: "Coreography",
             summary: "Watch CPU, memory, disk and network in real time.",
-            systemImage: "waveform.path.ecg", sourceRepository: "Coreography"),
+            systemImage: "waveform.path.ecg", status: .available, sourceRepository: "Coreography"),
     ]
 }

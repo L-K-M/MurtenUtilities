@@ -14,6 +14,9 @@ struct MCPAccessSection: View {
             ))
             Text("Clients run coreo mcp --stdio. Each app is asked once; it can then read resource use, app and process names and history, never paths, arguments or process control.")
                 .font(.caption).foregroundStyle(.secondary)
+            // The suite does not ship the CLI (it stays in Coreography's repo).
+            Text("Murten Utilities does not include coreo. Use the one inside the Coreography app: Coreography.app/Contents/Helpers/coreo mcp --stdio. Approvals still name the app behind it.")
+                .font(.caption).foregroundStyle(.secondary)
             if let problem = access.problem {
                 Text(problem).font(.caption).foregroundStyle(.red)
             }
@@ -49,27 +52,29 @@ struct MCPApprovalAlert: ViewModifier {
             Button("Allow") { access.answer(request.id, allow: true) }
             Button("Don't Allow", role: .cancel) { access.answer(request.id, allow: false) }
         } message: { request in
-            Text("\(request.identity.detail)\n\nIt can read resource use, app and process names and history through MCP. It cannot see paths or arguments, quit processes or change settings. Every program started from \(request.identity.displayName), such as a terminal's commands, shares this approval. Revoke it in Settings > MCP access.")
+            Text("\(request.identity.detail)\n\nIt can read resource use, app and process names and history through MCP. It cannot see paths or arguments, quit processes or change settings. Every program started from \(request.identity.displayName), such as a terminal's commands, shares this approval. Revoke it in Settings > Coreography > MCP access.")
         }
     }
 }
 
-/// Brings the window forward when a client waits for approval.
+/// Opens Coreography's pane, where the question is asked, when a client
+/// waits for approval.
 @MainActor
 final class MCPApprovalPresenter {
     private let access: MCPAccess
-    private let automation: AutomationRouter
+    private let present: @MainActor () -> Void
 
-    init(access: MCPAccess, automation: AutomationRouter) {
+    init(access: MCPAccess, present: @escaping @MainActor () -> Void) {
         self.access = access
-        self.automation = automation
+        self.present = present
         observe()
     }
 
     private func observe() {
         withObservationTracking {
             if access.pendingApproval != nil {
-                automation.showDashboard()
+                present()
+                NSApplication.shared.activate()
                 NSApplication.shared.requestUserAttention(.criticalRequest)
             }
         } onChange: { [weak self] in

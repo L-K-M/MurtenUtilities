@@ -48,13 +48,18 @@ final class BraidInspection {
     /// nil when the person's own hold was already in place.
     @ObservationIgnored private var ownHold: Int?
     @ObservationIgnored private var motionToken = UUID()
-    @ObservationIgnored private let feedback = InteractionFeedback()
+    @ObservationIgnored private let feedback: InteractionFeedback
     @ObservationIgnored private var lastHaptic: ContinuousClock.Instant?
     /// Where a pull started from: a pull on an open lens starts open.
     @ObservationIgnored private var pullBase = 0.0
     /// The opening cue sounds once per pull, however the hand wobbles.
     @ObservationIgnored private var openCuePlayed = false
     private static let hapticSpacing = Duration.milliseconds(100)
+
+    /// - Parameter preferences: holds the braid-sounds switch.
+    init(preferences: UserDefaults) {
+        feedback = InteractionFeedback(defaults: preferences)
+    }
 
     var isOpen: Bool { phase != .closed }
     /// Read from AppKit when motion starts, so it is current at that moment.
@@ -433,8 +438,11 @@ struct BraidPalette {
     private static let otherOpacity = 0.2
     private static let identitySaturation = 0.5
 
+    /// Light appearance only (the suite never draws dark), so one brightness.
+    private static let identityBrightness = 0.74
+
     @MainActor
-    init(braid: CPUBraid, bundles: [String: String?], dark: Bool) {
+    init(braid: CPUBraid, bundles: [String: String?]) {
         let strands = braid.strands
         let iconHues = strands.map { strand -> Double in
             guard let app = strand.appName else { return BraidPalette.neutralHue }
@@ -442,7 +450,6 @@ struct BraidPalette {
             return BraidPalette.hue(forName: app)
         }
         let hues = BraidLens.separatedHues(iconHues)
-        let brightness = dark ? 0.86 : 0.74
         var rest: [Color] = []
         var identity: [Color] = []
         var named = 0
@@ -452,7 +459,7 @@ struct BraidPalette {
                 let opacity = Self.restOpacities[min(named, Self.restOpacities.count - 1)]
                 named += 1
                 rest.append(Color.blue.opacity(opacity))
-                identity.append(Color(hue: hues[index], saturation: Self.identitySaturation, brightness: brightness))
+                identity.append(Color(hue: hues[index], saturation: Self.identitySaturation, brightness: Self.identityBrightness))
             case .otherApps:
                 rest.append(Color.blue.opacity(Self.otherOpacity))
                 identity.append(Color.gray.opacity(0.45))
@@ -1033,12 +1040,12 @@ struct BraidOverlay: View {
 }
 
 /// What the CPU lane derives from a braid, kept until the braid, the plot
-/// or the appearance changes: the chart closures rerun on every cursor move.
+/// or the apps' icons change: the chart closures rerun on every cursor move.
 @MainActor
 final class BraidCache {
     private var geometryKey: (braid: UUID, rect: CGRect, window: ClosedRange<Date>)?
     private var geometry: BraidGeometry?
-    private var paletteKey: (braid: UUID, bundles: [String: String?], dark: Bool)?
+    private var paletteKey: (braid: UUID, bundles: [String: String?])?
     private var palette: BraidPalette?
 
     func geometry(_ braid: CPUBraid, rect: CGRect, window: ClosedRange<Date>) -> BraidGeometry {
@@ -1051,14 +1058,14 @@ final class BraidCache {
         return built
     }
 
-    func palette(_ braid: CPUBraid, bundles: [String: String?], dark: Bool) -> BraidPalette {
+    func palette(_ braid: CPUBraid, bundles: [String: String?]) -> BraidPalette {
         // Bundles too: an app's icon can resolve after its strand exists.
-        if let palette, let key = paletteKey, key.braid == braid.id, key.bundles == bundles, key.dark == dark {
+        if let palette, let key = paletteKey, key.braid == braid.id, key.bundles == bundles {
             return palette
         }
-        let built = BraidPalette(braid: braid, bundles: bundles, dark: dark)
+        let built = BraidPalette(braid: braid, bundles: bundles)
         palette = built
-        paletteKey = (braid.id, bundles, dark)
+        paletteKey = (braid.id, bundles)
         return built
     }
 }
@@ -1101,8 +1108,10 @@ struct BraidKeyPress: Sendable {
 /// needs neither. Typing in a field always wins.
 @MainActor
 final class BraidKeys {
-    /// SwiftUI names a scene's window after its id (see CoreographyApp).
-    private static let dashboardID = "dashboard"
+    /// SwiftUI names a scene's window after its id. The pane shows only in
+    /// the suite's home window (SuiteScenes.homeWindowID in MurtenShell,
+    /// which modules do not import), so its keys are taken there.
+    private static let dashboardID = "home"
     private var monitor: Any?
     private var handler: ((BraidKeyPress) -> Bool)?
 
@@ -1127,7 +1136,7 @@ final class BraidKeys {
         handler = nil
     }
 
-    /// Example identifiers: "dashboard", or "dashboard-AppWindow-1".
+    /// Example identifiers: "home", or "home-AppWindow-1".
     private static func isDashboard(_ window: NSWindow) -> Bool {
         guard let identifier = window.identifier?.rawValue else { return false }
         return identifier == dashboardID || identifier.hasPrefix(dashboardID + "-")

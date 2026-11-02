@@ -16,12 +16,18 @@ struct DashboardView: View {
     @State private var markerName = ""
     @State private var paletteAction: ProcessActionRequest?
     /// The CPU braid's lens (plan: the CPU lane opens into its apps).
-    @State private var inspection = BraidInspection()
+    @State private var inspection: BraidInspection
     @State private var braidCache = BraidCache()
     @State private var braidKeys = BraidKeys()
-    /// The braid's identity colours differ by appearance; reading it here
-    /// redraws them when it changes.
-    @Environment(\.colorScheme) private var colorScheme
+    /// Why the privileged helper cannot run, shown once above the lanes.
+    @Environment(\.coreographyHelperUnavailable) private var helperUnavailable
+
+    init(model: DashboardModel, hud: HUDController) {
+        self.model = model
+        self.hud = hud
+        // Its sounds follow the module's own switch in Settings.
+        _inspection = State(initialValue: BraidInspection(preferences: model.preferences))
+    }
 
     var body: some View {
         ScrollView {
@@ -40,6 +46,11 @@ struct DashboardView: View {
                     }
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                }
+                if helperUnavailable != nil {
+                    Text(HelperAvailability.explanation)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 // The person's order, sizes and hidden lanes (plan: each lane's menu).
@@ -300,7 +311,6 @@ struct DashboardView: View {
                 .help("Hold the display while collection continues")
             }
         }
-        .onAppear { model.start() }
     }
 
     private func braidGeometry(_ braid: CPUBraid, _ rect: CGRect, _ window: ClosedRange<Date>) -> BraidGeometry {
@@ -470,7 +480,7 @@ struct DashboardView: View {
         let points = visiblePoints(model.points(for: metric), start, end)
         // Per-app strands over the live hour; without them the lane keeps user under system.
         let braid = metric == .cpu ? model.cpuBraid(in: start...end) : nil
-        let palette = braid.map { braidCache.palette($0, bundles: model.sampledApps, dark: colorScheme == .dark) }
+        let palette = braid.map { braidCache.palette($0, bundles: model.sampledApps) }
         let scopedStrand = braid?.strands.firstIndex { $0.appName != nil && $0.appName == model.scopedApp }
         // In the braid the scoped app is its own lit strand; an app idle all window has none, so its series still answers.
         let scoped = metric == .cpu && scopedStrand == nil ? model.scopedSeries().map { visiblePoints($0.cpu, start, end) } : nil
@@ -1928,7 +1938,13 @@ private struct ProcessPane: View {
     var filterFocused: FocusState<Bool>.Binding
     @State private var pendingAction: ProcessActionRequest?
     /// Which columns show, in which order; the header's menu changes it (plan: opt-in columns).
-    @State private var columns = ProcessColumns.saved()
+    @State private var columns: TableColumnCustomization<ProcessRow>
+
+    init(model: DashboardModel, filterFocused: FocusState<Bool>.Binding) {
+        self.model = model
+        self.filterFocused = filterFocused
+        _columns = State(initialValue: ProcessColumns.saved(in: model.preferences))
+    }
 
     var body: some View {
         let rows = model.visibleProcessRows
@@ -2129,7 +2145,7 @@ private struct ProcessPane: View {
                     }
                 }
                 .frame(height: 260)
-                .onChange(of: columns) { _, chosen in ProcessColumns.save(chosen) }
+                .onChange(of: columns) { _, chosen in ProcessColumns.save(chosen, in: model.preferences) }
                 // Signatures are read from disk, so checks start only while their
                 // column shows. `.automatic` is the column's hidden default.
                 .onChange(of: columns, initial: true) { _, chosen in
@@ -2277,6 +2293,8 @@ private struct ProcessActionMenu: View {
     let process: ObservedProcess
     @Binding var pendingAction: ProcessActionRequest?
     var includesQuit: QuitEntries = .yes
+    /// Raising priority and spindump run only in the privileged helper.
+    @Environment(\.coreographyHelperUnavailable) private var helperUnavailable
 
     var body: some View {
         if includesQuit == .yes {
@@ -2295,11 +2313,13 @@ private struct ProcessActionMenu: View {
         }
         Button("Lower Priority…") { ask(.lowerPriority) }
         Button("Raise Priority…") { ask(.raisePriority) }
-            .help("Renice to a negative value, which only root may do; the privileged helper does it")
+            .disabled(helperUnavailable != nil)
+            .help(helperUnavailable ?? "Renice to a negative value, which only root may do; the privileged helper does it")
         Button("Sample for \(SampleTool.defaultSeconds) Seconds") { Task { await model.sampleProcess(process) } }
             .help("Records its call stacks with the system sample tool; the process pauses briefly while it is read")
         Button("Spindump for \(SpindumpTool.defaultSeconds) Seconds") { Task { await model.spindumpProcess(process) } }
-            .help("Records a spindump with the privileged helper, the only way the tool may run; spindump samples every process, so the report includes system-wide call stacks")
+            .disabled(helperUnavailable != nil)
+            .help(helperUnavailable ?? "Records a spindump with the privileged helper, the only way the tool may run; spindump samples every process, so the report includes system-wide call stacks")
         Divider()
         if let path = process.executablePath {
             Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }
@@ -2625,17 +2645,17 @@ private enum ProcessColumns {
     static let signerID = "signer"
     static let portsID = "ports"
 
-    static func saved() -> TableColumnCustomization<ProcessRow> {
-        guard let data = UserDefaults.standard.data(forKey: defaultsKey),
+    static func saved(in defaults: UserDefaults) -> TableColumnCustomization<ProcessRow> {
+        guard let data = defaults.data(forKey: defaultsKey),
               let saved = try? JSONDecoder().decode(TableColumnCustomization<ProcessRow>.self, from: data) else {
             return TableColumnCustomization()
         }
         return saved
     }
 
-    static func save(_ columns: TableColumnCustomization<ProcessRow>) {
+    static func save(_ columns: TableColumnCustomization<ProcessRow>, in defaults: UserDefaults) {
         guard let data = try? JSONEncoder().encode(columns) else { return }
-        UserDefaults.standard.set(data, forKey: defaultsKey)
+        defaults.set(data, forKey: defaultsKey)
     }
 }
 
@@ -3336,11 +3356,6 @@ private extension RangePanel {
 }
 
 /// Already-encoded export bytes handed to the save panel.
-extension UTType {
-    /// Declared in Info.plist; JSON underneath.
-    static let coreographyRecording = UTType(exportedAs: "ch.lkmc.coreography.trace", conformingTo: .json)
-}
-
 private struct ExportFile: FileDocument {
     static let readableContentTypes: [UTType] = [.json, .commaSeparatedText, .plainText, .coreographyRecording]
     let data: Data
