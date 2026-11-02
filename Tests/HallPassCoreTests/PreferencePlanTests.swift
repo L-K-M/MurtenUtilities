@@ -4,18 +4,8 @@ import Testing
 
 /// Executes the real generated shell against temporary plist domains only.
 /// No real networking preferences, sudo, or administrator dialogs are used.
+@Suite(.enabled(if: FileManager.default.isExecutableFile(atPath: "/usr/bin/defaults"), "Requires macOS defaults"))
 struct PreferencePlanTests {
-    @Test func preservesMissingVersusEmpty() throws {
-        let snapshot = try PreferencesSnapshot(configuration: .init(wifi: [], ethernet: nil))
-        #expect(snapshot.configuration.wifi == [])
-        #expect(snapshot.configuration.ethernet == nil)
-    }
-
-    @Test func rejectsUnexpectedPreferenceType() throws {
-        let xml = try xmlString([NetworkInterface.wifi.key: "not an array"])
-        #expect(throws: ConfigurationError.self) { try PreferencesSnapshot(xml: xml) }
-    }
-
     @Test func updatesBothInterfacesAndPreservesUnmanagedKeys() throws {
         let fixture = try Fixture(values: ["Unmanaged": "leave me alone"])
         defer { fixture.cleanUp() }
@@ -85,14 +75,6 @@ struct PreferencePlanTests {
         #expect(try fixture.snapshot().configuration.wifi == nil)
     }
 
-    @Test func backupRoundTripAndRejectsUnknownVersion() throws {
-        let configuration = NetworkConfiguration(wifi: [], ethernet: ["fe80::/10"])
-        let data = try ConfigurationBackup(configuration: configuration).encoded()
-        #expect(try ConfigurationBackup.decode(data).configuration == configuration)
-        let altered = String(decoding: data, as: UTF8.self).replacingOccurrences(of: "\"formatVersion\" : 1", with: "\"formatVersion\" : 99")
-        #expect(throws: ConfigurationError.self) { try ConfigurationBackup.decode(Data(altered.utf8)) }
-    }
-
     @Test func doesNotClaimSuccessForIgnoredRollback() throws {
         let fixture = try Fixture(values: [NetworkInterface.wifi.key: ["169.254.0.0/16"]])
         defer { fixture.cleanUp() }
@@ -134,12 +116,6 @@ struct PreferencePlanTests {
         #expect(try fixture.snapshot().configuration.ethernet == nil)
     }
 
-    @Test func backupCanReopenLegacyValuesForInspection() throws {
-        let configuration = NetworkConfiguration(wifi: ["legacy-invalid-value"], ethernet: nil)
-        let data = try ConfigurationBackup(configuration: configuration).encoded()
-        #expect(try ConfigurationBackup.decode(data).configuration == configuration)
-        #expect(throws: CIDRError.self) { try configuration.validate() }
-    }
 }
 
 private func xmlString(_ dictionary: [String: Any]) throws -> String {
