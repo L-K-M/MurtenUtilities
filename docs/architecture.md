@@ -106,6 +106,35 @@ Revisit only if the standalone apps stay alive long-term — at that point the
 shared cores could be extracted into their own tiny packages both sides
 consume.
 
+## Transition from the standalone apps
+
+Until PLAN.md's *Standalone app fate* is settled, each migrated tool exists
+twice. Three rules hold either way:
+
+- **Record provenance.** Each migrated core notes the upstream commit it was
+  copied from (docs/modules.md). Without it, fixes made on either side after
+  the move cannot be found and the copies drift unnoticed.
+- **Never orphan undo data.** The suite's bundle id gives it its own
+  UserDefaults domain, and a module that reads only `MurtenUtilities` paths
+  cannot see what the standalone app saved. Some of that is the user's only
+  way back:
+
+  | Module | State | Holds |
+  | --- | --- | --- |
+  | BootCaptain | `~/Library/Application Support/BootCaptain/{Vault,Journal}`, `/Library/Application Support/BootCaptain/Vault` | startup items it moved aside; unfinished actions |
+  | HallPass | `~/Library/Application Support/HallPass/{Backups,Draft.json}` | the backup taken before each apply; unsaved edits |
+  | Zen Backup Manager | `~/Library/Application Support/ZenBackupManager/Safety Copies` | the copy taken before each restore |
+  | RunningMan | Keychain items; launchd labels `ch.lkmc.RunningMan.forgejo.*` | Forgejo tokens; which runners it manages |
+
+  A module reads these locations, or imports them once with the user's
+  consent; it never starts empty over them. Keychain items whose access list
+  names the standalone app may prompt or fail when the suite reads them;
+  verify per item before relying on a silent import.
+- **Define coexistence.** With both installed, both copies can act on the same
+  runners, startup items and preferences, and menu-bar items, login items
+  and update checks double up. Each module states whether it defers to a
+  running standalone app, and what the user sees.
+
 ## Testing strategy
 
 - `MurtenCore`: registry invariants, dedupe/snooze/threshold rules, deep-link
