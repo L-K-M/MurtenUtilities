@@ -98,6 +98,12 @@ Per-module migration notes, satellites, and new-module ideas:
   conversation.
 - **Tauri/Rust tools stay satellites** initially (Lantenna, Copywraith,
   Foldover) — a satellite can still feed suggestions; embedding is a port.
+- **Light appearance only — no dark mode.** The classic look *is* light
+  platinum; a dark variant would be a redesign, not a reskin, and it's not
+  worth paying now. Enforced app-wide via
+  `NSRequiresAquaSystemAppearance` in `Info.plist`. If this ever changes it is
+  a deliberate product decision plus real Rigi theming work — never a gradual
+  accumulation of dark patches (docs/ui-direction.md).
 
 ## Open questions
 
@@ -107,9 +113,6 @@ Per-module migration notes, satellites, and new-module ideas:
 - **Obtainintosh scope.** Generic "anything installed from a GitHub/Forgejo
   release" updater, or just the fleet? Leaning generic — the suggestion is
   only useful with the full picture.
-- **Dark mode.** Rigi is a light classic theme; classic Mac had no dark mode.
-  Ship light-only, or invest in a dark classic variant? Decide before polish
-  passes, not at v1.0.
 - **Name.** `MurtenUtilities` is the repo and bundle id; the *displayed* name
   can stay "Murten Utilities" or take a friendlier one later.
 - **Signing.** Ad-hoc now; Developer ID + notarization later is a distribution
