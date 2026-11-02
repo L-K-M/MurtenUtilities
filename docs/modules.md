@@ -39,9 +39,10 @@ app + CLI; **GitHub-only, not yet cloned**.
   The CLI could survive as a bundled tool or stay in its repo.
 - **Privilege:** ships a root helper today (`SMAppService.daemon`) whose
   enabled actions are reversible vault moves — launchd/cron mutations stay
-  gated off in the current build — and is a Developer ID, notarized,
-  non-sandboxed app. The helper embeds per-module at migration and gates on
-  the signing decision (docs/architecture.md § Module packaging).
+  gated off in the current build — and the app itself is Developer ID
+  signed, notarized and non-sandboxed. The helper embeds per-module at
+  migration and gates on the signing decision (docs/architecture.md §
+  Module packaging).
 - **Watcher:** diff the startup inventory on a cadence → "X installed 2 new
   login items". Boot-failure diagnosis stays an on-demand flow.
 
