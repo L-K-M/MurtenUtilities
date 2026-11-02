@@ -220,7 +220,8 @@ SwiftPM.
   menu-bar extra, login item, notifications and update check, and the
   `--demo` preview workspace and screenshot capture (kept for tests only).
   Core's `AppUpdate`, `NotificationPlanner` and `WidgetSnapshot` served only
-  those surfaces and stayed behind.
+  those surfaces and stayed behind, as did the `release-job.swift` CI helper
+  the standalone repository vendors into other projects, with its tests.
 - **Polling:** only while the pane or the menu section is on screen, or while
   a stop-after-job request waits for its runner (the provider owns those, so
   they continue with the pane closed). Keep-awake follows that polling.
