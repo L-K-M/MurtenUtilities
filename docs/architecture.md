@@ -234,5 +234,13 @@ is a UI decision. Declared floors per module are in
   Fake clocks and services cover threshold oscillation, multiple targets,
   snooze/restart, resolution/recurrence, partial/failing observations, timeout,
   wake coalescing, opt-out during a poll, late results and stale deep links.
-- The privileged write paths stay manual-verification-only, exactly as in the
-  standalone apps, and stay documented as such.
+- Repair paths keep the automated tests they bring. The standalone apps
+  already test repair plans, request validation, journals, recovery and
+  deletes against fakes: HallPass `PreferencePlanTests` and
+  `HallPassModelTests`, BootCaptain `RequestValidatorTests`,
+  `MutationPolicyTests` and `FileJournalTests`, DockVac `FakeDaemonTests`,
+  DeviceControlDoctor `RepairPlanTests`. Only the live authorization prompt
+  and the real system write stay manual, and stay documented as such.
+- The suite's own path from a suggestion to a repair (deep link, confirm,
+  module action) gets fake-backed tests for denied authorization, cancel,
+  system state that changed between preview and write, and partial failure.
