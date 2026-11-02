@@ -1,226 +1,307 @@
 import AppKit
-import Foundation
 import HallPassCore
 import Observation
-import UniformTypeIdentifiers
+
+enum SessionMode {
+    case system, preview
+}
 
 @MainActor @Observable
 final class HallPassModel {
-    /// What the privileged service is doing; quitting interrupts either.
-    enum Activity: Equatable {
-        case loading
-        case applying
+    enum Activity {
+        case idle, loading, saving
     }
 
-    /// Restart-state keys, unchanged from the standalone app. The suite's
-    /// per-module defaults domain keeps them from colliding.
-    static let restartUptimeKey = "restartRequiredAtUptime"
-    static let restartBootTimeKey = "restartRequiredBootTime"
-
-    var snapshot: PreferencesSnapshot?
-    var draft = NetworkConfiguration()
-    var selectedInterface: NetworkInterface = .wifi
-    private(set) var activity: Activity?
-    var notice: String?
+    private(set) var snapshot: PreferencesSnapshot?
+    private(set) var draft = NetworkConfiguration()
+    private(set) var activity = Activity.idle
+    private(set) var mode: SessionMode
+    private(set) var needsRestart = false
+    private(set) var recoveredDraft = false
+    private(set) var recoveryBlocked = false
+    private(set) var requiresReload = false
+    private(set) var notice: String?
+    private(set) var lastBackup: URL?
     var error: String?
-    var needsRestart = false
-    var lastBackup: URL?
-    private(set) var isDemo = false
-    private let service: any PreferencesService
+
+    @ObservationIgnored private(set) var undoManager = UndoManager()
+    private let service: any PreferencesServicing
+    private let backups: BackupStore
+    /// The module's defaults (`ModuleContext.defaults`), not `.standard`,
+    /// which is the whole suite's domain.
     private let defaults: UserDefaults
-    /// nil: the standalone app's folder, read and written in place
-    /// (docs/architecture.md, Transition from the standalone apps).
-    private let backupLocation: URL?
+    private var restoredSession = false
 
-    init(defaults: UserDefaults, service: any PreferencesService = SystemPreferencesService(),
-         backupLocation: URL? = nil) {
+    private enum RestartState {
+        static let uptimeKey = "restartRequiredAtUptime"
+        static let bootKey = "restartRequiredBootTime"
+        static let bootTolerance: TimeInterval = 5
+    }
+
+    init(defaults: UserDefaults, mode: SessionMode = .system, backups: BackupStore = .init(),
+         service: any PreferencesServicing = SystemPreferencesService()) {
         self.defaults = defaults
+        self.mode = mode
+        self.backups = backups
         self.service = service
-        self.backupLocation = backupLocation
+        if mode == .preview {
+            draft = .example
+            snapshot = try? PreferencesSnapshot(configuration: draft)
+        }
     }
 
-    var busy: Bool { activity != nil }
+    var isDemo: Bool { mode == .preview }
     var isLoaded: Bool { snapshot != nil }
+    var busy: Bool { activity != .idle }
     var isDirty: Bool { snapshot.map { $0.configuration != draft } ?? false }
-    var networks: [String] { draft[selectedInterface] ?? [] }
-    var totalCount: Int { Set((draft.wifi ?? []) + (draft.ethernet ?? [])).count }
-    var plan: PreferencePlan? {
-        guard let snapshot else { return nil }
-        return try? PreferencePlan(baseline: snapshot, desired: draft)
-    }
+    var canEdit: Bool { isLoaded && !busy && !requiresReload && (isDemo || !recoveryBlocked) }
+    var canReview: Bool { canEdit && isDirty && validationMessage == nil }
+    var changes: [InterfaceChange] { draft.changes(from: snapshot?.configuration ?? .init()) }
+
     var validationMessage: String? {
-        do { try draft.validate(); return nil } catch { return error.localizedDescription }
+        do {
+            try draft.validate()
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
     }
 
     /// Replaces the standalone app's quit and window-close guard: the suite
-    /// asks before quitting while this is non-nil.
+    /// asks before quitting while this is non-nil. A real draft also
+    /// survives in Draft.json; a preview draft does not.
     var interruptionWarning: String? {
         switch activity {
-        case .applying: return "Applying changes"
+        case .saving: return "Applying changes"
         case .loading: return "Reading the current exemptions"
-        case nil: return isDirty ? "Unsaved changes to local-network exemptions" : nil
+        case .idle: return isDirty ? "Unsaved changes to local-network exemptions" : nil
+        }
+    }
+
+    func useUndoManager(_ manager: UndoManager?) {
+        guard let manager, manager !== undoManager else { return }
+        undoManager.removeAllActions()
+        undoManager = manager
+    }
+
+    /// The suite's window, and so its undo manager, is shared by every
+    /// pane. When the pane leaves, take the draft's history with it so
+    /// Edit › Undo on the home screen cannot change a draft out of sight.
+    func releaseUndoManager() {
+        undoManager.removeAllActions(withTarget: self)
+        undoManager = UndoManager()
+    }
+
+    func restoreSession() {
+        guard !isDemo else { return }
+        restoreRestartState()
+        guard !restoredSession else { return }
+        restoredSession = true
+
+        do {
+            guard let recovery = try backups.loadRecovery() else { return }
+            let baseline = try recovery.baseline
+            guard recovery.draft != baseline.configuration else { return }
+            snapshot = baseline
+            draft = recovery.draft
+            recoveredDraft = true
+        } catch {
+            let failure = error.localizedDescription
+            do {
+                let preserved = try backups.preserveFailedRecovery()
+                self.error = "The draft could not be restored. The original is kept unchanged in the backups folder as “\(preserved.lastPathComponent)”.\n\n\(failure)"
+            } catch {
+                recoveryBlocked = true
+                self.error = "The original draft file is left unchanged. Editing is locked because the file could not be preserved. Check the permissions of the HallPass folder, then quit and reopen Murten Utilities.\n\n\(error.localizedDescription)"
+            }
         }
     }
 
     func startDemo() {
         guard !busy, !isLoaded else { return }
-        isDemo = true
+        mode = .preview
         draft = .example
         snapshot = try? PreferencesSnapshot(configuration: draft)
         needsRestart = false
         notice = nil
+        undoManager.removeAllActions()
     }
 
     func leaveDemo() {
         guard isDemo, !busy else { return }
-        isDemo = false
+        mode = .system
         snapshot = nil
         draft = .init()
         notice = nil
-        restoreRestartState()
+        undoManager.removeAllActions()
+        restoreSession()
     }
 
     func load() async {
         guard !busy else { return }
         activity = .loading
-        defer { activity = nil }
+        defer { activity = .idle }
+
         do {
             let result = isDemo ? try PreferencesSnapshot(configuration: .example) : try await service.load()
             snapshot = result
             draft = result.configuration
+            recoveredDraft = false
+            requiresReload = false
             notice = nil
-        } catch { self.error = error.localizedDescription }
+            undoManager.removeAllActions()
+            persistRecovery()
+        } catch PreferencesServiceError.cancelled {
+            notice = "Loading cancelled. The draft is kept."
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 
     func add(_ notation: String, interfaces: [NetworkInterface]) throws {
-        let canonical = try CIDR(notation).notation
-        var candidate = draft
-        for interface in interfaces {
-            var values = candidate[interface] ?? []
-            let exists = values.contains { (try? CIDR($0).notation) == canonical }
-            if !exists { values.append(canonical) }
-            guard values.count <= 512 else { throw ConfigurationError.tooManyNetworks }
-            candidate[interface] = values
-        }
-        draft = candidate
+        guard canEdit else { return }
+        let candidate = try draft.adding(notation, to: interfaces)
+        guard candidate != draft else { throw ConfigurationError.duplicateNetwork }
+        replaceDraft(candidate, actionName: "Add Network Range")
     }
 
-    func remove(_ notation: String) {
-        draft[selectedInterface] = networks.filter { $0 != notation }
-        if networks.isEmpty { draft[selectedInterface] = nil }
+    func edit(_ index: Int, notation: String, interface: NetworkInterface) throws {
+        guard canEdit else { return }
+        let candidate = try draft.replacing(index, with: notation, in: interface)
+        replaceDraft(candidate, actionName: "Edit Network Range")
+    }
+
+    func remove(_ indices: Set<Int>, interface: NetworkInterface) {
+        guard canEdit else { return }
+        let candidate = draft.removing(indices, from: interface)
+        replaceDraft(candidate, actionName: indices.count == 1 ? "Remove Network Range" : "Remove Network Ranges")
     }
 
     func discard() {
-        if let snapshot { draft = snapshot.configuration }
+        guard canEdit, let snapshot else { return }
+        replaceDraft(snapshot.configuration, actionName: "Discard Changes")
     }
 
     func resetDraft() {
-        draft = NetworkConfiguration()
-        notice = nil
+        guard canEdit else { return }
+        replaceDraft(.init(), actionName: "Remove All Exemptions")
     }
 
     func save() async {
-        guard !busy, isDirty, let snapshot else { return }
-        activity = .applying
-        defer { activity = nil }
+        guard canReview, let snapshot else { return }
+        activity = .saving
+        defer { activity = .idle }
+
         do {
             let plan = try PreferencePlan(baseline: snapshot, desired: draft)
             if isDemo {
                 self.snapshot = try PreferencesSnapshot(configuration: draft)
-                notice = nil
+                undoManager.removeAllActions()
+                notice = "Preview applied. The system settings are unchanged."
                 return
             }
-            lastBackup = try writeAutomaticBackup(snapshot.configuration)
+
+            lastBackup = try backups.automaticBackup(snapshot.configuration)
             let result = try await service.save(plan)
             self.snapshot = result
             draft = result.configuration
             needsRestart = true
+            recoveredDraft = false
             markRestartRequired()
+            undoManager.removeAllActions()
             notice = nil
+            persistRecovery()
+        } catch PreferencesServiceError.cancelled {
+            notice = "Applying cancelled. The draft is kept."
         } catch {
             if let serviceError = error as? PreferencesServiceError {
                 switch serviceError {
                 case .rollbackFailed, .verificationFailed:
-                    self.snapshot = nil
+                    requiresReload = true
                     needsRestart = true
                     markRestartRequired()
-                default: break
+                default:
+                    break
                 }
             }
             self.error = error.localizedDescription
         }
     }
 
-    func exportBackup() {
-        guard let snapshot else { return }
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.json]
-        panel.nameFieldStringValue = "HallPass-Backup.json"
-        panel.title = "Back Up the Saved Configuration"
-        panel.message = "The backup contains the most recently loaded or saved state."
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+    func exportBackup(to url: URL) {
+        guard !busy, let snapshot else { return }
         do {
-            try ConfigurationBackup(configuration: snapshot.configuration).encoded().write(to: url, options: .atomic)
-            notice = "Backup exported."
-        } catch { self.error = error.localizedDescription }
-    }
-
-    func importBackup() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.json]
-        panel.allowsMultipleSelection = false
-        panel.title = "Open a HallPass Backup as a Draft"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-            guard size <= 1_048_576 else { throw ConfigurationError.unsupportedBackup }
-            draft = try ConfigurationBackup.decode(Data(contentsOf: url)).configuration
-            notice = nil
-        } catch { self.error = error.localizedDescription }
-    }
-
-    func showBackups() {
-        if let lastBackup { NSWorkspace.shared.activateFileViewerSelecting([lastBackup]) }
-        else {
-            do {
-                let url = try backupDirectory()
-                NSWorkspace.shared.open(url)
-            } catch { self.error = error.localizedDescription }
+            try backups.export(snapshot.configuration, to: url)
+            notice = "Saved state exported."
+        } catch {
+            self.error = error.localizedDescription
         }
     }
 
-    func restoreRestartState() {
+    func importBackup(from url: URL) {
+        guard canEdit else { return }
+        do {
+            let configuration = try backups.readBackup(at: url)
+            replaceDraft(configuration, actionName: "Import Backup")
+            notice = "Backup opened as the draft. Review the changes before applying them."
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func showBackups() {
         guard !isDemo else { return }
-        let savedUptime = defaults.double(forKey: Self.restartUptimeKey)
-        let savedBoot = defaults.double(forKey: Self.restartBootTimeKey)
+        do {
+            if let lastBackup {
+                NSWorkspace.shared.activateFileViewerSelecting([lastBackup])
+                return
+            }
+            NSWorkspace.shared.open(try backups.backupsDirectory())
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func replaceDraft(_ candidate: NetworkConfiguration, actionName: String) {
+        guard candidate != draft else { return }
+        let previous = draft
+        let startsGroup = !undoManager.isUndoing && !undoManager.isRedoing
+        if startsGroup { undoManager.beginUndoGrouping() }
+        undoManager.registerUndo(withTarget: self) { target in
+            MainActor.assumeIsolated { target.replaceDraft(previous, actionName: actionName) }
+        }
+        undoManager.setActionName(actionName)
+        if startsGroup { undoManager.endUndoGrouping() }
+
+        draft = candidate
+        notice = nil
+        persistRecovery()
+    }
+
+    private func persistRecovery() {
+        guard !isDemo, !recoveryBlocked, let snapshot else { return }
+        do {
+            if isDirty {
+                try backups.saveRecovery(DraftRecovery(baseline: snapshot, draft: draft))
+            } else {
+                try backups.removeRecovery()
+                recoveredDraft = false
+            }
+        } catch {
+            self.error = "The draft is kept in the window but could not be saved for recovery.\n\n\(error.localizedDescription)"
+        }
+    }
+
+    private func restoreRestartState() {
+        let savedUptime = defaults.double(forKey: RestartState.uptimeKey)
+        let savedBoot = defaults.double(forKey: RestartState.bootKey)
         let boot = Date().timeIntervalSince1970 - ProcessInfo.processInfo.systemUptime
-        needsRestart = savedUptime > 0 && abs(boot - savedBoot) < 5
+        needsRestart = savedUptime > 0 && abs(boot - savedBoot) < RestartState.bootTolerance
     }
 
     private func markRestartRequired() {
         let uptime = ProcessInfo.processInfo.systemUptime
-        defaults.set(uptime, forKey: Self.restartUptimeKey)
-        defaults.set(Date().timeIntervalSince1970 - uptime, forKey: Self.restartBootTimeKey)
-    }
-
-    /// `~/Library/Application Support/HallPass/Backups`, shared with the
-    /// standalone app so neither hides the other's backups.
-    static func standardBackupDirectory() throws -> URL {
-        let root = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-        return root.appendingPathComponent("HallPass/Backups", isDirectory: true)
-    }
-
-    private func backupDirectory() throws -> URL {
-        let directory = try backupLocation ?? Self.standardBackupDirectory()
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-        return directory
-    }
-
-    private func writeAutomaticBackup(_ configuration: NetworkConfiguration) throws -> URL {
-        let name = "HallPass-\(ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-"))-\(UUID().uuidString.prefix(8)).json"
-        let url = try backupDirectory().appendingPathComponent(name)
-        try ConfigurationBackup(configuration: configuration).encoded().write(to: url, options: [.atomic])
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
-        return url
+        defaults.set(uptime, forKey: RestartState.uptimeKey)
+        defaults.set(Date().timeIntervalSince1970 - uptime, forKey: RestartState.bootKey)
     }
 }

@@ -16,15 +16,14 @@ enum PreferencesServiceError: LocalizedError {
     }
 }
 
-/// The privileged boundary: both reads and writes ask for administrator
+/// The privileged boundary: reads and writes both ask for administrator
 /// access, so nothing here may back a watcher (docs/modules.md, HallPass).
-/// A protocol so the model's save flow can be tested against a fake.
-protocol PreferencesService: Sendable {
+protocol PreferencesServicing: Sendable {
     func load() async throws -> PreferencesSnapshot
     func save(_ plan: PreferencePlan) async throws -> PreferencesSnapshot
 }
 
-actor SystemPreferencesService: PreferencesService {
+actor SystemPreferencesService: PreferencesServicing {
     func load() throws -> PreferencesSnapshot {
         let xml = try authorized(PreferencePlan.readCommand, prompt: "HallPass wants to read the local network exemptions.")
         return try PreferencesSnapshot(xml: xml)

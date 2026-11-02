@@ -1,128 +1,244 @@
+import AppKit
 import Foundation
-import Testing
 import HallPassCore
+import Testing
 @testable import HallPassModule
 
-/// The apply flow against a fake service: the automatic backup, the
-/// restart flag in the module's defaults, and how each service failure
-/// leaves the draft. The generated script's re-check and rollback are
-/// covered by HallPassCoreTests' PreferencePlanTests.
 @MainActor
 struct HallPassModelTests {
-    private let baseline = NetworkConfiguration(wifi: ["169.254.0.0/16"], ethernet: nil)
+    @Test func addingToBothInterfacesIsOneNamedUndo() throws {
+        let model = preview()
+        try model.add("10.1.2.3/8", interfaces: NetworkInterface.allCases)
+        #expect(model.draft.wifi?.last == "10.0.0.0/8")
+        #expect(model.draft.ethernet?.last == "10.0.0.0/8")
+        #expect(model.undoManager.undoActionName == "Add Network Range")
 
-    @Test func applyWritesBackupAndRemembersRestart() async throws {
-        let sandbox = Sandbox()
-        defer { sandbox.cleanUp() }
-        let service = try FakePreferences(baseline: baseline)
-        let model = sandbox.model(service)
-
-        await model.load()
-        try model.add("10.0.0.1/8", interfaces: NetworkInterface.allCases)
-        await model.save()
-
-        #expect(model.error == nil)
-        #expect(model.snapshot?.configuration == NetworkConfiguration(wifi: ["169.254.0.0/16", "10.0.0.0/8"],
-                                                                     ethernet: ["10.0.0.0/8"]))
+        model.undoManager.undo()
+        #expect(model.draft == .example)
         #expect(!model.isDirty)
-        #expect(model.needsRestart)
-
-        let files = try sandbox.backupFiles()
-        #expect(files.count == 1)
-        let backup = try #require(files.first)
-        #expect(backup.lastPathComponent.hasPrefix("HallPass-"))
-        let permissions = try FileManager.default.attributesOfItem(atPath: backup.path)[.posixPermissions] as? Int
-        #expect(permissions == 0o600)
-        #expect(try ConfigurationBackup.decode(Data(contentsOf: backup)).configuration == baseline)
-
-        // A pane rebuilt later, or after relaunch, reads the flag back.
-        let reopened = sandbox.model(service)
-        reopened.restoreRestartState()
-        #expect(reopened.needsRestart)
-        #expect(sandbox.defaults.double(forKey: HallPassModel.restartUptimeKey) > 0)
+        model.undoManager.redo()
+        #expect(model.draft.wifi?.last == "10.0.0.0/8")
+        #expect(model.draft.ethernet?.last == "10.0.0.0/8")
     }
 
-    @Test func conflictKeepsDraftAndSnapshot() async throws {
-        let sandbox = Sandbox()
-        defer { sandbox.cleanUp() }
-        let model = sandbox.model(try FakePreferences(baseline: baseline, saveFailure: .conflict))
+    @Test func editRemovalResetAndDiscardCanBeUndone() throws {
+        let model = preview()
+        try model.edit(0, notation: "10.0.0.1/32", interface: .wifi)
+        let edited = model.draft
+        model.remove([0, 1], interface: .wifi)
+        #expect(model.draft.wifi == nil)
+        #expect(model.undoManager.undoActionName == "Remove Network Ranges")
+        model.undoManager.undo()
+        #expect(model.draft == edited)
 
-        await model.load()
-        try model.add("192.168.1.0/24", interfaces: [.wifi])
+        model.resetDraft()
+        #expect(model.draft == .init())
+        model.undoManager.undo()
+        #expect(model.draft == edited)
+        model.discard()
+        #expect(model.draft == .example)
+        model.undoManager.undo()
+        #expect(model.draft == edited)
+    }
+
+    @Test func importIsUndoableAndExportUsesSavedState() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = BackupStore(root: directory)
+        let imported = NetworkConfiguration(wifi: ["legacy", "legacy"], ethernet: [])
+        let backup = directory.appendingPathComponent("backup.json")
+        try store.export(imported, to: backup)
+        let model = preview()
+        model.importBackup(from: backup)
+        #expect(model.draft == imported)
+        model.remove([0], interface: .wifi)
+        #expect(model.draft.wifi == ["legacy"])
+        model.undoManager.undo()
+        #expect(model.draft == imported)
+        model.undoManager.undo()
+        #expect(model.draft == .example)
+        model.undoManager.redo()
+
+        let exported = directory.appendingPathComponent("export.json")
+        model.exportBackup(to: exported)
+        #expect(try store.readBackup(at: exported) == .example)
+    }
+
+    @Test func corruptImportDoesNotAlterTheDraftOrUndoHistory() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("invalid.json")
+        try Data("not JSON".utf8).write(to: url)
+        let model = preview()
+        model.importBackup(from: url)
+        #expect(model.draft == .example)
+        #expect(!model.undoManager.canUndo)
+        #expect(model.error != nil)
+    }
+
+    @Test func previewCommitEndsDraftUndoWithoutSystemWrites() async throws {
+        let model = preview()
+        try model.add("10.0.0.0/8", interfaces: [.wifi])
         await model.save()
-
-        #expect(model.error == PreferencesServiceError.conflict.errorDescription)
-        #expect(model.snapshot?.configuration == baseline)
-        #expect(model.isDirty, "the draft survives so the user can reload and redo it")
+        #expect(!model.isDirty)
+        #expect(!model.undoManager.canUndo)
         #expect(!model.needsRestart)
-        #expect(sandbox.defaults.double(forKey: HallPassModel.restartUptimeKey) == 0)
-        #expect(try sandbox.backupFiles().count == 1, "the backup is taken before the write")
+        #expect(model.lastBackup == nil)
+        #expect(model.snapshot?.configuration == model.draft)
     }
 
-    @Test func cancelledAuthorizationChangesNothing() async throws {
-        let sandbox = Sandbox()
-        defer { sandbox.cleanUp() }
-        let model = sandbox.model(try FakePreferences(baseline: baseline, saveFailure: .cancelled))
+    @Test func recoverySurvivesAnotherModelAndDiscardRemovesIt() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = BackupStore(root: directory)
+        let baseline = try PreferencesSnapshot(configuration: .example)
+        let draft = try NetworkConfiguration.example.adding("10.0.0.0/8", to: [.ethernet])
+        try store.saveRecovery(DraftRecovery(baseline: baseline, draft: draft))
 
+        let first = HallPassModel(defaults: defaults(), backups: store)
+        first.restoreSession()
+        first.undoManager.groupsByEvent = false
+        #expect(first.recoveredDraft)
+        #expect(first.draft == draft)
+        try first.edit(0, notation: "fe80::/10", interface: .wifi)
+        let second = HallPassModel(defaults: defaults(), backups: store)
+        second.restoreSession()
+        #expect(second.draft == first.draft)
+        #expect(second.snapshot?.xml == baseline.xml)
+        second.discard()
+        #expect(try store.loadRecovery() == nil)
+        #expect(!second.isDirty)
+    }
+
+    @Test func previewNeverCreatesRecoveryOrAutomaticBackups() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = HallPassModel(defaults: defaults(), mode: .preview, backups: BackupStore(root: directory))
+        try model.add("10.0.0.0/8", interfaces: [.wifi])
+        #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path).isEmpty)
+    }
+
+    @Test func automaticBackupsRemainPrivateAndReadable() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = BackupStore(root: directory)
+        let original = NetworkConfiguration(wifi: [], ethernet: ["old", "old"])
+        let url = try store.automaticBackup(original)
+        #expect(try store.readBackup(at: url) == original)
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        #expect((attributes[.posixPermissions] as? NSNumber)?.intValue == 0o600)
+    }
+
+    @Test func unsupportedRecoverySurvivesLoadingAndLaterEdits() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let original = Data(#"{"formatVersion":99,"baselineXML":"future format","draft":{}}"#.utf8)
+        try original.write(to: directory.appendingPathComponent("Draft.json"))
+        let model = HallPassModel(defaults: defaults(), backups: BackupStore(root: directory), service: try LoadedPreferences())
+        model.restoreSession()
+        #expect(model.error != nil)
         await model.load()
-        try model.add("192.168.1.0/24", interfaces: [.wifi])
-        await model.save()
-
-        #expect(model.error == "The administrator dialog was cancelled.")
-        #expect(model.snapshot?.configuration == baseline)
-        #expect(model.isDirty)
-        #expect(!model.needsRestart)
+        try model.add("10.0.0.0/8", interfaces: [.wifi])
+        #expect(try files(in: directory).contains { (try? Data(contentsOf: $0)) == original })
     }
 
-    @Test(arguments: [PreferencesServiceError.rollbackFailed, .verificationFailed])
-    func unknownSystemStateForcesReloadAndRestart(_ failure: PreferencesServiceError) async throws {
-        let sandbox = Sandbox()
-        defer { sandbox.cleanUp() }
-        let model = sandbox.model(try FakePreferences(baseline: baseline, saveFailure: failure))
-
-        await model.load()
-        try model.add("192.168.1.0/24", interfaces: [.wifi])
-        await model.save()
-
-        #expect(model.error == failure.errorDescription)
-        #expect(!model.isLoaded, "the system state is unknown, so the pane asks for a reload")
-        #expect(model.needsRestart)
-        #expect(sandbox.defaults.double(forKey: HallPassModel.restartUptimeKey) > 0)
-    }
-
-    @Test func previewNeverTouchesTheSystem() async throws {
-        let sandbox = Sandbox()
-        defer { sandbox.cleanUp() }
-        let service = try FakePreferences(baseline: baseline)
-        let model = sandbox.model(service)
-
-        model.startDemo()
-        #expect(model.isDemo)
-        try model.add("192.168.1.0/24", interfaces: [.wifi])
-        await model.save()
+    @Test func unreadableRecoverySurvivesASuccessfulLoad() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let baseline = try PreferencesSnapshot(configuration: .example)
+        let original = try DraftRecovery(baseline: baseline, draft: .init(wifi: ["fe80::/10"])).encoded()
+        let url = directory.appendingPathComponent("Draft.json")
+        try original.write(to: url)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: url.path)
+        let model = HallPassModel(defaults: defaults(), backups: BackupStore(root: directory), service: try LoadedPreferences())
+        model.restoreSession()
+        #expect(model.error != nil)
         await model.load()
 
-        #expect(await service.loads == 0)
-        #expect(await service.saves.isEmpty)
-        #expect(try sandbox.backupFiles().isEmpty)
-        #expect(!model.needsRestart)
+        let retained = try files(in: directory)
+        #expect(retained.count == 1)
+        for file in retained {
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+        }
+        #expect(retained.contains { (try? Data(contentsOf: $0)) == original })
     }
 
-    @Test func restartFlagFromAnotherBootIsIgnored() {
-        let sandbox = Sandbox()
-        defer { sandbox.cleanUp() }
-        let defaults = sandbox.defaults
-        defaults.set(120.0, forKey: HallPassModel.restartUptimeKey)
-        defaults.set(1_000_000.0, forKey: HallPassModel.restartBootTimeKey)
+    @Test func failedPreservationStillProtectsTheOriginalAfterPermissionsReturn() async throws {
+        let directory = try temporaryDirectory()
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
+            try? FileManager.default.removeItem(at: directory)
+        }
+        let original = Data(#"{"formatVersion":99,"baselineXML":"future format","draft":{}}"#.utf8)
+        try original.write(to: directory.appendingPathComponent("Draft.json"))
+        try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: directory.path)
+        let model = HallPassModel(defaults: defaults(), backups: BackupStore(root: directory), service: try LoadedPreferences())
+        model.restoreSession()
+        #expect(model.error != nil)
 
-        let model = HallPassModel(defaults: defaults, service: try! FakePreferences(baseline: baseline),
-                                  backupLocation: sandbox.backups)
-        model.restoreRestartState()
-        #expect(!model.needsRestart)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
+        await model.load()
+        try model.add("10.0.0.0/8", interfaces: [.wifi])
+        #expect(try files(in: directory).contains { (try? Data(contentsOf: $0)) == original })
     }
 
-    @Test func backupsStayInTheStandaloneAppsFolder() throws {
-        let directory = try HallPassModel.standardBackupDirectory()
-        #expect(directory.path.hasSuffix("Library/Application Support/HallPass/Backups"))
+    @Test func endingPreviewRestoresTheUntouchedRealDraft() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = BackupStore(root: directory)
+        let baseline = try PreferencesSnapshot(configuration: .example)
+        let draft = NetworkConfiguration(wifi: ["fe80::/10"], ethernet: [])
+        let original = try DraftRecovery(baseline: baseline, draft: draft).encoded()
+        let url = directory.appendingPathComponent("Draft.json")
+        try original.write(to: url)
+        let model = HallPassModel(defaults: defaults(), mode: .preview, backups: store)
+        model.restoreSession()
+        #expect(model.draft == .example)
+        #expect(try Data(contentsOf: url) == original)
+
+        model.leaveDemo()
+        #expect(model.recoveredDraft)
+        #expect(model.draft == draft)
+        #expect(model.snapshot?.xml == baseline.xml)
+        #expect(try Data(contentsOf: url) == original)
+    }
+
+    private func files(in directory: URL) throws -> [URL] {
+        let enumerator = try #require(FileManager.default.enumerator(at: directory, includingPropertiesForKeys: [.isRegularFileKey]))
+        return enumerator.allObjects.compactMap { $0 as? URL }.filter {
+            (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+        }
+    }
+
+    private func preview() -> HallPassModel {
+        let model = HallPassModel(defaults: defaults(), mode: .preview)
+        model.undoManager.groupsByEvent = false
+        return model
+    }
+
+    /// An empty domain the test never writes to: none of these tests
+    /// applies to the system, so the restart reminder is only read.
+    private func defaults() -> UserDefaults {
+        UserDefaults(suiteName: "HallPassModelTests.\(UUID().uuidString)")!
+    }
+
+    private func temporaryDirectory() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("HallPassModelTests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+}
+
+private actor LoadedPreferences: PreferencesServicing {
+    private let snapshot: PreferencesSnapshot
+
+    init() throws {
+        snapshot = try PreferencesSnapshot(configuration: .example)
+    }
+
+    func load() -> PreferencesSnapshot { snapshot }
+
+    func save(_ plan: PreferencePlan) throws -> PreferencesSnapshot {
+        throw PreferencesServiceError.commandFailed("Unexpected test write")
     }
 }

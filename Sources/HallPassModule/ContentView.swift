@@ -3,384 +3,463 @@ import SwiftUI
 import HallPassCore
 import MurtenModuleKit
 
-enum AppleDocumentation {
-    /// Apple TN3179, Understanding local network privacy.
-    static let localNetworkPrivacy = URL(string: "https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy")!
-}
+struct NetworkRow: Identifiable {
+    enum Status: String {
+        case saved = "Saved"
+        case added = "Added"
+        case invalid = "Invalid Value"
 
-enum Palette {
-    // Light appearance only (docs/ui-direction.md): the source's dark
-    // variant is gone.
-    static let green = Color(nsColor: NSColor(calibratedRed: 0.13, green: 0.43, blue: 0.35, alpha: 1))
-    static let surface = Color(nsColor: .controlBackgroundColor)
-    static let background = Color(nsColor: .windowBackgroundColor)
-}
-
-struct InfoButton: View {
-    let title: String
-    let documentation: String
-    var appleLink = false
-    @State private var isOpen = false
-
-    var body: some View {
-        Button { isOpen.toggle() } label: {
-            Image(systemName: "info.circle").font(.system(size: 14)).foregroundStyle(.secondary)
-        }
-        .buttonStyle(.plain)
-        .help(title)
-        .accessibilityLabel("Information: \(title)")
-        .popover(isPresented: $isOpen, arrowEdge: .bottom) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(title).font(.system(size: 13, weight: .semibold))
-                Text(documentation).font(.system(size: 12)).foregroundStyle(.secondary).lineSpacing(3)
-                    .fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
-                if appleLink {
-                    Link("Apple Documentation ↗", destination: AppleDocumentation.localNetworkPrivacy)
-                        .font(.system(size: 11))
-                }
+        var symbol: String {
+            switch self {
+            case .saved: "checkmark"
+            case .added: "plus.circle"
+            case .invalid: "exclamationmark.triangle"
             }
-            .padding(18).frame(width: 295).tint(Palette.green)
         }
     }
-}
 
-struct TicketMark: View {
-    var size: CGFloat = 36
-    var body: some View {
-        // The standalone app showed its .icns from Bundle.main, which is the
-        // suite's bundle now; the symbol was already its fallback.
-        Image(systemName: "ticket.fill").font(.system(size: size * 0.7)).foregroundStyle(Palette.green)
-            .frame(width: size, height: size).accessibilityHidden(true)
-    }
+    let id: Int
+    let notation: String
+    let status: Status
+    var cidr: CIDR? { try? CIDR(notation) }
+    var version: String { cidr.map { $0.isIPv6 ? "IPv6" : "IPv4" } ?? "–" }
 }
 
 struct ContentView: View {
+    private static let minimumDetailWidth: CGFloat = 430
+
     @Bindable var model: HallPassModel
-    @State private var showingAdd = false
-    @State private var showingReview = false
-    @State private var confirmingReset = false
-    @State private var confirmingReload = false
-    @State private var confirmingImport = false
-    @State private var confirmingLeaveDemo = false
+    @Environment(\.undoManager) private var windowUndoManager
+    // The suite's window is shared by every pane, so the keys carry the module id.
+    @SceneStorage("hallpass.selectedInterface") private var interfaceName = NetworkInterface.wifi.rawValue
+    @SceneStorage("hallpass.showsInspector") private var showsInspector = false
+    @State private var columnVisibility = NavigationSplitViewVisibility.all
+    @State private var selection = Set<Int>()
+    @State private var searchText = ""
+    @State private var sheet: WorkspaceSheet?
+    @State private var confirmation: DraftConfirmation?
+    @State private var showingFilePanel = false
+    @State private var window: NSWindow?
+    @FocusState private var searchFocused: Bool
+
+    private var interface: NetworkInterface { NetworkInterface(rawValue: interfaceName) ?? .wifi }
+    private var available: Bool { !model.busy && sheet == nil && confirmation == nil && !showingFilePanel }
+
+    private var rows: [NetworkRow] {
+        var saved = (model.snapshot?.configuration[interface] ?? [])
+            .reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
+        return (model.draft[interface] ?? []).enumerated().map { index, notation in
+            let wasSaved = saved[notation, default: 0] > 0
+            saved[notation, default: 0] -= 1
+            let status: NetworkRow.Status = (try? CIDR(notation)) == nil ? .invalid : (wasSaved ? .saved : .added)
+            return NetworkRow(id: index, notation: notation, status: status)
+        }
+    }
+
+    private var visibleRows: [NetworkRow] {
+        guard !searchText.isEmpty else { return rows }
+        return rows.filter { $0.notation.localizedStandardContains(searchText) || $0.version.localizedStandardContains(searchText) }
+    }
+
+    private var selectedRows: [NetworkRow] { visibleRows.filter { selection.contains($0.id) } }
+
+    private var windowContents: some View {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            sidebar
+                .navigationSplitViewColumnWidth(min: 170, ideal: 200, max: 280)
+        } detail: {
+            detail
+                .navigationSplitViewColumnWidth(min: Self.minimumDetailWidth, ideal: 520)
+                .navigationTitle("HallPass")
+                .navigationSubtitle(interface.title)
+                .toolbar { toolbar }
+        }
+        .navigationSplitViewStyle(.balanced)
+        .inspector(isPresented: $showsInspector) {
+            NetworkInspector(rows: selectedRows, interface: interface, canEdit: model.canEdit && available) {
+                perform(.edit)
+            }
+            .inspectorColumnWidth(min: NetworkInspector.minimumWidth, ideal: NetworkInspector.idealWidth, max: NetworkInspector.maximumWidth)
+        }
+        .moduleCommands(WorkspaceActions(
+            model: model, available: available, selectionCount: selectedRows.count,
+            selectionIsActive: !searchFocused, showsInspector: showsInspector, interface: interface, perform: perform
+        ).moduleCommands)
+    }
 
     var body: some View {
-        HStack(spacing: 0) {
-            sidebar
-            Divider()
-            VStack(alignment: .leading, spacing: 18) {
-                header
-                if model.isLoaded { editor } else { welcome }
-                footer
+        windowContents
+        .background(HostingWindowReader { window = $0 }.frame(width: 0, height: 0))
+        .task { model.restoreSession() }
+        .onChange(of: windowUndoManager, initial: true) { model.useUndoManager(windowUndoManager) }
+        .onDisappear { model.releaseUndoManager() }
+        .sheet(item: $sheet) { request in
+            switch request {
+            case .add:
+                NetworkEditor(model: model, interface: interface)
+            case .edit(let row):
+                NetworkEditor(model: model, interface: interface, entry: row)
+            case .review:
+                ReviewView(model: model)
+            case .help:
+                HelpView()
             }
-            .padding(.horizontal, 28).padding(.top, 22).padding(.bottom, 22)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .background(Palette.background).tint(Palette.green)
-        .task { model.restoreRestartState() }
-        .moduleCommands([
-            ModuleCommand("Open Apple Documentation", id: "hallpass.tn3179") {
-                _ = NSWorkspace.shared.open(AppleDocumentation.localNetworkPrivacy)
-            }
-        ])
-        .sheet(isPresented: $showingAdd) { AddNetworkView(model: model) }
-        .sheet(isPresented: $showingReview) { ReviewView(model: model) }
-        .alert("HallPass", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
-            Button("OK") { model.error = nil }
-        } message: { Text(model.error ?? "") }
-        .confirmationDialog("Remove All Exemptions?", isPresented: $confirmingReset, titleVisibility: .visible) {
-            Button("Mark for Removal", role: .destructive) { model.resetDraft() }
-        } message: { Text("The change is saved only when you apply it.") }
-        .confirmationDialog("Discard the Draft and Reload?", isPresented: $confirmingReload, titleVisibility: .visible) {
-            Button("Discard and Reload", role: .destructive) { Task { await model.load() } }
+        .alert("Could Not Finish", isPresented: Binding(
+            get: { model.error != nil }, set: { if !$0 { model.error = nil } }
+        )) {
+            Button("OK", role: .cancel) { model.error = nil }
+        } message: {
+            Text(model.error ?? "")
         }
-        .confirmationDialog("Replace the Draft with a Backup?", isPresented: $confirmingImport, titleVisibility: .visible) {
-            Button("Choose Backup…") { model.importBackup() }
+        .alert(confirmation?.title ?? "", isPresented: Binding(
+            get: { confirmation != nil }, set: { if !$0 { confirmation = nil } }
+        ), presenting: confirmation) { pending in
+            Button(pending.actionTitle, role: .destructive) { confirm(pending) }
+            Button("Cancel", role: .cancel) { }
+        } message: { pending in
+            Text(pending.message)
         }
-        .confirmationDialog("End the Preview and Discard the Draft?", isPresented: $confirmingLeaveDemo, titleVisibility: .visible) {
-            Button("End Preview", role: .destructive) { model.leaveDemo() }
-        }
+        .onChange(of: model.draft) { selection.removeAll() }
+        .onChange(of: interfaceName) { selection.removeAll() }
+        .onChange(of: searchText) { selection.formIntersection(Set(visibleRows.map(\.id))) }
     }
 
     private var sidebar: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 9) {
-                TicketMark(size: 32)
-                Text("HallPass").font(.system(size: 20, weight: .semibold, design: .rounded)).tracking(-0.6)
-            }.padding(.top, 22).padding(.bottom, 32)
-            ForEach(NetworkInterface.allCases) { interface in
-                Button { model.selectedInterface = interface } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: interface.symbol).font(.system(size: 15)).frame(width: 19)
-                        Text(interface.title).font(.system(size: 12, weight: .medium))
-                        Spacer()
-                        Text(model.isLoaded ? "\((model.draft[interface] ?? []).count)" : "–")
-                            .font(.system(size: 10, weight: .semibold, design: .monospaced)).foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal, 11).padding(.vertical, 11)
-                    .background(model.selectedInterface == interface ? Palette.green.opacity(0.10) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
-                    .contentShape(Rectangle())
+        List(selection: Binding<NetworkInterface?>(
+            get: { interface }, set: { if let value = $0 { interfaceName = value.rawValue } }
+        )) {
+            Section("Connections") {
+                ForEach(NetworkInterface.allCases) { connection in
+                    Label(connection.title, systemImage: connection.symbol)
+                        .badge(model.isLoaded ? Text("\((model.draft[connection] ?? []).count)") : Text(""))
+                        .tag(connection)
                 }
-                .buttonStyle(.plain).padding(.bottom, 5)
-                .accessibilityLabel("\(interface.title), \((model.draft[interface] ?? []).count) exemptions")
             }
-            Spacer()
-            Menu {
-                Button("Export Saved State…", action: model.exportBackup)
-                Button("Import Backup…") {
-                    if model.isDirty { confirmingImport = true } else { model.importBackup() }
-                }
-                Divider()
-                Button("Open Backups Folder", action: model.showBackups).disabled(model.isDemo)
-                Divider()
-                Button("Remove All Exemptions…", role: .destructive) { confirmingReset = true }
-            } label: { Label("Backups", systemImage: "clock.arrow.circlepath").font(.system(size: 11)) }
-                .menuStyle(.borderlessButton).disabled(!model.isLoaded || model.busy)
         }
-        .padding(.horizontal, 16).padding(.bottom, 24)
-        .frame(width: 180).frame(maxHeight: .infinity)
-        .background(Palette.green.opacity(0.025))
+        .listStyle(.sidebar)
+        .disabled(!available)
+        .accessibilityLabel("Network Connection")
     }
 
-    private var header: some View {
-        HStack(spacing: 10) {
-            Text("Network Exemptions").font(.system(size: 23, weight: .semibold)).tracking(-0.6)
-            InfoButton(title: "Network Exemptions", documentation: "Every app on this Mac can reach the IP ranges listed here, regardless of its local network permission. The exemptions apply in every network that uses these addresses. Wi-Fi and Ethernet are managed separately.", appleLink: true)
-            Spacer(minLength: 6)
-            if model.isDemo {
-                HStack(spacing: 6) {
-                    Text("Preview").font(.system(size: 10, weight: .medium)).foregroundStyle(Palette.green)
-                    InfoButton(title: "Preview", documentation: "You are working with sample values. Changes stay in memory; the system settings are neither read nor changed.")
-                    Button {
-                        if model.isDirty { confirmingLeaveDemo = true } else { model.leaveDemo() }
-                    } label: { Image(systemName: "xmark").font(.system(size: 9, weight: .semibold)) }
-                    .buttonStyle(.plain).help("End Preview").accessibilityLabel("End Preview")
+    private var detail: some View {
+        VStack(spacing: 0) {
+            notices
+            Group {
+                if model.isLoaded {
+                    networkTable
+                } else {
+                    welcome
                 }
-            } else if model.needsRestart {
-                HStack(spacing: 6) {
-                    Label("Restart required", systemImage: "arrow.clockwise").font(.system(size: 10)).foregroundStyle(.orange)
-                    InfoButton(title: "Restart Required", documentation: "The changes are saved. macOS applies them only after a restart. HallPass does not restart your Mac automatically.")
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            statusBar
+        }
+        // Bound wrapping before the split view measures its minimum size.
+        .frame(minWidth: Self.minimumDetailWidth, maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var networkTable: some View {
+        Table(visibleRows, selection: $selection) {
+            TableColumn("IP Range") { row in
+                Text(row.notation).monospaced()
+            }
+            .width(min: 190, ideal: 250)
+            TableColumn("Version", value: \.version).width(65)
+            TableColumn("Status") { row in
+                Label(row.status.rawValue, systemImage: row.status.symbol)
+                    .foregroundStyle(row.status == .invalid ? Color.orange : Color.secondary)
+                    .accessibilityLabel(row.status.rawValue)
+            }
+            .width(min: 110, ideal: 125)
+        }
+        .disabled(model.busy)
+        .searchable(text: $searchText, placement: .toolbar, prompt: "Search IP Ranges")
+        .searchFocused($searchFocused)
+        .onDeleteCommand {
+            guard model.canEdit, available, !searchFocused else { return }
+            model.remove(selection, interface: interface)
+        }
+        .onCopyCommand(perform: selectedRows.isEmpty ? nil : {
+            [NSItemProvider(object: selectedRows.map(\.notation).joined(separator: "\n") as NSString)]
+        })
+        .onKeyPress(.return) {
+            guard available, model.canEdit, !searchFocused, selectedRows.count == 1 else { return .ignored }
+            perform(.edit)
+            return .handled
+        }
+        .contextMenu(forSelectionType: Int.self) { items in
+            Button("Edit IP Range…") { edit(items) }
+                .disabled(items.count != 1 || !model.canEdit)
+            Button("Copy") { copy(items) }.disabled(items.isEmpty)
+            Divider()
+            Button("Remove", role: .destructive) { model.remove(items, interface: interface) }
+                .disabled(items.isEmpty || !model.canEdit)
+        } primaryAction: { items in
+            edit(items)
+        }
+        .overlay {
+            if visibleRows.isEmpty {
+                ContentUnavailableView {
+                    Label(searchText.isEmpty ? "No Exemptions" : "No Matches", systemImage: searchText.isEmpty ? interface.symbol : "magnifyingglass")
+                } description: {
+                    Text(searchText.isEmpty
+                         ? "The regular local network permissions apply to \(interface.title)."
+                         : "No IP range matches “\(searchText)”.")
+                } actions: {
+                    if searchText.isEmpty {
+                        Button("Add Network Range…") { perform(.add) }.disabled(!model.canEdit)
+                    } else {
+                        Button("Clear Search") { searchText = "" }
+                    }
                 }
             }
         }
+        .accessibilityLabel("IP Ranges for \(interface.title)")
     }
 
     private var welcome: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "lock.rectangle.on.rectangle").font(.system(size: 32, weight: .light)).foregroundStyle(Palette.green)
-            HStack(spacing: 9) {
-                Button { Task { await model.load() } } label: {
-                    Text(model.busy ? "Loading…" : "Load Configuration").padding(.horizontal, 7).padding(.vertical, 4)
+        ContentUnavailableView {
+            Label {
+                Text("Local Network Exemptions")
+            } icon: {
+                // The standalone app showed its own icon here; the suite's
+                // application icon is not HallPass's.
+                Image(systemName: "ticket.fill")
+                    .resizable().scaledToFit().frame(width: 72, height: 72).foregroundStyle(.secondary)
+            }
+        } description: {
+            Text("Manage the IP ranges every app on this Mac may reach without a local network permission prompt. Loading needs administrator access.")
+                .frame(maxWidth: 390)
+        } actions: {
+            Button("Load Configuration…") { perform(.load) }
+                .buttonStyle(.borderedProminent).disabled(!available)
+            Button("Try with Sample Data") { perform(.preview) }.disabled(!available)
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var toolbar: some ToolbarContent {
+        ToolbarItem {
+            Button(model.isLoaded ? "Reload Configuration" : "Load Configuration", systemImage: "arrow.clockwise") {
+                perform(.load)
+            }
+            .help("Load the configuration (⌘L)")
+            .disabled(!available)
+        }
+        ToolbarSpacer(.fixed)
+        ToolbarItemGroup {
+            Button("Add Network Range", systemImage: "plus") { perform(.add) }
+                .help("Add a network range (⌘N)").disabled(!available || !model.canEdit)
+            Button("Remove Selection", systemImage: "minus") { model.remove(selection, interface: interface) }
+                .help("Remove the selected IP ranges").disabled(!available || !model.canEdit || selectedRows.isEmpty)
+        }
+        ToolbarSpacer(.fixed)
+        ToolbarItem(placement: .primaryAction) {
+            Button("Review Changes…") { perform(.review) }
+                .help("Review the changes before applying them (⌘S)")
+                .disabled(!available || !model.canReview)
+        }
+        ToolbarItem {
+            Button("Information", systemImage: "sidebar.right") { showsInspector.toggle() }
+                .help("Show or hide information (⌥⌘I)")
+                .disabled(!available || !model.isLoaded)
+                .accessibilityValue(showsInspector ? "Shown" : "Hidden")
+        }
+    }
+
+    private var notices: some View {
+        VStack(spacing: 0) {
+            if model.isDemo {
+                banner("Preview", symbol: "eye", text: "Sample data. The system settings stay unchanged.") {
+                    Button("End Preview") { perform(.preview) }.disabled(!available)
                 }
-                .buttonStyle(.borderedProminent).disabled(model.busy).keyboardShortcut("l", modifiers: .command)
-                InfoButton(title: "Load Configuration", documentation: "macOS asks for administrator access so HallPass can read the system-wide settings. Loading changes nothing. The displayed exemptions are saved only after Review Changes and Apply.")
+            } else if model.recoveryBlocked {
+                banner("Draft File Protected", symbol: "exclamationmark.triangle", text: "Check the permissions of the HallPass folder, then quit and reopen Murten Utilities before you make changes.") {
+                    EmptyView()
+                }
+            } else if model.requiresReload {
+                banner("Check the System State", symbol: "exclamationmark.triangle", text: "Reload the configuration. The draft and the automatic backup are kept until then.") {
+                    Button("Reload…") { perform(.load) }.disabled(!available)
+                }
+            } else if model.recoveredDraft {
+                banner("Draft Restored", symbol: "arrow.counterclockwise", text: "Not applied yet. Saving checks the system state again.") {
+                    EmptyView()
+                }
             }
-            Button("Preview") { model.startDemo() }.buttonStyle(.link).font(.system(size: 11)).disabled(model.busy)
+
+            if model.needsRestart, !model.isDemo {
+                banner("Restart Required", symbol: "restart", text: "The saved exemptions take effect only after a restart.") {
+                    EmptyView()
+                }
+            }
+
+            if model.isLoaded, model.validationMessage != nil {
+                banner("Invalid IP Ranges", symbol: "exclamationmark.triangle", text: "Correct or remove the marked values before applying.") {
+                    Button("Information") { showsInspector = true }
+                }
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity).padding(20)
-        .background(Palette.surface, in: RoundedRectangle(cornerRadius: 13))
-        .overlay(RoundedRectangle(cornerRadius: 13).strokeBorder(.primary.opacity(0.06)))
     }
 
-    private var editor: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("IP Ranges").font(.system(size: 12, weight: .semibold))
-                Text("\(model.networks.count)").font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
-                Spacer()
-                Button { showingAdd = true } label: { Label("Add", systemImage: "plus").font(.system(size: 11, weight: .medium)) }
-                    .buttonStyle(.bordered).disabled(model.busy).keyboardShortcut("n", modifiers: .command)
-            }.padding(16)
+    private func banner<Actions: View>(_ title: String, symbol: String, text: String, @ViewBuilder actions: () -> Actions) -> some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: symbol).foregroundStyle(.secondary).accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title).font(.callout.bold())
+                    Text(text).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                actions().controlSize(.small)
+            }
+            .padding(12)
             Divider()
-            if model.networks.isEmpty {
-                VStack(spacing: 12) {
-                    HStack(spacing: 8) {
-                        Text("No Exemptions").font(.system(size: 13)).foregroundStyle(.secondary)
-                        InfoButton(title: "No Exemptions", documentation: "No exemptions are configured for this connection. Apps need their regular permission for local network access.")
-                    }
-                    Button("Add") { showingAdd = true }.buttonStyle(.link).font(.system(size: 11))
-                }.frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(Array(model.networks.enumerated()), id: \.offset) { index, network in
-                            networkRow(network)
-                            if index < model.networks.count - 1 { Divider().padding(.leading, 16) }
-                        }
-                    }
-                }.frame(maxHeight: .infinity)
-            }
         }
-        .background(Palette.surface, in: RoundedRectangle(cornerRadius: 13))
-        .overlay(RoundedRectangle(cornerRadius: 13).strokeBorder(.primary.opacity(0.07)))
-        .disabled(model.busy)
+        .background(.background)
     }
 
-    private func networkRow(_ network: String) -> some View {
-        let cidr = try? CIDR(network)
-        let isNew = !(model.snapshot?.configuration[model.selectedInterface] ?? []).contains(network)
-        return HStack(spacing: 12) {
-            Text(network).font(.system(size: 13, weight: .medium, design: .monospaced)).textSelection(.enabled)
-            Spacer()
-            if cidr == nil {
-                InfoButton(title: "Invalid Existing Value", documentation: "This existing value is not valid CIDR notation. Remove it before saving or replace it with a valid IP range.")
-            } else {
-                Text(cidr!.isIPv6 ? "IPv6" : "IPv4").font(.system(size: 10)).foregroundStyle(.tertiary)
+    private var statusBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+            HStack(spacing: 8) {
+                if model.busy {
+                    ProgressView().controlSize(.small)
+                    Text(model.activity == .loading ? "Loading the configuration…" : "Applying changes…")
+                } else if let notice = model.notice {
+                    Text(notice)
+                } else if model.isLoaded {
+                    Text(searchText.isEmpty ? "\(rows.count) IP ranges" : "\(visibleRows.count) of \(rows.count) IP ranges")
+                    if !selection.isEmpty { Text("· \(selection.count) selected") }
+                } else {
+                    Text("No configuration loaded")
+                }
+                Spacer(minLength: 8)
+                if model.isDirty { Label("Not applied", systemImage: "pencil") }
             }
-            if isNew { Circle().fill(Palette.green).frame(width: 5, height: 5).help("New in the draft") }
-            Button { model.remove(network) } label: {
-                Image(systemName: "minus.circle").font(.system(size: 14)).foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain).help("Remove").accessibilityLabel("Remove \(network)")
-        }.padding(.horizontal, 16).padding(.vertical, 17)
+            .font(.callout).foregroundStyle(.secondary).padding(.horizontal, 16).padding(.vertical, 10)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .background(.bar)
     }
 
-    private var footer: some View {
-        HStack(spacing: 12) {
-            if model.busy { ProgressView().controlSize(.small) }
-            Button {
-                if model.isDirty { confirmingReload = true } else { Task { await model.load() } }
-            } label: { Image(systemName: "arrow.clockwise") }
-            .help("Reload").accessibilityLabel("Reload").disabled(model.busy || !model.isLoaded)
-            if model.isDirty {
-                Button("Discard", action: model.discard).buttonStyle(.plain).font(.system(size: 11)).disabled(model.busy)
+    private func perform(_ command: WorkspaceCommand) {
+        guard available else { return }
+        switch command {
+        case .add:
+            guard model.canEdit else { return }
+            sheet = .add
+        case .edit:
+            edit(selection)
+        case .remove:
+            guard !searchFocused else { return }
+            model.remove(selection, interface: interface)
+        case .review:
+            guard model.canReview else { return }
+            sheet = .review
+        case .load:
+            if model.isDirty { confirmation = .reload } else { Task { await model.load() } }
+        case .discard:
+            confirmation = .discard
+        case .reset:
+            confirmation = .reset
+        case .preview:
+            guard model.isDemo else { model.startDemo(); return }
+            if model.isDirty { confirmation = .leavePreview } else { model.leaveDemo() }
+        case .importBackup:
+            guard model.canEdit, let window else { return }
+            showingFilePanel = true
+            BackupPanels.open(in: window) { url in
+                showingFilePanel = false
+                if let url { model.importBackup(from: url) }
             }
-            Spacer()
-            if let message = model.validationMessage, model.isLoaded {
-                InfoButton(title: "Check the Draft", documentation: message)
-            } else if model.isDirty {
-                Text("Unsaved").font(.system(size: 10)).foregroundStyle(.secondary)
-            } else if let notice = model.notice {
-                Text(notice).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
+        case .exportBackup:
+            guard model.isLoaded, let window else { return }
+            showingFilePanel = true
+            BackupPanels.save(in: window) { url in
+                showingFilePanel = false
+                if let url { model.exportBackup(to: url) }
             }
-            Button { showingReview = true } label: {
-                Text("Review Changes").font(.system(size: 12, weight: .medium)).padding(.horizontal, 5).padding(.vertical, 3)
-            }
-            .buttonStyle(.borderedProminent).disabled(!model.isDirty || model.busy || model.validationMessage != nil)
-            .keyboardShortcut("s", modifiers: .command)
+        case .backups:
+            model.showBackups()
+        case .inspector:
+            showsInspector.toggle()
+        case .search:
+            searchFocused = true
+        case .wifi:
+            interfaceName = NetworkInterface.wifi.rawValue
+        case .ethernet:
+            interfaceName = NetworkInterface.ethernet.rawValue
+        case .help:
+            sheet = .help
+        }
+    }
+
+    private func edit(_ items: Set<Int>) {
+        guard available, model.canEdit, items.count == 1,
+              let row = rows.first(where: { items.contains($0.id) }) else { return }
+        selection = items
+        sheet = .edit(row)
+    }
+
+    private func copy(_ items: Set<Int>) {
+        let text = rows.filter { items.contains($0.id) }.map(\.notation).joined(separator: "\n")
+        guard !text.isEmpty else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    private func confirm(_ pending: DraftConfirmation) {
+        confirmation = nil
+        switch pending {
+        case .reload: Task { await model.load() }
+        case .discard: model.discard()
+        case .reset: model.resetDraft()
+        case .leavePreview: model.leaveDemo()
         }
     }
 }
 
-struct AddNetworkView: View {
-    @Bindable var model: HallPassModel
-    @Environment(\.dismiss) private var dismiss
-    @State private var input = ""
-    @State private var both = true
-    @State private var failure: String?
-    @FocusState private var focused: Bool
-    private var parsed: CIDR? { try? CIDR(input) }
+private enum WorkspaceSheet: Identifiable {
+    case add, edit(NetworkRow), review, help
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            HStack {
-                Text("Add Network Range").font(.system(size: 19, weight: .semibold)).tracking(-0.5)
-                Spacer()
-                InfoButton(title: "Add Network Range", documentation: "The exemption applies to all apps. Entries are added to the draft first. Only Apply saves them in macOS.")
-            }
-            VStack(alignment: .leading, spacing: 9) {
-                HStack(spacing: 7) {
-                    Text("IP Range").font(.system(size: 12, weight: .medium))
-                    InfoButton(title: "CIDR Notation", documentation: "Enter an IPv4 or IPv6 address with a network prefix, for example 192.168.1.0/24 or fd12:3456::/48. For a single address use /32 for IPv4 and /128 for IPv6. Host bits are normalized to the network address automatically.")
-                }
-                TextField("192.168.1.0/24", text: $input).textFieldStyle(.roundedBorder)
-                    .font(.system(size: 14, design: .monospaced)).controlSize(.large).focused($focused).onSubmit(add)
-                if let parsed, parsed.notation != input.trimmingCharacters(in: .whitespacesAndNewlines) {
-                    HStack(spacing: 7) {
-                        Text("→ \(parsed.notation)").font(.system(size: 11, design: .monospaced)).foregroundStyle(Palette.green)
-                        InfoButton(title: "Network Address", documentation: "The address was normalized to the start of the given network. This entire IP range is saved.")
-                    }
-                } else if !input.isEmpty && parsed == nil {
-                    HStack(spacing: 7) {
-                        Text("Invalid IP range").font(.system(size: 11)).foregroundStyle(.orange)
-                        InfoButton(title: "Correct the IP Range", documentation: "A numeric IP address and a prefix are required: IPv4 /0 to /32, IPv6 /0 to /128. Hostnames, zone IDs and spaces inside the address are not allowed.")
-                    }
-                }
-            }
-            HStack(spacing: 7) {
-                preset("Link-Local", "169.254.0.0/16")
-                preset("Private /24", "192.168.1.0/24")
-                preset("IPv6 Link-Local", "fe80::/10")
-                InfoButton(title: "Presets", documentation: "Link-Local: 169.254.0.0/16. Private /24: 192.168.1.0/24 as an example; adjust it to your network. IPv6 Link-Local: fe80::/10. A click only fills in the input field.")
-            }
-            Toggle("Wi-Fi and Ethernet", isOn: $both).font(.system(size: 12))
-            if !both { Text("Only \(model.selectedInterface.title)").font(.system(size: 11)).foregroundStyle(.secondary) }
-            if parsed?.prefixLength == 0 {
-                HStack(spacing: 7) {
-                    Label("All IPv\(parsed!.isIPv6 ? "6" : "4") addresses", systemImage: "exclamationmark.triangle").font(.system(size: 11)).foregroundStyle(.orange)
-                    InfoButton(title: "Exemption for /0", documentation: "This range covers every address of the chosen IP version. Local network checks no longer apply to this entire address space.")
-                }
-            }
-            if let failure { Text(failure).font(.system(size: 11)).foregroundStyle(.orange) }
-            Divider()
-            HStack {
-                Spacer()
-                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Add", action: add).buttonStyle(.borderedProminent).disabled(parsed == nil).keyboardShortcut(.defaultAction)
-            }
-        }.padding(25).frame(width: 455).tint(Palette.green).onAppear { focused = true }
-    }
-
-    private func preset(_ title: String, _ value: String) -> some View {
-        Button(title) { input = value }.font(.system(size: 10)).buttonStyle(.bordered)
-    }
-    private func add() {
-        guard parsed != nil else { return }
-        do {
-            try model.add(input, interfaces: both ? NetworkInterface.allCases : [model.selectedInterface])
-            dismiss()
-        } catch { failure = error.localizedDescription }
+    var id: String {
+        switch self {
+        case .add: "add"
+        case .edit(let row): "edit-\(row.id)"
+        case .review: "review"
+        case .help: "help"
+        }
     }
 }
 
-struct ReviewView: View {
-    @Bindable var model: HallPassModel
-    @Environment(\.dismiss) private var dismiss
+private enum DraftConfirmation {
+    case reload, discard, reset, leavePreview
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack {
-                Text("Apply Changes?").font(.system(size: 20, weight: .semibold)).tracking(-0.5)
-                Spacer()
-                InfoButton(title: "Apply Changes", documentation: model.isDemo ? "Preview: the system settings are not changed." : "The exemptions apply to all apps. HallPass creates a backup before saving, and macOS asks for administrator access. The changes take effect after a restart.")
-            }
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    ForEach(NetworkInterface.allCases) { interface in
-                        let before = model.snapshot?.configuration[interface] ?? []
-                        let after = model.draft[interface] ?? []
-                        let added = after.filter { !before.contains($0) }
-                        let removed = before.filter { !after.contains($0) }
-                        if model.snapshot?.configuration[interface] != model.draft[interface] {
-                            VStack(alignment: .leading, spacing: 10) {
-                                Label(interface.title, systemImage: interface.symbol).font(.system(size: 12, weight: .semibold))
-                                ForEach(added, id: \.self) { row($0, added: true) }
-                                ForEach(removed, id: \.self) { row($0, added: false) }
-                                if added.isEmpty && removed.isEmpty {
-                                    Label("Reset the empty setting", systemImage: "minus.circle").font(.system(size: 11)).foregroundStyle(.secondary)
-                                }
-                            }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Palette.surface, in: RoundedRectangle(cornerRadius: 10))
-                        }
-                    }
-                }
-            }.frame(maxHeight: 260)
-            Divider()
-            HStack {
-                Button("Back") { dismiss() }.keyboardShortcut(.cancelAction)
-                Spacer()
-                Button(model.isDemo ? "Apply Preview" : "Apply") {
-                    dismiss()
-                    Task { await model.save() }
-                }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
-            }
-        }.padding(25).frame(width: 455).tint(Palette.green)
+    var title: String {
+        switch self {
+        case .reload: "Discard the Draft and Reload?"
+        case .discard: "Discard Changes?"
+        case .reset: "Remove All Exemptions?"
+        case .leavePreview: "End the Preview?"
+        }
     }
 
-    private func row(_ network: String, added: Bool) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: added ? "plus.circle.fill" : "minus.circle.fill").foregroundStyle(added ? Palette.green : Color.orange)
-            Text(network).font(.system(size: 12, design: .monospaced))
-            Spacer()
-        }.accessibilityLabel("\(added ? "Add" : "Remove"): \(network)")
+    var message: String {
+        switch self {
+        case .reload: "The system state replaces the changes you have not applied."
+        case .discard: "The draft returns to the most recently loaded or saved state. You can undo this."
+        case .reset: "The Wi-Fi and Ethernet exemptions are removed from the draft. Only applying and a restart change the settings in effect."
+        case .leavePreview: "Your changes to the sample data are discarded."
+        }
+    }
+
+    var actionTitle: String {
+        switch self {
+        case .reload: "Discard and Reload"
+        case .discard: "Discard Changes"
+        case .reset: "Mark for Removal"
+        case .leavePreview: "End Preview"
+        }
     }
 }

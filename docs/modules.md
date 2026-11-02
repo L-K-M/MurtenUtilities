@@ -144,26 +144,34 @@ privileged osascript with baseline re-check and rollback.
 
 - **Status:** available. `HallPassCore` and its Swift Testing suites moved
   in unchanged apart from English messages; the app target became
-  `HallPassModule` (provider, pane, privileged service). Both keep the
-  source's Swift 6 language mode.
-- **Provenance:** HallPass@831065aa50626e5633bd87a150c18e90db3ab81b
-- **Migrated:** the pane with its preview mode, backups menu and in-pane
-  confirmations. The privileged write path keeps its own confirmation,
-  baseline re-check and rollback inside the suite; this is a repair-flow
-  boundary, not OS-enforced isolation from other modules.
+  `HallPassModule` (provider, pane, backup store, privileged service), and
+  its model tests moved to `HallPassModuleTests`. All keep the source's
+  Swift 6 language mode.
+- **Provenance:** HallPass@1ab2ac48ba98bc11d606e509cdedc88a3f8afa70
+- **Migrated:** the Tahoe pane (sidebar, searchable table, inspector,
+  editing and review sheets, Help), preview with sample data, named undo,
+  draft recovery and the backup commands. The privileged write path keeps
+  its own confirmation, baseline re-check and rollback inside the suite;
+  this is a repair-flow boundary, not OS-enforced isolation from other
+  modules.
 - **Changed for the suite:** the UI and every message are English
-  ("WLAN" is "Wi-Fi"). The window-close and quit guard became the
-  provider's `interruptionWarning` (an unsaved draft, a load or an apply
-  in progress). The TN3179 menu item is the Tool menu's *Open Apple
-  Documentation*. The `--demo` flag is gone; *Preview* in the pane remains.
-  The sidebar shows the `ticket.fill` symbol instead of the app's `.icns`.
-  No dark-appearance accent.
-- **State:** backups stay in
-  `~/Library/Application Support/HallPass/Backups`, shared with the
-  standalone app. The restart reminder's keys (`restartRequiredAtUptime`,
+  ("WLAN" is "Wi-Fi"). The app delegate, the window takeover and its
+  close and quit guards are gone: the provider's `interruptionWarning`
+  covers an unsaved draft, a load and an apply. The menu commands are
+  Tool menu commands with the same shortcuts; window, full-screen and
+  sidebar commands are the shell's. The `--demo` flag is gone; *Try with
+  Sample Data* remains. The welcome shows the `ticket.fill` symbol
+  instead of the application icon. Undo uses the window's undo manager
+  while the pane is shown and leaves with it; it is not disabled during a
+  load or an apply, which needed the window delegate. osascript waits on
+  a dispatch thread rather than the shared cooperative pool.
+- **State:** `~/Library/Application Support/HallPass/Backups` and
+  `Draft.json` stay where they are, shared with the standalone app, so a
+  draft from one appears in the other; the apply still re-checks the
+  system state first. Quitting the suite keeps a real draft for next
+  time. The restart reminder's keys (`restartRequiredAtUptime`,
   `restartRequiredBootTime`) live in the module's defaults, so a restart
-  the standalone app asked for is not shown here. The source keeps no
-  draft file.
+  the standalone app asked for is not shown here.
 - **Watcher:** none; HallPass stays on-demand. The read service requests
   administrator access, so it cannot back a watcher. A future "exemptions
   changed" check needs an unprivileged signal first.
