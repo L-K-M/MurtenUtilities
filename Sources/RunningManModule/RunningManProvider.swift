@@ -28,7 +28,10 @@ public final class RunningManProvider: SuiteModuleProvider {
         model = AppModel(defaults: context.defaults, demoMode: demoMode)
 
         let memory = RunnerHealthMemoryStore()
-        if !demoMode { model.healthMemory = memory }
+        if !demoMode {
+            model.healthMemory = memory
+            model.runnerActionSucceeded = context.requestRecheck
+        }
         let defaults = UnsafeSendableDefaults(context.defaults)
         watch = WatcherRegistration(
             watcher: RunnerHealthWatcher(probe: probe, memory: memory,

@@ -206,6 +206,9 @@ final class AppModel {
     /// Shared with the suite's background check, so a stop asked for here is not reported as
     /// an outage and the pane's refreshes date when a runner went offline. Nil in demo mode.
     @ObservationIgnored var healthMemory: RunnerHealthMemoryStore?
+    /// Called after a runner action succeeds, so the suite re-checks runner health soon and a
+    /// suggestion the action settled (a runner started again) resolves without waiting.
+    @ObservationIgnored var runnerActionSucceeded: (@MainActor () -> Void)?
     /// Nil in demo mode, which must not write preferences.
     @ObservationIgnored private let drainRequestStore: DrainRequestStore?
     @ObservationIgnored private var pollingTask: Task<Void, Never>?
@@ -807,6 +810,7 @@ final class AppModel {
                 }
                 record(title: title, runnerID: runner.id, detail: runner.runner.name, kind: .success)
                 await refresh()
+                runnerActionSucceeded?()
             } catch {
                 let message = Self.message(error)
                 switch origin {
