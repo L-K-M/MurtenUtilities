@@ -35,6 +35,46 @@ final class ProtectedLocationTests: XCTestCase {
         }
     }
 
+    // MARK: - Links
+
+    private func resolve(_ path: String, links: [String: String]) -> (path: String?, looked: [String]) {
+        var looked: [String] = []
+        let result = ProtectedLocation.readablePath(path, home: home) { candidate in
+            looked.append(candidate)
+            return links[candidate]
+        }
+        return (result, looked)
+    }
+
+    func testPathWithoutLinksIsReturnedAsIs() {
+        let result = resolve("/Applications/Tool.app", links: [:])
+        XCTAssertEqual(result.path, "/Applications/Tool.app")
+        XCTAssertEqual(result.looked, ["/Applications", "/Applications/Tool.app"])
+        XCTAssertEqual(resolve("/Users/example/Applications/Tool.app", links: [:]).path,
+                       "/Users/example/Applications/Tool.app", "home itself may be passed on the way to a safe folder")
+    }
+
+    func testLinkIntoAGuardedFolderIsRefusedWithoutLookingInside() {
+        let result = resolve("/Applications/Tool.app", links: ["/Applications/Tool.app": "/Users/example/Downloads/Tool.app"])
+        XCTAssertNil(result.path)
+        XCTAssertFalse(result.looked.contains { $0.hasPrefix("/Users/example/Downloads") })
+    }
+
+    func testLinkedFolderIntoAGuardedFolderIsRefused() {
+        let links = ["/Users/example/Applications": "Documents/Apps"]
+        XCTAssertNil(resolve("/Users/example/Applications/Tool.app", links: links).path)
+    }
+
+    func testLinksBetweenSafeFoldersResolve() {
+        let links = ["/Applications/Tool.app": "../opt/tools/Tool.app", "/opt": "/private/opt"]
+        XCTAssertEqual(resolve("/Applications/Tool.app", links: links).path, "/private/opt/tools/Tool.app")
+    }
+
+    func testLinkLoopsAreRefused() {
+        let links = ["/Applications/A.app": "/Applications/B.app", "/Applications/B.app": "/Applications/A.app"]
+        XCTAssertNil(resolve("/Applications/A.app", links: links).path)
+    }
+
     func testTrailingSlashesDoNotChangeTheAnswer() {
         XCTAssertFalse(ProtectedLocation.contains("/Users/example/Applications/Tool.app/", home: home + "/"))
         XCTAssertTrue(ProtectedLocation.contains("/Users/example/Desktop/Tool.app/", home: home + "/"))

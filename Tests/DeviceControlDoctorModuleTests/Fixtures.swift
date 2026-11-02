@@ -38,7 +38,9 @@ final class FakeProcessRunner: ProcessRunning, @unchecked Sendable {
     private func record(_ command: [String]) -> (CommandResult?, cancel: Bool) {
         lock.lock(); defer { lock.unlock() }
         recorded.append(command)
-        return (responses[command], cancelsCallingTask)
+        let cancel = cancelsCallingTask
+        cancelsCallingTask = false
+        return (responses[command], cancel)
     }
 
     // MARK: - tccutil and codesign fixtures

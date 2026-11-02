@@ -96,12 +96,14 @@ struct PermissionWatcher: Watcher {
     private func read(_ app: WatchedApp, listing: inout Bool?) async -> AppCheck {
         guard !Task.isCancelled else { return .cancelled }
 
-        if ProtectedLocation.contains(app.path, home: home) {
+        // Resolved without looking inside a guarded folder, and then used for
+        // every read, so a link added later cannot lead a read into one.
+        guard let path = ProtectedLocation.readablePath(app.path, home: home, linkDestination: Self.linkDestination) else {
             return .skipped(.permissionDenied,
                             "It is in a folder macOS protects, so it is checked only when you open DeviceControlDoctor.")
         }
         let clientIdentifier = app.canReset ? nil : app.bundleID
-        guard let current = AppCatalog.app(at: URL(fileURLWithPath: app.path), clientIdentifier: clientIdentifier) else {
+        guard let current = AppCatalog.app(at: URL(fileURLWithPath: path), clientIdentifier: clientIdentifier) else {
             return .skipped(.toolMissing, "It is missing at \(app.path).")
         }
         if app.canReset && current.bundleID != app.bundleID {
@@ -133,9 +135,17 @@ struct PermissionWatcher: Watcher {
         guard app.identity.signatureValid != nil else {
             return .read(WatchedAppReading(permissions: permissions, identity: AppIdentity()))
         }
-        let identity = await IdentityInspector(runner: runner).inspect(path: app.path)
+        let identity = await IdentityInspector(runner: runner).inspect(path: path)
         guard !Task.isCancelled else { return .cancelled }
         return .read(WatchedAppReading(permissions: permissions, identity: identity))
+    }
+
+    /// The target of `path` when that one entry is a symbolic link (`lstat`,
+    /// then `readlink`); nil otherwise. Never follows the link.
+    private static func linkDestination(_ path: String) -> String? {
+        let attributes = try? FileManager.default.attributesOfItem(atPath: path)
+        guard attributes?[.type] as? FileAttributeType == .typeSymbolicLink else { return nil }
+        return try? FileManager.default.destinationOfSymbolicLink(atPath: path)
     }
 
     // MARK: - Removed apps

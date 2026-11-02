@@ -28,6 +28,61 @@ public enum ProtectedLocation {
         return !safeInHome.contains { isInside(path, home + "/" + $0) }
     }
 
+    /// Where `path` really leads, or nil when it is, or passes through, a
+    /// guarded location. A symlink placed after the app was added (the app
+    /// itself, or `~/Applications` pointing into Documents) would otherwise
+    /// lead a background read into a guarded folder.
+    ///
+    /// Links are resolved one component at a time with `linkDestination`
+    /// (an `lstat` plus `readlink` of that one entry), and the walk stops
+    /// before it would look at anything inside a guarded location, so the
+    /// resolution itself cannot prompt. The home folder is the one guarded
+    /// path the walk may pass, because the safe folders sit inside it.
+    public static func readablePath(_ path: String, home: String,
+                                    linkDestination: (String) -> String?) -> String? {
+        let home = normalized(home)
+        var components = lexicalComponents(of: path)
+        var resolved = ""
+        var index = 0
+        var hops = 0
+
+        while index < components.count {
+            let candidate = resolved + "/" + components[index]
+            if candidate != home && contains(candidate, home: home) { return nil }
+
+            guard let destination = linkDestination(candidate) else {
+                resolved = candidate
+                index += 1
+                continue
+            }
+
+            hops += 1
+            guard hops <= maximumLinkHops else { return nil }
+            // A relative target is relative to the link's folder, which is
+            // already free of links, so lexical ".." handling is exact.
+            let base = destination.hasPrefix("/") ? destination : resolved + "/" + destination
+            components = lexicalComponents(of: ([base] + components[(index + 1)...]).joined(separator: "/"))
+            resolved = ""
+            index = 0
+        }
+        return resolved.isEmpty ? "/" : resolved
+    }
+
+    /// The kernel's own limit (MAXSYMLINKS) is 32.
+    private static let maximumLinkHops = 32
+
+    private static func lexicalComponents(of path: String) -> [String] {
+        var components: [String] = []
+        for component in path.split(separator: "/") where component != "." {
+            if component == ".." {
+                _ = components.popLast()
+            } else {
+                components.append(String(component))
+            }
+        }
+        return components
+    }
+
     private static func normalized(_ path: String) -> String {
         var path = path
         while path.count > 1 && path.hasSuffix("/") { path.removeLast() }

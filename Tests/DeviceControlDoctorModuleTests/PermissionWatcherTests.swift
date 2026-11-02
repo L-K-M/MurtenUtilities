@@ -179,6 +179,40 @@ final class PermissionWatcherTests: XCTestCase {
         XCTAssertTrue(runner.calls.isEmpty, "a protected folder is never read in the background")
     }
 
+    func testLinkIntoAProtectedFolderIsNotFollowed() async throws {
+        let real = try mac.installApp("Linked", bundleID: "com.example.Linked", in: "home/Downloads")
+        let link = mac.root.appendingPathComponent("Applications/Linked.app")
+        try FileManager.default.createDirectory(at: link.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(atPath: link.path, withDestinationPath: real.path)
+        var watched = real
+        watched.path = link.path
+        try mac.saveWatchList([watched])
+        runner.offerListing()
+
+        let observation = try await observeWithoutWriting()
+
+        XCTAssertEqual(observation.failures.map(\.kind), [.permissionDenied])
+        XCTAssertTrue(runner.calls.isEmpty, "a link into a protected folder is never followed in the background")
+    }
+
+    func testLinkBetweenReadableFoldersIsFollowedForEveryRead() async throws {
+        let real = try mac.installApp("Moved", bundleID: "com.example.Moved", in: "opt")
+        let link = mac.root.appendingPathComponent("Applications/Moved.app")
+        try FileManager.default.createDirectory(at: link.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(atPath: link.path, withDestinationPath: real.path)
+        var watched = real
+        watched.path = link.path
+        try mac.saveWatchList([watched])
+        runner.offerListing()
+        runner.report(.accessibility, for: real.bundleID, "granted", exitCode: 0)
+        runner.sign(real.path)
+
+        let observation = try await observeWithoutWriting()
+
+        XCTAssertEqual(observation.outcome, .complete)
+        XCTAssertTrue(runner.calls.contains { $0.first == SystemTool.codesign && $0.last == real.path })
+    }
+
     // MARK: - The watch list
 
     func testMissingWatchListIsACompleteEmptyCheck() async throws {

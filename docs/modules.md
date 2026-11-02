@@ -125,10 +125,10 @@ user-confirmed per service.
   changed, or an earlier change has no passing test since → "Verify <App>'s
   permissions again", route `review` with context `app`. Unclear answers,
   timeouts and a missing `tccutil list` (macOS 26) are failures, never
-  healthy. Apps in privacy-guarded places (Desktop, Documents, Downloads,
-  iCloud Drive and file providers, other apps' containers, other volumes,
-  any home folder but `~/Applications` and `~/Library`) are left to the
-  pane. It never resets, writes or prompts.
+  healthy. Apps in, or linked into, privacy-guarded places (Desktop,
+  Documents, Downloads, iCloud Drive and file providers, other apps'
+  containers, other volumes, any home folder but `~/Applications` and
+  `~/Library`) are left to the pane. It never resets, writes or prompts.
 - **Preselection:** the route selects the named app in the watch list and
   nothing else. The repair sheet opens only on the user's click, with the
   app's expected permissions checked, as in the standalone app.
