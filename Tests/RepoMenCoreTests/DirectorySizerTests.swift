@@ -46,6 +46,9 @@ final class DirectorySizerTests: XCTestCase {
         try patternData(1).write(to: url)
         let pinned = Date().addingTimeInterval(-3_600)
         try fileManager.setAttributes([.modificationDate: pinned], ofItemAtPath: url.path)
+        // Writing the file touched the folder; the sizer counts the folder's
+        // own mtime too, so pin it as well.
+        try fileManager.setAttributes([.modificationDate: pinned], ofItemAtPath: root.path)
         let measurement = DirectorySizer.measure(root)
         XCTAssertEqual(measurement.newestModification.timeIntervalSince1970,
                        pinned.timeIntervalSince1970, accuracy: 1.0,
