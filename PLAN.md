@@ -133,6 +133,12 @@ Per-module migration notes, satellites, and new-module ideas:
   floor such as 15.5 is HallPass's own feature
   floor. Decide before Phase 2 migrates HallPass. Any floor still needs
   per-module applicability (docs/architecture.md).
+- **Suite updates.** One update check for the suite bundle replaces the
+  modules' own (docs/architecture.md §Module packaging). On by default keeps
+  ad-hoc-signed installs current, but contacts GitHub without the user
+  opting in; off by default matches "opt-in, never nagware" and leaves
+  installs stale. Sparkle would be a second dependency. A fleet-scoped
+  Obtainintosh could own this check.
 - **Name.** `MurtenUtilities` is the repo and bundle id; the *displayed* name
   can stay "Murten Utilities" or take a friendlier one later.
 - **Signing.** Ad-hoc now. That limits function, not just distribution.

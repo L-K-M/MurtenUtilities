@@ -199,6 +199,23 @@ Revisit only if the standalone apps stay alive long-term — at that point the
 shared cores could be extracted into their own tiny packages both sides
 consume.
 
+Per-module update checks do not migrate. Four roster apps check for new
+releases of themselves, on by default (RunningMan through a manifest file,
+the others through the GitHub releases API):
+
+| App | Checker | Announces with |
+| --- | --- | --- |
+| Coreography | `Sources/CoreographyServices/UpdateChecker.swift` | a notification |
+| RunningMan | `Sources/RunningMan/AppUpdateChecker.swift` | an in-app banner |
+| RepoMen | `RepoMen/Updates/UpdateChecker.swift` | a modal alert, from a background check |
+| Zen Backup Manager | `ZenBackupManager/Updates/UpdateChecker.swift` | the same modal alert |
+
+Inside the suite a module has no version of its own, so these checks would
+announce standalone releases the suite cannot install, and three of them do
+it through surfaces the suite rules out (a default-on notification, a modal).
+The suite has one update check for its own bundle; whether it runs by default
+is open (PLAN.md, *Suite updates*).
+
 ## Module applicability
 
 `SuiteModule` says what a tool is, not whether it can run on this Mac. Its
