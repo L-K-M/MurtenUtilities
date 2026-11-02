@@ -1,23 +1,8 @@
 import Foundation
 
-enum BackupCatalog {
-    static func scan(profile: ZenProfile, safetyRoot: URL, progress: (Int, Int) -> Void = { _, _ in }) throws -> [BackupRecord] {
-        try SessionFiles.validateProfile(profile.directory)
-        let fm = FileManager.default
-        var candidates: [(URL, BackupRecord.Kind)] = []
-        for name in SessionFiles.names {
-            let file = profile.directory.appendingPathComponent(name)
-            if fm.fileExists(atPath: file.path) { candidates.append((file, .current)) }
-        }
-        for (folder, kind) in [("zen-sessions-backup", BackupRecord.Kind.automatic), ("sessionstore-backups", .legacy)] {
-            let directory = profile.directory.appendingPathComponent(folder)
-            if !fm.fileExists(atPath: directory.path) { continue }
-            guard directory.standardizedFileURL == directory.resolvingSymlinksInPath().standardizedFileURL else { throw BackupError.unsafePath }
-            let files = try fm.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey])
-            for file in files where file.lastPathComponent.contains(".jsonlz4") || file.pathExtension == "baklz4" {
-                candidates.append((file, kind))
-            }
-        }
+public enum BackupCatalog {
+    public static func scan(profile: ZenProfile, safetyRoot: URL, progress: (Int, Int) -> Void = { _, _ in }) throws -> [BackupRecord] {
+        var candidates = try snapshotFiles(in: profile)
         for archive in try SafetyArchive.list(root: safetyRoot, profile: profile) {
             for name in SessionFiles.names where archive.manifest.hashes[name] != nil {
                 candidates.append((archive.directory.appendingPathComponent(name), .safety))
@@ -43,5 +28,29 @@ enum BackupCatalog {
             progress(offset + 1, candidates.count)
         }
         return records.sorted { $0.date == $1.date ? $0.id < $1.id : $0.date > $1.date }
+    }
+
+    /// The session files Zen itself wrote for the profile: its current state
+    /// and its automatic and legacy backup folders. Lists paths without
+    /// reading them, so the watcher can date them from metadata alone.
+    /// Safety copies are this app's own and are not included.
+    static func snapshotFiles(in profile: ZenProfile) throws -> [(URL, BackupRecord.Kind)] {
+        try SessionFiles.validateProfile(profile.directory)
+        let fm = FileManager.default
+        var candidates: [(URL, BackupRecord.Kind)] = []
+        for name in SessionFiles.names {
+            let file = profile.directory.appendingPathComponent(name)
+            if fm.fileExists(atPath: file.path) { candidates.append((file, .current)) }
+        }
+        for (folder, kind) in [("zen-sessions-backup", BackupRecord.Kind.automatic), ("sessionstore-backups", .legacy)] {
+            let directory = profile.directory.appendingPathComponent(folder)
+            if !fm.fileExists(atPath: directory.path) { continue }
+            guard directory.standardizedFileURL == directory.resolvingSymlinksInPath().standardizedFileURL else { throw BackupError.unsafePath }
+            let files = try fm.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey])
+            for file in files where file.lastPathComponent.contains(".jsonlz4") || file.pathExtension == "baklz4" {
+                candidates.append((file, kind))
+            }
+        }
+        return candidates
     }
 }
