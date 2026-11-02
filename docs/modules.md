@@ -155,10 +155,32 @@ privileged osascript with baseline re-check and rollback.
 ### Zen Backup Manager — effort: medium — phase 3
 
 Inspects browser tabs and Spaces on a timeline of session backups; restores
-with a verified safety copy and undo. **GitHub-only**.
+with a verified safety copy and undo.
 
-- **Migrates:** the backup-timeline/restore core and its pane.
-- **Watcher:** backup freshness → "last session snapshot is 9 days old".
+- **Status:** available. The `.xcodeproj` is ported to SwiftPM:
+  `ZenBackupManagerCore` (session decoding, timeline, restore with safety
+  copies, the rule) and `ZenBackupManagerModule` (pane, provider, watcher).
+  The source's 23 tests moved to `ZenBackupManagerCoreTests`.
+- **Provenance:** ZenBackupManager@14efe4434430e453b5a53e79434d2ea828ad70ba
+- **Applicability:** a profile listed in Zen's `profiles.ini`; otherwise
+  "Zen Browser is not installed".
+- **Watcher:** hourly, unprivileged and metadata only: `profiles.ini`, then
+  the dates of each profile's session files (current state,
+  `zen-sessions-backup/`, `sessionstore-backups/`; never the safety copies).
+  One finding per profile, scoped by its folder path. At 7 days or more:
+  "Zen has not saved a session in N days", opening
+  `murten://zenbackupmanager/timeline?profile=<path>`. A restore rewrites the
+  current session file, so it counts as a save.
+- **Preselection:** the profile only. The pane re-scans it and selects its
+  current state, never a backup to restore; restoring still takes the
+  confirmation sheet, which offers to quit Zen.
+- **State:** safety copies stay in
+  `~/Library/Application Support/ZenBackupManager/Safety Copies` and are read
+  in place, so undo sees the standalone app's copies too. No preferences
+  migrate: the standalone app's only ones belonged to its update checker,
+  which is removed. Quitting during a restore asks first.
+- **Coexistence:** both apps take Zen's profile lock while restoring, so a
+  restore in one is refused while the other is writing.
 - **Source facts:** Zen Browser only. Zen writes the session snapshots; the
   app reads them and writes safety copies around restores. A stale snapshot
   means Zen has not saved a session (unused, or crashing), not an overdue
