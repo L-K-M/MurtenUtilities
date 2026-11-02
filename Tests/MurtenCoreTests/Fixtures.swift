@@ -34,7 +34,7 @@ struct ReclaimableRule: SuggestionRule {
     }
 }
 
-func complete(_ findings: [Finding], scopes: Set<FindingScope> = [socketScope], at date: Date = t0) -> Observation {
+func complete(_ findings: [Finding], scopes: Set<FindingScope> = [socketScope], at date: Date = t0) -> WatchObservation {
     .complete(moduleID: dockvac, at: date, scopes: scopes, findings: findings)
 }
 

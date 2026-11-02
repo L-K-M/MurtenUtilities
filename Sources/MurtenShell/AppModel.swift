@@ -347,7 +347,7 @@ public final class AppModel {
         return settings.gate(for: resources, in: environment)
     }
 
-    private func receive(_ observation: Observation, from registration: WatcherRegistration) async {
+    private func receive(_ observation: WatchObservation, from registration: WatcherRegistration) async {
         let now = services.clock.now()
         let events = await store.record(observation, rule: registration.rule, at: now)
         let notify = settings.notifyingModules.intersection(runnableWatchers())

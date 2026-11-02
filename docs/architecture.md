@@ -6,8 +6,8 @@
 Sources/
   MurtenCore/         pure logic — no AppKit, no process spawning, no privilege
     SuiteModule         module descriptor (id, name, one-liner, icon, status) + ModuleRegistry
-    Finding/Observation what a watcher saw, per scope, including failures
-    Watcher             observe() → Observation; cadence, timeout, resources
+    Finding/WatchObservation what a watcher saw, per scope, including failures
+    Watcher             observe() → WatchObservation; cadence, timeout, resources
     SuggestionRule      finding → at most one suggestion, with hysteresis
     SuggestionLedger    episodes, dedupe, snooze, dismissal, staleness, health
     SuggestionStore     the ledger's single owner; JSON persistence
@@ -37,7 +37,7 @@ The contracts, abridged:
 public protocol Watcher: Sendable {
     var moduleID: String { get }
     var cadence: WatchCadence { get }          // ≥ 15 min, timeout, .network
-    func observe() async -> Observation        // never throws; failures are data
+    func observe() async -> WatchObservation   // never throws; failures are data
 }
 
 public protocol SuggestionRule: Sendable {
@@ -108,7 +108,7 @@ click suggestion ──▶ deep link ──▶ module pane ──▶ explicit co
 ### Observation and suggestion lifecycle
 
 - A successful, complete observation can mark a condition active or resolved.
-  An `Observation` lists the scopes it completed and the failures it hit, so
+  A `WatchObservation` lists the scopes it completed and the failures it hit, so
   "checked and absent" (resolved), "not checked" (unchanged) and "check
   failed" (stale) stay distinct. A failed/incomplete check never proves a
   condition resolved.
