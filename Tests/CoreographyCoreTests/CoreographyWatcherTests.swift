@@ -9,8 +9,8 @@ final class CoreographyWatcherTests: XCTestCase {
     private lazy var watcher = CoreographyWatcher(observer: system, now: { [clock] in clock.now })
 
     /// Polls every 15 minutes while `Xcode` keeps a whole core busy.
-    private func pollBusyXcode(polls: Int, from cpuSeconds: Double = 0, pid: Int32 = 100) async -> [Observation] {
-        var observations: [Observation] = []
+    private func pollBusyXcode(polls: Int, from cpuSeconds: Double = 0, pid: Int32 = 100) async -> [WatchObservation] {
+        var observations: [WatchObservation] = []
         for poll in 0..<polls {
             if poll > 0 { clock.advance(minutes: 15) }
             system.processes = .success([process("Xcode", pid: pid, cpuSeconds: cpuSeconds + Double(poll) * 900),
@@ -139,7 +139,7 @@ final class CoreographyWatcherTests: XCTestCase {
 
     func testCancellationFailsWhatWasNotChecked() async {
         let watcher = self.watcher
-        let task = Task { () -> Observation in
+        let task = Task { () -> WatchObservation in
             withUnsafeCurrentTask { $0?.cancel() }
             return await watcher.observe()
         }

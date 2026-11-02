@@ -28,7 +28,7 @@ public actor CoreographyWatcher: Watcher {
         self.now = now
     }
 
-    public func observe() async -> Observation {
+    public func observe() async -> WatchObservation {
         var findings: [Finding] = []
         var completed: Set<FindingScope> = []
         var failures: [ObservationFailure] = []
@@ -90,7 +90,7 @@ public actor CoreographyWatcher: Watcher {
             fail(failure, CoreographyWatch.startupVolumeScope)
         }
 
-        return Observation(moduleID: moduleID, observedAt: now(), findings: findings,
+        return WatchObservation(moduleID: moduleID, observedAt: now(), findings: findings,
                            completedScopes: completed, failures: failures)
     }
 
@@ -130,9 +130,9 @@ public actor CoreographyWatcher: Watcher {
     /// A poll cancelled midway reports what it finished and fails the rest,
     /// so nothing unchecked resolves.
     private func cancelled(_ findings: [Finding], _ completed: Set<FindingScope>,
-                           _ failures: [ObservationFailure]) -> Observation {
+                           _ failures: [ObservationFailure]) -> WatchObservation {
         let cancellation = ObservationFailure(kind: .failed, message: "The check was cancelled.")
-        return Observation(moduleID: moduleID, observedAt: now(), findings: findings,
+        return WatchObservation(moduleID: moduleID, observedAt: now(), findings: findings,
                            completedScopes: completed, failures: failures + [cancellation])
     }
 }
