@@ -33,6 +33,10 @@ public final class ProbeRunner: @unchecked Sendable {
 
     public static let helperName = "shortking-probe"
 
+    /// The helper's name in SwiftPM's build directory. Only the app bundle
+    /// renames it to ``helperName`` (scripts/build-app.sh).
+    public static let buildProductName = "ShortkingProbe"
+
     private let helperURL: URL?
 
     public init(helperURL: URL? = ProbeRunner.locateHelper()) {
@@ -41,22 +45,40 @@ public final class ProbeRunner: @unchecked Sendable {
 
     public var isAvailable: Bool { helperURL != nil }
 
-    /// Finds the helper next to the app binary.
+    /// Finds the helper.
     ///
-    /// `forAuxiliaryExecutable:` is the bundled case; the sibling-path fallback is
-    /// what makes `swift run` work during development.
+    /// Inside Murten Utilities the helper sits in the suite's `Contents/MacOS`,
+    /// which `forAuxiliaryExecutable:` searches. The build-directory fallback is
+    /// what makes `swift run` and `swift test` work during development; the
+    /// suite owns `CommandLine.arguments`, so it is not consulted.
     public static func locateHelper() -> URL? {
         if let url = Bundle.main.url(forAuxiliaryExecutable: helperName) {
             return url
         }
+        return firstExecutable(named: [helperName, buildProductName], in: buildDirectories())
+    }
+
+    /// Where SwiftPM leaves the helper: beside the running executable for
+    /// `swift run`, beside the loaded test bundle for `swift test`.
+    static func buildDirectories() -> [URL] {
+        var directories: [URL] = []
         if let executable = Bundle.main.executableURL {
-            let sibling = executable.deletingLastPathComponent().appendingPathComponent(helperName)
-            if FileManager.default.isExecutableFile(atPath: sibling.path) { return sibling }
+            directories.append(executable.deletingLastPathComponent())
         }
-        let cwdSibling = URL(fileURLWithPath: CommandLine.arguments[0])
-            .deletingLastPathComponent()
-            .appendingPathComponent(helperName)
-        if FileManager.default.isExecutableFile(atPath: cwdSibling.path) { return cwdSibling }
+        for bundle in Bundle.allBundles where bundle.bundleURL.pathExtension == "xctest" {
+            directories.append(bundle.bundleURL.deletingLastPathComponent())
+        }
+        return directories
+    }
+
+    /// The first executable file among `names` in `directories`, searched in order.
+    static func firstExecutable(named names: [String], in directories: [URL]) -> URL? {
+        for directory in directories {
+            for name in names {
+                let candidate = directory.appendingPathComponent(name)
+                if FileManager.default.isExecutableFile(atPath: candidate.path) { return candidate }
+            }
+        }
         return nil
     }
 
