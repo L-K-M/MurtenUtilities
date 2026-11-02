@@ -4,10 +4,16 @@ import ShortkingCore
 /// Where Shortking keeps its data.
 public enum StoreLocation {
 
-    public static var directory: URL = {
+    /// The directory, without creating it. Murten Utilities' watcher and its
+    /// one-time settings import only read, so they must not create it either.
+    public static let directoryURL: URL = {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSHomeDirectory() + "/Library/Application Support")
-        let url = base.appendingPathComponent("Shortking", isDirectory: true)
+        return base.appendingPathComponent("Shortking", isDirectory: true)
+    }()
+
+    public static var directory: URL = {
+        let url = directoryURL
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }()

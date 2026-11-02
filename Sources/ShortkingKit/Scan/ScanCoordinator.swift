@@ -216,7 +216,9 @@ public final class ClaimDatabase: @unchecked Sendable {
     private let lock = NSLock()
     private var cached: [Claim]?
 
-    public init(filename: String = "claims.json") {
+    public static let filename = "claims.json"
+
+    public init(filename: String = ClaimDatabase.filename) {
         self.store = JSONStore(filename: filename)
     }
 

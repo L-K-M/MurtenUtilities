@@ -138,10 +138,10 @@ public enum HealthChecker {
                 title: "Accessibility",
                 status: .warning,
                 message: "Granted, but a test menu read returned nothing.",
-                detail: "If you just granted it, relaunch Shortking — macOS caches the decision "
-                    + "for the life of the process. Otherwise the grant has lapsed, which happens "
-                    + "when the app is updated or re-signed; remove Shortking from the "
-                    + "Accessibility list and add it again.",
+                detail: "If you just granted it, quit Murten Utilities and open it again — macOS "
+                    + "caches the decision for the life of the process. Otherwise the grant has "
+                    + "lapsed, which happens when the app is updated or re-signed; remove Murten "
+                    + "Utilities from the Accessibility list and add it again.",
                 action: .relaunch
             )
         }
@@ -370,7 +370,7 @@ public enum HealthChecker {
                 message: "Running as a bare executable, not from an app bundle.",
                 detail: "Permission grants are attributed to whatever launched this process, so "
                     + "Accessibility and Input Monitoring checks may report the wrong thing. Build "
-                    + "the bundle with `make app` and launch it from /Applications before trusting "
+                    + "the bundle with scripts/build-app.sh and launch it from /Applications before trusting "
                     + "any permission result."
             )
         }

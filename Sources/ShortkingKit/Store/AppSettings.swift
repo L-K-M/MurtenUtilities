@@ -44,7 +44,9 @@ public final class SettingsStore: @unchecked Sendable {
 
     public static let shared = SettingsStore()
 
-    private let store = JSONStore<AppSettings>(filename: "settings.json")
+    public static let filename = "settings.json"
+
+    private let store = JSONStore<AppSettings>(filename: SettingsStore.filename)
     private let lock = NSLock()
     private var cached: AppSettings
 
