@@ -202,6 +202,7 @@ and reveals it in Finder. It does not install or replace anything.
   pane already filled, so the check never reads the Keychain; a private
   Forgejo program whose key is not in memory is reported as not checked.
   Removed programs are reported as checked, so their suggestions resolve.
+  A check in the pane, or removing a program, asks the suite to poll soon.
 - **Preselection:** none. The suggestion's route `updates` opens the pane,
   which checks again; downloading stays a click.
 - **Platforms:** macOS only. Linux users (deb, AppImage, Flatpak) keep the
