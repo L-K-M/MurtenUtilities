@@ -101,9 +101,9 @@ Per-module migration notes, satellites, and new-module ideas:
   Asset catalogs do compile — SwiftPM runs actool for any `.xcassets` in a
   target's resources — but the resulting `.car` lands in that target's
   resource bundle, so `scripts/build-app.sh` must hoist or recompile it
-  into the app bundle. Coreography's Shortcuts actions depend on that
-  extractor, so they stay out of the suite or this decision gains an
-  exception.
+  into the app bundle. Coreography's Shortcuts actions depend on the
+  App Intents metadata extractor, so they stay out of the suite or this
+  decision gains an exception.
 - **Migrate code in**, don't depend on the tool repos as packages. The suite
   becomes the home of each core; standalone apps keep working from their own
   history. Revisit if standalones stay alive long-term (docs/architecture.md
