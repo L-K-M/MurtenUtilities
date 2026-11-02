@@ -44,11 +44,14 @@ final class MemoryPersistence: SuggestionPersisting, @unchecked Sendable {
     private let lock = NSLock()
     private var saved: SuggestionLedger?
     private var failure: Error?
+    private let quarantineFailure: Error?
     private(set) var quarantined = false
+    private(set) var saveCount = 0
 
-    init(saved: SuggestionLedger? = nil, failure: Error? = nil) {
+    init(saved: SuggestionLedger? = nil, failure: Error? = nil, quarantineFailure: Error? = nil) {
         self.saved = saved
         self.failure = failure
+        self.quarantineFailure = quarantineFailure
     }
 
     var ledger: SuggestionLedger? {
@@ -65,10 +68,12 @@ final class MemoryPersistence: SuggestionPersisting, @unchecked Sendable {
     func save(_ ledger: SuggestionLedger) throws {
         lock.lock(); defer { lock.unlock() }
         saved = ledger
+        saveCount += 1
     }
 
     func quarantine() throws -> URL? {
         lock.lock(); defer { lock.unlock() }
+        if let quarantineFailure { throw quarantineFailure }
         quarantined = true
         failure = nil
         return nil
@@ -82,6 +87,7 @@ final class ManualClock: WatchClock, @unchecked Sendable {
     private let lock = NSLock()
     private var current: Date
     private var waiters: [UUID: (deadline: Date, continuation: CheckedContinuation<Void, Error>)] = [:]
+    private var calls = 0
 
     init(_ start: Date = t0) {
         current = start
@@ -97,7 +103,18 @@ final class ManualClock: WatchClock, @unchecked Sendable {
         return waiters.count
     }
 
+    /// Every call to `sleep(until:)`, including ones that returned at once.
+    var sleepCalls: Int {
+        lock.lock(); defer { lock.unlock() }
+        return calls
+    }
+
+    private func countCall() {
+        lock.lock(); calls += 1; lock.unlock()
+    }
+
     func sleep(until deadline: Date) async throws {
+        countCall()
         let id = UUID()
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in

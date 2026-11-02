@@ -27,9 +27,16 @@ public struct ModuleRoute: Hashable, Codable, Sendable {
         if !context.isEmpty {
             components.queryItems = context.keys.sorted().map { URLQueryItem(name: $0, value: context[$0]) }
         }
-        // Components built from validated identifiers always form a URL.
-        return components.url ?? URL(string: "\(Self.scheme)://\(moduleID)")!
+        // An identifier outside [a-z0-9-] may not form a URL; fall back to a
+        // hostless one that `RouteAllowlist` rejects instead of trapping.
+        return components.url ?? Self.unroutableURL
     }
+
+    private static let unroutableURL: URL = {
+        var components = URLComponents()
+        components.scheme = scheme
+        return components.url ?? URL(fileURLWithPath: "/")
+    }()
 }
 
 public enum RouteError: Error, Equatable {

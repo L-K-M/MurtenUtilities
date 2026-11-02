@@ -93,11 +93,16 @@ final class RecordingNotifier: SuggestionNotifying {
     var onOpen: ((URL) -> Void)?
     var authorization: NotificationAuthorization = .granted
     private(set) var delivered: [Suggestion] = []
+    private(set) var withdrawn: [Set<String>] = []
 
     func requestAuthorization() async -> NotificationAuthorization { authorization }
 
     func deliver(_ suggestion: Suggestion, moduleName: String) {
         delivered.append(suggestion)
+    }
+
+    func withdraw(modules moduleIDs: Set<String>) {
+        withdrawn.append(moduleIDs)
     }
 }
 

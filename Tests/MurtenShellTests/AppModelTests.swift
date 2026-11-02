@@ -201,6 +201,32 @@ final class AppModelTests: XCTestCase {
         await harness.model.stop()
     }
 
+    func testSilencingWithdrawsDeliveredNotifications() async {
+        let harness = Harness(settings: residentSettings(notifying: [fakeModuleID]))
+        await harness.model.start()
+
+        harness.model.settings.residentMode = .off
+        XCTAssertEqual(harness.notifier.withdrawn, [[fakeModuleID]])
+
+        harness.model.settings.residentMode = .on
+        await harness.model.setNotifications(.off, for: fakeModuleID)
+        XCTAssertEqual(harness.notifier.withdrawn.last, [fakeModuleID])
+        await harness.model.stop()
+    }
+
+    func testApplicabilityIsRecheckedWhenTheEnvironmentChanges() async {
+        let harness = Harness(applicability: .inapplicable(reason: "Docker is not installed"))
+        await harness.model.start()
+        guard case .rejected = harness.model.open(ModuleRoute(moduleID: fakeModuleID)) else {
+            return XCTFail("inapplicable at launch")
+        }
+
+        harness.provider.applicabilityResult = .applicable
+        await harness.model.refreshEnvironment()
+        XCTAssertEqual(harness.model.open(ModuleRoute(moduleID: fakeModuleID)), .opened)
+        await harness.model.stop()
+    }
+
     func testQuitGuardListsBusyModules() async {
         let harness = Harness()
         XCTAssertTrue(harness.model.interruptionWarnings().isEmpty)

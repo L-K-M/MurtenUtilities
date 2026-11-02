@@ -1,0 +1,365 @@
+{
+  "sha": "dcfc91e3b72aee612b2b48aed4a744397b78dc77",
+  "url": "https://api.github.com/repos/L-K-M/Rigi/git/trees/dcfc91e3b72aee612b2b48aed4a744397b78dc77",
+  "tree": [
+    {
+      "path": ".github",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "2bbc67d7fb0b16a771b6aa67dcaf282d12065d3e",
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/trees/2bbc67d7fb0b16a771b6aa67dcaf282d12065d3e"
+    },
+    {
+      "path": ".github/dependabot.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "80049834289c86e55d0fe144de3d59519386dd0a",
+      "size": 144,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/80049834289c86e55d0fe144de3d59519386dd0a"
+    },
+    {
+      "path": ".github/workflows",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "057ffeef18638f617637cd2436bcc6c2f5d41b83",
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/trees/057ffeef18638f617637cd2436bcc6c2f5d41b83"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c51bdb5a594662d16bf63535c1184019f31f0956",
+      "size": 1031,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/c51bdb5a594662d16bf63535c1184019f31f0956"
+    },
+    {
+      "path": ".github/workflows/release.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ea375444e9bb05fdb67fa02d2f69da989cfe3f87",
+      "size": 782,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/ea375444e9bb05fdb67fa02d2f69da989cfe3f87"
+    },
+    {
+      "path": ".github/workflows/zai-code-review.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "85ed8f2d50cad99d55adcc98a0480b37fed62ed0",
+      "size": 7474,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/85ed8f2d50cad99d55adcc98a0480b37fed62ed0"
+    },
+    {
+      "path": ".gitignore",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "eed369d44d8388c24f608c94a4ce0c6bedcd8933",
+      "size": 80,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/eed369d44d8388c24f608c94a4ce0c6bedcd8933"
+    },
+    {
+      "path": "AGENTS.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "487b36d15f3a7beb9d2fbc0ed4770efc1620233b",
+      "size": 9429,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/487b36d15f3a7beb9d2fbc0ed4770efc1620233b"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a9029f61bd17d86286c4c56b2a18b8d7fa1fe746",
+      "size": 364,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/a9029f61bd17d86286c4c56b2a18b8d7fa1fe746"
+    },
+    {
+      "path": "CLAUDE.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dc583bd8e515e506d05d51a08ab6d3dfd274f143",
+      "size": 2312,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/dc583bd8e515e506d05d51a08ab6d3dfd274f143"
+    },
+    {
+      "path": "LICENSE",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fdddb29aa445bf3d6a5d843d6dd77e10a9f99657",
+      "size": 1211,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/fdddb29aa445bf3d6a5d843d6dd77e10a9f99657"
+    },
+    {
+      "path": "Package.swift",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b4f27d1efc60caa42d386640c0e78dceedf685e9",
+      "size": 469,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/b4f27d1efc60caa42d386640c0e78dceedf685e9"
+    },
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1c126d3dca2d384cb72c33dc4fc60192bd4763d7",
+      "size": 3106,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/1c126d3dca2d384cb72c33dc4fc60192bd4763d7"
+    },
+    {
+      "path": "Sources",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "f2e80fd48853b8f71a1e24abc008d65581e97077",
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/trees/f2e80fd48853b8f71a1e24abc008d65581e97077"
+    },
+    {
+      "path": "Sources/RigiGallery",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "939302667f50e35ecc1930eba2101ba7d0c8dfda",
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/trees/939302667f50e35ecc1930eba2101ba7d0c8dfda"
+    },
+    {
+      "path": "Sources/RigiGallery/GalleryApplication.swift",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1c5613d5ce70f2b6364ab284290f053b745fa2da",
+      "size": 1783,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/1c5613d5ce70f2b6364ab284290f053b745fa2da"
+    },
+    {
+      "path": "Sources/RigiGallery/GalleryChecks.swift",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6374e4039a010f27c9ab7f815f6c22b214ae9827",
+      "size": 5999,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/6374e4039a010f27c9ab7f815f6c22b214ae9827"
+    },
+    {
+      "path": "Sources/RigiGallery/GalleryPalettes.swift",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "65df36fa0bae2975fbddfaf3a93a14897e7f7c54",
+      "size": 6179,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/65df36fa0bae2975fbddfaf3a93a14897e7f7c54"
+    },
+    {
+      "path": "Sources/RigiGallery/GalleryWindow.swift",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "daba42a9fa212c1fb17d92dc84cffcbc691c15c5",
+      "size": 14719,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/daba42a9fa212c1fb17d92dc84cffcbc691c15c5"
+    },
+    {
+      "path": "Sources/RigiUI",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "529b5f88fb330a4449260f3d86fd2252ad543d96",
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/trees/529b5f88fb330a4449260f3d86fd2252ad543d96"
+    },
+    {
+      "path": "Sources/RigiUI/ClassicBarView.swift",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0916d023f5a2db37fabe9c1c4b12951573e4f84d",
+      "size": 3515,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/0916d023f5a2db37fabe9c1c4b12951573e4f84d"
+    },
+    {
+      "path": "Sources/RigiUI/ClassicControls.swift",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7fec01f93a2cde0f27ae181cbedf91c43d32f58c",
+      "size": 39027,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/7fec01f93a2cde0f27ae181cbedf91c43d32f58c"
+    },
+    {
+      "path": "Sources/RigiUI/ClassicNativeControls.swift",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "eb82075c488b31e62d8d77742a58f900de903e39",
+      "size": 3894,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/eb82075c488b31e62d8d77742a58f900de903e39"
+    },
+    {
+      "path": "Sources/RigiUI/Palettes",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "b0e48fdb5e46ed0807464768f854fe516d799c1a",
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/trees/b0e48fdb5e46ed0807464768f854fe516d799c1a"
+    },
+    {
+      "path": "Sources/RigiUI/Palettes/ClassicPalette.swift",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "019a1858d2a4b53d205b41331993f1f870fb9a54",
+      "size": 12669,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/019a1858d2a4b53d205b41331993f1f870fb9a54"
+    },
+    {
+      "path": "Sources/RigiUI/Palettes/Palette.swift",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a7a4254c4258320b63f6d37209763600d237ff4e",
+      "size": 7998,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/a7a4254c4258320b63f6d37209763600d237ff4e"
+    },
+    {
+      "path": "Sources/RigiUI/Palettes/PaletteCenter.swift",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cafad467b18b40ecb5751985bd5a9e4c75791b76",
+      "size": 2368,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/cafad467b18b40ecb5751985bd5a9e4c75791b76"
+    },
+    {
+      "path": "Sources/RigiUI/Palettes/PalettePanel.swift",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bc6069d97da5d08c17fa4eb6a433f270b1dcaf98",
+      "size": 13828,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/bc6069d97da5d08c17fa4eb6a433f270b1dcaf98"
+    },
+    {
+      "path": "Sources/RigiUI/Palettes/PaletteTypes.swift",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0a004520d3107bef68ff831c8ebc9de900825d06",
+      "size": 4631,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/0a004520d3107bef68ff831c8ebc9de900825d06"
+    },
+    {
+      "path": "Sources/RigiUI/PickerListView.swift",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "62593c7154c482ddf7e29afbb1342bfde3356ed4",
+      "size": 18134,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/62593c7154c482ddf7e29afbb1342bfde3356ed4"
+    },
+    {
+      "path": "Sources/RigiUI/StatusBarView.swift",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2bbc801f4315f48df78664b8be7231c541f3af07",
+      "size": 4361,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/2bbc801f4315f48df78664b8be7231c541f3af07"
+    },
+    {
+      "path": "Sources/RigiUI/TryOnPopover.swift",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6a8f70e4096b5e1939e8a0d7a1d5b39ee7f47b41",
+      "size": 6057,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/6a8f70e4096b5e1939e8a0d7a1d5b39ee7f47b41"
+    },
+    {
+      "path": "Tests",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "71d4ae956cdf4e85b6518c20f967494305269d32",
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/trees/71d4ae956cdf4e85b6518c20f967494305269d32"
+    },
+    {
+      "path": "Tests/RigiUITests",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "b2590e0a0810eeab6ca7824248942fc7dc812cab",
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/trees/b2590e0a0810eeab6ca7824248942fc7dc812cab"
+    },
+    {
+      "path": "Tests/RigiUITests/PalettePanelTests.swift",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ff3016ee5e5ef20a22c9910025fe21e4c1afdca7",
+      "size": 13262,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/ff3016ee5e5ef20a22c9910025fe21e4c1afdca7"
+    },
+    {
+      "path": "Tests/RigiUITests/PalettePopoverTests.swift",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "21608959068cc6147d82476c09d6bf1795ad23c9",
+      "size": 4198,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/21608959068cc6147d82476c09d6bf1795ad23c9"
+    },
+    {
+      "path": "Tests/RigiUITests/PaletteTests.swift",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "940723015d935bb1050fc8256fd078718b74cf17",
+      "size": 9489,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/940723015d935bb1050fc8256fd078718b74cf17"
+    },
+    {
+      "path": "Tests/RigiUITests/PickerTests.swift",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7cde320a13d16edac76db7bffb913d0a12d14118",
+      "size": 2603,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/7cde320a13d16edac76db7bffb913d0a12d14118"
+    },
+    {
+      "path": "Tests/RigiUITests/TryOnPopoverTests.swift",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "56fc4f004a2833da90d6f3d8678fa3a5117fbdbf",
+      "size": 4814,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/56fc4f004a2833da90d6f3d8678fa3a5117fbdbf"
+    },
+    {
+      "path": "docs",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "a04fc93dd38a3f819c2c30010854d53541033db1",
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/trees/a04fc93dd38a3f819c2c30010854d53541033db1"
+    },
+    {
+      "path": "docs/integration.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "97bc4635b4a23719764b1fdbdfb8e0dac5342dbc",
+      "size": 3824,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/97bc4635b4a23719764b1fdbdfb8e0dac5342dbc"
+    },
+    {
+      "path": "docs/interface-guidelines.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "610a06a8d2e4d937c54286d0040948e5953ccd60",
+      "size": 7168,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/610a06a8d2e4d937c54286d0040948e5953ccd60"
+    },
+    {
+      "path": "docs/verification.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "def720f7f91221acc9b52f5a5a5825384a96f656",
+      "size": 2139,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/def720f7f91221acc9b52f5a5a5825384a96f656"
+    },
+    {
+      "path": "scripts",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "82450e344d6336eeec6dcad649d0350a2d6fc17a",
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/trees/82450e344d6336eeec6dcad649d0350a2d6fc17a"
+    },
+    {
+      "path": "scripts/build.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2374c24a6a369bfca9b2f5db167128869245b735",
+      "size": 871,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/2374c24a6a369bfca9b2f5db167128869245b735"
+    },
+    {
+      "path": "scripts/release.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "93597c4eefe8bb71159cd63364679bddc21ae6f3",
+      "size": 600,
+      "url": "https://api.github.com/repos/L-K-M/Rigi/git/blobs/93597c4eefe8bb71159cd63364679bddc21ae6f3"
+    }
+  ],
+  "truncated": false
+}

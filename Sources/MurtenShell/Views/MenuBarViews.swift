@@ -115,7 +115,8 @@ struct MenuBarLabel: View {
             Image(systemName: "wrench.and.screwdriver")
             if count > 0 { Text("\(count)") }
         }
-        .accessibilityLabel(count == 0 ? "Murten Utilities" : "Murten Utilities, \(count) suggestions")
+        .accessibilityLabel(count == 0 ? "Murten Utilities"
+                            : "Murten Utilities, \(count) suggestion\(count == 1 ? "" : "s")")
         .onChange(of: model.windowRequests) {
             openWindow(id: SuiteScenes.homeWindowID)
             NSApp.activate()

@@ -12,19 +12,19 @@ public struct ModuleContext {
     public let defaults: UserDefaults
     /// Re-runs the module's watcher soon, e.g. after a repair, so a
     /// suggestion the repair fixed resolves without waiting a full interval.
-    public let requestRecheck: () -> Void
+    public let requestRecheck: @MainActor () -> Void
     /// Opens a pane, this module's or another's. Routes are validated
     /// against the allowlist before anything opens.
-    public let open: (ModuleRoute) -> Void
+    public let open: @MainActor (ModuleRoute) -> Void
     /// Whether the user currently allows this module to work in the
     /// background: resident mode on and the module's background check not
     /// switched off. User-armed automation (RepoMen's auto-trash) runs only
     /// while this is true.
-    public let backgroundWorkAllowed: () -> Bool
+    public let backgroundWorkAllowed: @MainActor () -> Bool
 
     public init(moduleID: String, defaults: UserDefaults,
-                requestRecheck: @escaping () -> Void, open: @escaping (ModuleRoute) -> Void,
-                backgroundWorkAllowed: @escaping () -> Bool = { false }) {
+                requestRecheck: @escaping @MainActor () -> Void, open: @escaping @MainActor (ModuleRoute) -> Void,
+                backgroundWorkAllowed: @escaping @MainActor () -> Bool = { false }) {
         self.moduleID = moduleID
         self.defaults = defaults
         self.requestRecheck = requestRecheck

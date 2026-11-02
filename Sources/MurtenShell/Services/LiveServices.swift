@@ -101,6 +101,16 @@ final class UserNotificationNotifier: NSObject, SuggestionNotifying, UNUserNotif
         center.add(request)
     }
 
+    func withdraw(modules moduleIDs: Set<String>) {
+        guard let center, !moduleIDs.isEmpty else { return }
+        center.getDeliveredNotifications { delivered in
+            let identifiers = delivered
+                .filter { moduleIDs.contains($0.request.content.threadIdentifier) }
+                .map(\.request.identifier)
+            center.removeDeliveredNotifications(withIdentifiers: identifiers)
+        }
+    }
+
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
                                             didReceive response: UNNotificationResponse) async {
         guard let text = response.notification.request.content.userInfo[Self.routeKey] as? String,
@@ -220,6 +230,8 @@ struct GitHubReleaseChecker: SuiteUpdateChecking {
     func latestRelease() async throws -> SuiteRelease {
         var request = URLRequest(url: Self.endpoint, timeoutInterval: 30)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        // URLSession sends a default agent; name the app so GitHub can tell.
+        request.setValue(ShellServices.bundleIdentifier, forHTTPHeaderField: "User-Agent")
         let (data, response) = try await URLSession.shared.data(for: request)
 
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0

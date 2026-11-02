@@ -49,6 +49,19 @@ final class ModuleRouteTests: XCTestCase {
         }
     }
 
+    func testInvalidIdentifiersNeverTrapAndNeverParse() {
+        for route in [ModuleRoute(moduleID: "Dock Vac"), ModuleRoute(moduleID: "dockvac", action: "re claim"),
+                      ModuleRoute(moduleID: "DockVac")] {
+            XCTAssertThrowsError(try allowlist.route(from: route.url), "\(route) must not round-trip")
+        }
+    }
+
+    func testContextValuesWithReservedCharactersRoundTrip() throws {
+        let route = ModuleRoute(moduleID: "dockvac", action: "reclaim",
+                                context: ["endpoint": "ssh://me@host:22/?a=b&c=d#e"])
+        XCTAssertEqual(try allowlist.route(from: route.url), route)
+    }
+
     func testRejectsControlCharactersInValues() {
         let route = ModuleRoute(moduleID: "dockvac", action: "reclaim", context: ["endpoint": "a\nb"])
         XCTAssertThrowsError(try allowlist.validate(route))

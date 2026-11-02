@@ -16,7 +16,8 @@ public struct ReleaseVersion: Comparable, Hashable, Sendable, CustomStringConver
 
         var numbers: [Int] = []
         for part in parts {
-            guard !part.isEmpty, part.allSatisfy(\.isASCII), let number = Int(part), number >= 0 else { return nil }
+            // Digits only: Int("+1") would otherwise accept a sign.
+            guard !part.isEmpty, part.allSatisfy({ ("0"..."9").contains($0) }), let number = Int(part) else { return nil }
             numbers.append(number)
         }
         components = numbers
