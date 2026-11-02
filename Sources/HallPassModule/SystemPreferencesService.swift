@@ -24,19 +24,30 @@ protocol PreferencesServicing: Sendable {
 }
 
 actor SystemPreferencesService: PreferencesServicing {
-    func load() throws -> PreferencesSnapshot {
-        let xml = try authorized(PreferencePlan.readCommand, prompt: "HallPass wants to read the local network exemptions.")
+    func load() async throws -> PreferencesSnapshot {
+        let xml = try await authorized(PreferencePlan.readCommand, prompt: "HallPass wants to read the local network exemptions.")
         return try PreferencesSnapshot(xml: xml)
     }
 
-    func save(_ plan: PreferencePlan) throws -> PreferencesSnapshot {
-        let xml = try authorized(plan.shellScript(), prompt: "HallPass wants to save the displayed network exemptions.")
+    func save(_ plan: PreferencePlan) async throws -> PreferencesSnapshot {
+        let xml = try await authorized(plan.shellScript(), prompt: "HallPass wants to save the displayed network exemptions.")
         let result = try PreferencesSnapshot(xml: xml)
         guard result.configuration == plan.desired else { throw PreferencesServiceError.verificationFailed }
         return result
     }
 
-    private func authorized(_ command: String, prompt: String) throws -> String {
+    /// osascript blocks until the administrator dialog closes, which can take
+    /// minutes. Wait on a dispatch thread, not on the cooperative pool that
+    /// the suite's other modules and watchers share.
+    private func authorized(_ command: String, prompt: String) async throws -> String {
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                continuation.resume(with: Result { try Self.runAuthorized(command, prompt: prompt) })
+            }
+        }
+    }
+
+    private static func runAuthorized(_ command: String, prompt: String) throws -> String {
         let source = "do shell script \(PreferencePlan.appleScriptString(command)) with prompt \(PreferencePlan.appleScriptString(prompt)) with administrator privileges without altering line endings"
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
