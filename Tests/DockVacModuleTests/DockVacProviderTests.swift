@@ -182,6 +182,7 @@ final class DockVacProviderTests: XCTestCase {
   }
 
   /// A service whose daemon answers at `address` with the captured fixtures.
+  @MainActor
   private static func service(
     reaching address: String, targets: Recorder<DockerConnectionTarget>? = nil
   ) -> DockerService {

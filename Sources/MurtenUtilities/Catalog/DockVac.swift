@@ -3,7 +3,5 @@ import MurtenModuleKit
 
 extension ModuleCatalog {
     /// DockVac's provider (docs/migrating-a-module.md).
-    static let dockVac: ModuleFactory? = ModuleFactory(moduleID: DockVacProvider.moduleID) {
-        DockVacProvider(context: $0)
-    }
+    static let dockVac: ModuleFactory? = DockVacProvider.factory()
 }

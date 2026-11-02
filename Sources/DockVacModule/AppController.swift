@@ -17,7 +17,7 @@ final class AppController: NSObject, ReportActions, DockerServiceDelegate {
   /// What the pane's bar and the suite's Tool menu offer right now.
   let chrome = PaneChrome()
   /// Called when a cleanup run ends, so the suite re-checks Docker sooner.
-  var onCleanupFinished: (@MainActor () -> Void)?
+  var onCleanupFinished: (() -> Void)?
   private let service: DockerService
 
   private(set) var phase: AppPhase = .idle
@@ -50,6 +50,8 @@ final class AppController: NSObject, ReportActions, DockerServiceDelegate {
   private var pendingPreselection: String?
   /// What opening a suggestion did, shown above the report until dismissed.
   private(set) var notice: String?
+  /// False while SwiftUI is building the pane, when `chrome` must not change.
+  private var publishesChrome = true
 
   var isCleaning: Bool { service.isCleaning }
 
@@ -78,7 +80,12 @@ final class AppController: NSObject, ReportActions, DockerServiceDelegate {
     pane.scanningView.onCancel = { [weak self] in self?.cancelScan() }
     pane.messageView.onAction = { [weak self] in self?.rescan(nil) }
     pane.onDismissNotice = { [weak self] in self?.dismissNotice() }
+    // SwiftUI calls this while it builds the pane: draw the AppKit views now, and publish
+    // the Tool menu's state once that update is over rather than in the middle of it.
+    publishesChrome = false
     render()
+    publishesChrome = true
+    Task { @MainActor [weak self] in self?.refreshChrome() }
   }
 
   func detach(_ pane: PaneViewController) {
@@ -577,9 +584,8 @@ final class AppController: NSObject, ReportActions, DockerServiceDelegate {
     pane?.apply(state)
     // Observation notifies on every assignment; only a real change should rebuild the
     // Tool menu.
-    if chrome.state != state {
-      chrome.state = state
-    }
+    guard publishesChrome, chrome.state != state else { return }
+    chrome.state = state
   }
 
   // MARK: - Rendering

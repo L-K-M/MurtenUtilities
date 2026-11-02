@@ -9,9 +9,12 @@ import SwiftUI
 /// Nothing touches Docker until the pane first opens, apart from the opt-in watcher.
 @MainActor
 public final class DockVacProvider: SuiteModuleProvider {
-  public nonisolated static let moduleID = DockVacSuite.moduleID
+  /// How the suite's catalog registers DockVac.
+  public nonisolated static func factory() -> ModuleFactory {
+    ModuleFactory(moduleID: DockVacSuite.moduleID) { DockVacProvider(context: $0) }
+  }
 
-  public let moduleID = DockVacProvider.moduleID
+  public let moduleID = DockVacSuite.moduleID
   /// `murten://dockvac/reclaim?endpoint=<address>`: re-scan that endpoint and select what
   /// Docker can rebuild there, for review.
   public let routeActions: [String: Set<String>] = [
@@ -39,7 +42,7 @@ public final class DockVacProvider: SuiteModuleProvider {
       watcher: DockVacWatcher(reader: reader), rule: RebuildableSpaceRule())
     // A cleanup changes what the watcher would report; re-check soon so a suggestion the
     // cleanup settled resolves without waiting an hour.
-    controller.onCleanupFinished = context.requestRecheck
+    controller.onCleanupFinished = { context.requestRecheck() }
   }
 
   /// Applicable when a Docker endpoint can be located without connecting: a socket in a
