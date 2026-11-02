@@ -9,8 +9,9 @@ Legend — **effort**: cheap (SwiftPM core moves nearly unchanged) · medium
 
 ## Platform floors
 
-The suite declares macOS 14 (`Package.swift`, `LSMinimumSystemVersion`). The
-source repos declare these floors (checked 2026-11-02 against each `main`):
+The suite declares macOS 26 (`Package.swift`, `LSMinimumSystemVersion`;
+PLAN.md, *Deployment floor*). The source repos declare these floors
+(checked 2026-11-02 against each `main`):
 
 | Module | Declared floor | Declared in | What needs it |
 | --- | --- | --- | --- |
@@ -25,15 +26,9 @@ source repos declare these floors (checked 2026-11-02 against each `main`):
 | Coreography | 26 | `Package.swift`, `.xcodeproj` | A product decision in its own plan (`docs/plan.md`, decision 1), not an API gate: the tree has no `#available` checks. Its private NetworkStatistics keys are verified only "as the framework publishes them on macOS 26". |
 | Obtainintosh | Tauri app | `tauri.conf.json` | a port; no Swift floor yet |
 
-Two modules sit above the suite floor, so "moves in nearly unchanged" holds
-for their pure cores at most, not their panes or samplers. Either the suite
-floor rises, or both modules run below the floor they were built for:
-HallPass's pane needs availability fallbacks, and Coreography's private
-framework reads run on releases they were never verified on. CI covers
-neither (`ci.yml` tests only on `macos-26`). Any floor below 15.5 also
-needs HallPass marked inapplicable on those releases
-([architecture.md](architecture.md#module-applicability)). The choice is open
-(PLAN.md, *Deployment floor*).
+Every module's floor is at or below the suite's, so no module needs an
+availability fallback or an OS applicability check, and CI (`macos-26`)
+tests the only supported release.
 
 ## Confirmed roster
 
@@ -79,45 +74,92 @@ DerivedData, Homebrew caches — and reclaims them by age and size.
 ### BootCaptain — effort: medium — phase 3
 
 Inventories launch agents, login items and other startup mechanisms,
-attributes them to installed products, and investigates boot failures. SwiftUI
-app + CLI; **GitHub-only, not yet cloned**.
+attributes them to installed products, and investigates boot failures.
 
-- **Migrates:** inventory/attribution core; its investigator UI as the pane.
-  The CLI could survive as a bundled tool or stay in its repo.
-- **Privilege:** ships a root helper today (`SMAppService.daemon`) whose
-  enabled actions are reversible vault moves — launchd/cron mutations stay
-  gated off in the current build — and the app itself is Developer ID
-  signed, notarized and non-sandboxed. The helper embeds per-module at
-  migration and gates on the signing decision (docs/architecture.md §
+- **Status:** available.
+- **Provenance:** BootCaptain@1fd84a9f6ec8626fa7ef8a5a100554944a733940
+- **Migrated:** `BootCaptainCore` and `BootCaptainKit` with their test
+  suites; the app's views, view model and services as `BootCaptainModule`.
+  The `bootcaptain` CLI stays in its repo. Rescan (⌘R) and Run Boot Audit
+  (⇧⌘R) are in the Tool menu; the pane scans when it appears, as the app
+  did.
+- **Privilege:** the root helper (`SMAppService.daemon`, bundle ID and
+  Team ID pinned both ways) is left out, because ad-hoc suite builds cannot
+  authenticate it. Moving `/Library` items to the root vault, and the
+  launchd/cron toggles the standalone build already gates off, stay visible
+  but disabled: "Needs a signed build of Murten Utilities". User-scope vault
+  moves and login-item removal keep working, with their session undo. The
+  helper embeds per module once the suite is signed (docs/architecture.md §
   Module packaging).
-- **Watcher:** diff the startup inventory on a cadence → "X installed 2 new
-  login items". Boot-failure diagnosis stays an on-demand flow.
-- **Source facts:** the shipping app and helper build from XcodeGen
-  `project.yml`; `Package.swift` builds only the libraries and the CLI. Spawns
-  live in `BootCaptainKit`, so the module needs Kit as well as Core. launchd
-  plist folders are readable unprivileged, but Background Task Management
-  (`sfltool dumpbtm`), the source for modern login items, needs root and
-  likely Full Disk Access, and System Events login-item reads need Automation
-  consent. An unprivileged watcher sees plists only.
+- **State:** Clean Up's vault and journal stay in
+  `~/Library/Application Support/BootCaptain/{Vault,Journal}`. Items the
+  standalone helper moved to `/Library/Application Support/BootCaptain/Vault`
+  can only be restored by the standalone app. Undo history is per session,
+  as before. The reviewed inventory is the module default
+  `reviewedStartupInventory`.
+- **Consent:** login-item reads and removals through System Events
+  (Automation; `NSAppleEventsUsageDescription`), the Full Disk Access probe
+  and Background Task Management (`sfltool dumpbtm` needs root, so the scan
+  reports a coverage gap) stay in the pane's on-demand scan.
+- **Watcher:** hourly, unprivileged read of `/Library/LaunchDaemons`,
+  `/Library/LaunchAgents`, `~/Library/LaunchAgents` and the launchd plists
+  apps embed (`/Applications`, `/Applications/Setapp`, `~/Applications`),
+  compared with the inventory the user last reviewed in the pane → one
+  suggestion per product, "Docker installed 2 new startup items", route
+  `review`. The pane's first completed scan becomes the reviewed inventory;
+  its review bar marks the current list as reviewed. Not watched: Apple's
+  folders and `com.apple.` labels, BTM, login items, other users' homes.
+  Without a reviewed inventory the check is unavailable; an unreadable
+  folder makes it partial, so a suggestion goes stale instead of resolving.
+- **Preselection:** none. `review` opens the "New since last review" filter
+  with nothing selected; Clean Up preselects nothing, as before.
+- **Source facts:** the standalone app and helper build from XcodeGen
+  `project.yml`; `Package.swift` builds only the libraries and the CLI.
+  Spawns live in `BootCaptainKit`, so the module needs Kit as well as Core.
+  The app is Developer ID signed, notarized and non-sandboxed.
 
 ### DeviceControlDoctor — effort: cheap — phase 2
 
 Diagnoses Device Control / Data Access (TCC) permission records that look
-granted but fail functionally. Already fleet-standard: `DoctorCore` is pure,
-`ProcessRunner` is the only subprocess boundary, `tccutil`/`codesign` run via
-fixed paths, repair is user-confirmed per service.
+granted but fail functionally. `DoctorCore` is pure, `ProcessRunning` is the
+only subprocess boundary, `tccutil`/`codesign` run via fixed paths, repair is
+user-confirmed per service.
 
-- **Migrates:** `DoctorCore` + the pane nearly unchanged — it is the model
-  every other module's boundary copies.
-- **Watcher:** periodic grant-vs-function drift checks where a cheap signal
-  exists → "X lost its working permission after the update". No
-  watcher-triggered resets, ever.
+- **Status:** available. `DoctorCore` (in `Sources/DeviceControlDoctorCore`)
+  and `DeviceControlDoctorModule`; the source's tests run as
+  `DeviceControlDoctorCoreTests` and `DeviceControlDoctorIntegrationTests`.
+- **Provenance:** DeviceControlDoctor@09accf844d6118bf0eea927ef4f6a8dd52fd033b
+- **Pane:** the standalone main window. It checks when it appears and, while
+  *Check every minute* is on (the default), every minute and after app
+  launches and wake, only while visible. The Test Pad is a module window
+  (`test-pad`); the File-menu commands are Tool-menu commands with the same
+  shortcuts (⌘O, ⌘R, ⇧⌘E); the menu-bar extra is a companion section
+  (watched apps, apps needing review, Refresh, Test Pad). Launch at login
+  is the suite's.
+- **Watcher:** every 30 minutes (120 s timeout, local), per watched app:
+  `tccutil list` for its expected permissions and `codesign` against the
+  identity the pane saved. One finding per app (scope: its watch-list id)
+  when an expected permission reads denied or limited, the signing identity
+  changed, or an earlier change has no passing test since → "Verify <App>'s
+  permissions again", route `review` with context `app`. Unclear answers,
+  timeouts and a missing `tccutil list` (macOS 26) are failures, never
+  healthy. Apps in, or linked into, privacy-guarded places (Desktop,
+  Documents, Downloads, iCloud Drive and file providers, other apps'
+  containers, other volumes, any home folder but `~/Applications` and
+  `~/Library`) are left to the pane. It never resets, writes or prompts.
+- **Preselection:** the route selects the named app in the watch list and
+  nothing else. The repair sheet opens only on the user's click, with the
+  app's expected permissions checked, as in the standalone app.
+- **State:** the watch list stays at
+  `~/Library/Application Support/DeviceControlDoctor/watchlist.json`, read
+  and written in place; `monitorEnabled` is in the module's defaults.
+- **Coexistence:** the standalone app writes the same file, so the last save
+  wins; the pane says so while the standalone app runs. App discovery skips
+  the suite and the standalone app.
 - **Source facts:** the cheap signal detects identity and record changes, not
   functional failure, so a suggestion can only say "verify again". Reads use
   `tccutil list`, which its AGENTS.md records as verified only on macOS 27.2;
-  elsewhere they degrade to unavailable. `ProcessRunner` is a concrete struct,
-  so the reset path has no fake seam. The app inserts its `MenuBarExtra`
-  unconditionally and monitors by default (`monitorEnabled = true`).
+  elsewhere they degrade to unavailable.
 
 ### Shortking — effort: medium — phase 3
 
@@ -142,23 +184,71 @@ Manages system-wide CIDR exemptions from the macOS local-network privacy
 restriction. Already fleet-standard: `HallPassCore` is pure; writes go through
 privileged osascript with baseline re-check and rollback.
 
-- **Migrates:** `HallPassCore` + pane. Its privileged write path keeps its
-  own confirmation, baseline re-check and rollback inside the suite; this is
-  a repair-flow boundary, not OS-enforced isolation from other modules.
-- **Watcher:** keep it on-demand. The current read service also requests
+- **Status:** available. `HallPassCore` and its Swift Testing suites moved
+  in unchanged apart from English messages; the app target became
+  `HallPassModule` (provider, pane, backup store, privileged service), and
+  its model tests moved to `HallPassModuleTests`. All keep the source's
+  Swift 6 language mode.
+- **Provenance:** HallPass@1ab2ac48ba98bc11d606e509cdedc88a3f8afa70
+- **Migrated:** the Tahoe pane (sidebar, searchable table, inspector,
+  editing and review sheets, Help), preview with sample data, named undo,
+  draft recovery and the backup commands. The privileged write path keeps
+  its own confirmation, baseline re-check and rollback inside the suite;
+  this is a repair-flow boundary, not OS-enforced isolation from other
+  modules.
+- **Changed for the suite:** the UI and every message are English
+  ("WLAN" is "Wi-Fi"). The app delegate, the window takeover and its
+  close and quit guards are gone: the provider's `interruptionWarning`
+  covers an unsaved draft, a load and an apply. The menu commands are
+  Tool menu commands with the same shortcuts; window, full-screen and
+  sidebar commands are the shell's. The `--demo` flag is gone; *Try with
+  Sample Data* remains. The welcome shows the `ticket.fill` symbol
+  instead of the application icon. Undo uses the window's undo manager
+  while the pane is shown and leaves with it; it is not disabled during a
+  load or an apply, which needed the window delegate. osascript waits on
+  a dispatch thread rather than the shared cooperative pool.
+- **State:** `~/Library/Application Support/HallPass/Backups` and
+  `Draft.json` stay where they are, shared with the standalone app, so a
+  draft from one appears in the other; the apply still re-checks the
+  system state first. Quitting the suite keeps a real draft for next
+  time. The restart reminder's keys (`restartRequiredAtUptime`,
+  `restartRequiredBootTime`) live in the module's defaults, so a restart
+  the standalone app asked for is not shown here.
+- **Watcher:** none; HallPass stays on-demand. The read service requests
   administrator access, so it cannot back a watcher. A future "exemptions
   changed" check needs an unprivileged signal first.
-- **Source facts:** every UI string is German and hardcoded; every other
-  module is English. The suite needs a language decision before this pane
-  moves.
+- **Preselection:** nothing. The provider declares no route actions, so
+  only the bare route opens the pane.
 
 ### Zen Backup Manager — effort: medium — phase 3
 
 Inspects browser tabs and Spaces on a timeline of session backups; restores
-with a verified safety copy and undo. **GitHub-only**.
+with a verified safety copy and undo.
 
-- **Migrates:** the backup-timeline/restore core and its pane.
-- **Watcher:** backup freshness → "last session snapshot is 9 days old".
+- **Status:** available. The `.xcodeproj` is ported to SwiftPM:
+  `ZenBackupManagerCore` (session decoding, timeline, restore with safety
+  copies, the rule) and `ZenBackupManagerModule` (pane, provider, watcher).
+  The source's 23 tests moved to `ZenBackupManagerCoreTests`.
+- **Provenance:** ZenBackupManager@14efe4434430e453b5a53e79434d2ea828ad70ba
+- **Applicability:** a profile listed in Zen's `profiles.ini`; otherwise
+  "Zen Browser is not installed".
+- **Watcher:** hourly, unprivileged and metadata only: `profiles.ini`, then
+  the dates of each profile's session files (current state,
+  `zen-sessions-backup/`, `sessionstore-backups/`; never the safety copies).
+  One finding per profile, scoped by its folder path. At 7 days or more:
+  "Zen has not saved a session in N days", opening
+  `murten://zenbackupmanager/timeline?profile=<path>`. A restore rewrites the
+  current session file, so it counts as a save.
+- **Preselection:** the profile only. The pane re-scans it and selects its
+  current state, never a backup to restore; restoring still takes the
+  confirmation sheet, which offers to quit Zen.
+- **State:** safety copies stay in
+  `~/Library/Application Support/ZenBackupManager/Safety Copies` and are read
+  in place, so undo sees the standalone app's copies too. No preferences
+  migrate: the standalone app's only ones belonged to its update checker,
+  which is removed. Quitting during a restore asks first.
+- **Coexistence:** both apps take Zen's profile lock while restoring, so a
+  restore in one is refused while the other is writing.
 - **Source facts:** Zen Browser only. Zen writes the session snapshots; the
   app reads them and writes safety copies around restores. A stale snapshot
   means Zen has not saved a session (unused, or crashing), not an overdue

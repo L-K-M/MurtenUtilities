@@ -13,8 +13,9 @@ public struct ModuleContext {
     /// Re-runs the module's watcher soon, e.g. after a repair, so a
     /// suggestion the repair fixed resolves without waiting a full interval.
     public let requestRecheck: @MainActor () -> Void
-    /// Opens a pane, this module's or another's. Routes are validated
-    /// against the allowlist before anything opens.
+    /// Opens a pane, this module's or another's, and brings the home window
+    /// forward (so it works from a menu-bar section too). Routes are
+    /// validated against the allowlist before anything opens.
     public let open: @MainActor (ModuleRoute) -> Void
     /// Whether the user currently allows this module to work in the
     /// background: resident mode on and the module's background check not

@@ -120,6 +120,20 @@ public struct SuggestionLedger: Codable, Equatable, Sendable {
         // Could not check: keep the suggestion, flag it as possibly outdated.
         let wholeCheckFailed = observation.failures.contains { $0.scope == nil }
         let failedScopes = Set(observation.failures.compactMap(\.scope))
+
+        // The watcher listed every scope that exists: the rest are gone.
+        if observation.coverage == .exhaustive, !wholeCheckFailed {
+            // A finding proves its scope exists even if the watcher left the
+            // scope out of completedScopes.
+            let ownFindings = observation.findings.filter { $0.moduleID == moduleID }
+            let existing = observation.completedScopes.union(failedScopes)
+                .union(ownFindings.map(\.scope))
+            for key in activeKeys(in: moduleID) where !reported.contains(key) && !existing.contains(key.scope) {
+                resolve(key, at: observation.observedAt)
+                events.append(.resolved(key))
+            }
+        }
+
         for key in activeKeys(in: moduleID) where !reported.contains(key)
             && (wholeCheckFailed || failedScopes.contains(key.scope))
             && records[key]?.staleSince == nil {

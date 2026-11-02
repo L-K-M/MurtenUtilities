@@ -266,7 +266,7 @@ twice. Three rules hold either way:
   | Module | State | Holds |
   | --- | --- | --- |
   | BootCaptain | `~/Library/Application Support/BootCaptain/{Vault,Journal}`, `/Library/Application Support/BootCaptain/Vault` | startup items it moved aside; unfinished actions |
-  | HallPass | `~/Library/Application Support/HallPass/{Backups,Draft.json}` | the backup taken before each apply; unsaved edits |
+  | HallPass | `~/Library/Application Support/HallPass/Backups` | the backup taken before each apply |
   | Zen Backup Manager | `~/Library/Application Support/ZenBackupManager/Safety Copies` | the copy taken before each restore |
   | RunningMan | Keychain items; launchd labels `ch.lkmc.RunningMan.forgejo.*` | Forgejo tokens; which runners it manages |
 

@@ -47,11 +47,11 @@ public enum ModuleRegistry {
         SuiteModule(
             id: "bootcaptain", name: "BootCaptain",
             summary: "Inventory startup items and investigate boot failures.",
-            systemImage: "power", sourceRepository: "BootCaptain"),
+            systemImage: "power", status: .available, sourceRepository: "BootCaptain"),
         SuiteModule(
             id: "devicecontroldoctor", name: "DeviceControlDoctor",
             summary: "Diagnose privacy permissions that look granted but fail.",
-            systemImage: "cross.case", sourceRepository: "DeviceControlDoctor"),
+            systemImage: "cross.case", status: .available, sourceRepository: "DeviceControlDoctor"),
         SuiteModule(
             id: "shortking", name: "Shortking",
             summary: "Find out who owns — or stole — a keyboard shortcut.",
@@ -59,11 +59,11 @@ public enum ModuleRegistry {
         SuiteModule(
             id: "hallpass", name: "HallPass",
             summary: "Exempt trusted networks from local-network privacy prompts.",
-            systemImage: "network", sourceRepository: "HallPass"),
+            systemImage: "network", status: .available, sourceRepository: "HallPass"),
         SuiteModule(
             id: "zenbackupmanager", name: "Zen Backup Manager",
-            summary: "Browse and restore browser-session backups on a timeline.",
-            systemImage: "clock.arrow.circlepath", sourceRepository: "ZenBackupManager"),
+            summary: "Browse and restore Zen Browser session backups on a timeline.",
+            systemImage: "clock.arrow.circlepath", status: .available, sourceRepository: "ZenBackupManager"),
         SuiteModule(
             id: "obtainintosh", name: "Obtainintosh",
             summary: "Track updates for apps and fonts installed from releases.",

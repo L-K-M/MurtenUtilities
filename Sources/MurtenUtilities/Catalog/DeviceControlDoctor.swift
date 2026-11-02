@@ -1,6 +1,7 @@
 import MurtenModuleKit
+import DeviceControlDoctorModule
 
 extension ModuleCatalog {
-    /// DeviceControlDoctor's provider; nil until it migrates (docs/migrating-a-module.md).
-    static let deviceControlDoctor: ModuleFactory? = nil
+    /// DeviceControlDoctor's provider (docs/modules.md).
+    static let deviceControlDoctor: ModuleFactory? = DeviceControlDoctorProvider.factory
 }
