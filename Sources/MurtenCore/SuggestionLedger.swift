@@ -123,7 +123,10 @@ public struct SuggestionLedger: Codable, Equatable, Sendable {
 
         // The watcher listed every scope that exists: the rest are gone.
         if observation.coverage == .exhaustive, !wholeCheckFailed {
+            // A finding proves its scope exists even if the watcher left the
+            // scope out of completedScopes.
             let existing = observation.completedScopes.union(failedScopes)
+                .union(observation.findings.map(\.scope))
             for key in activeKeys(in: moduleID) where !reported.contains(key) && !existing.contains(key.scope) {
                 resolve(key, at: observation.observedAt)
                 events.append(.resolved(key))

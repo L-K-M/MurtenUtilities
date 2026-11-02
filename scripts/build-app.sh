@@ -53,7 +53,8 @@ swift "$PROJECT_ROOT/scripts/make-icon.swift" "$PROJECT_ROOT/assets/MurtenUtilit
 /usr/bin/iconutil -c icns "$BUILD_DIR/MurtenUtilities.iconset" -o "$APP_PATH/Contents/Resources/AppIcon.icns"
 
 # Set CODE_SIGN_IDENTITY for a stable Apple Development or Developer ID identity.
-# Ad-hoc signing is sufficient for a local build; no privacy grant is requested.
+# Ad-hoc signing (no hardened runtime) is sufficient for a local build; signed
+# builds embed the Apple Events entitlement below.
 if [[ -n "${CODE_SIGN_IDENTITY:-}" ]]; then
     # The hardened runtime blocks Apple Events unless entitled.
     codesign --force --options runtime --entitlements "$PROJECT_ROOT/Resources/MurtenUtilities.entitlements" \
