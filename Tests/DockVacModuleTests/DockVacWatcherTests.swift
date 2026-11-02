@@ -262,8 +262,13 @@ final class LiveDockerUsageReaderTests: XCTestCase {
     try process.run()
     self.process = process
 
+    // The socket file appears at bind(), a moment before the server listens, so wait
+    // until it answers rather than until the file exists.
     let deadline = Date().addingTimeInterval(10)
-    while !FileManager.default.fileExists(atPath: socketPath) {
+    let ping = HTTPRequest(method: "GET", path: "/_ping")
+    while (try? await UnixSocketHTTPClient(socketPath: socketPath, idleTimeout: 2).send(ping))
+      == nil
+    {
       guard Date() < deadline, process.isRunning else {
         throw XCTSkip("fake daemon did not start")
       }
