@@ -51,7 +51,7 @@ public enum ModuleRegistry {
         SuiteModule(
             id: "devicecontroldoctor", name: "DeviceControlDoctor",
             summary: "Diagnose privacy permissions that look granted but fail.",
-            systemImage: "cross.case", sourceRepository: "DeviceControlDoctor"),
+            systemImage: "cross.case", status: .available, sourceRepository: "DeviceControlDoctor"),
         SuiteModule(
             id: "shortking", name: "Shortking",
             summary: "Find out who owns — or stole — a keyboard shortcut.",
