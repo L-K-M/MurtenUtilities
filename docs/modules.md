@@ -206,15 +206,46 @@ Discovers self-hosted GitHub Actions and Forgejo runners in place, starts and
 stops them, sets launch-at-login, registers new ones, follows job logs.
 SwiftPM.
 
-- **Migrates:** its discovery/control core + the manager pane.
-- **Watcher:** runner health → "2 of 4 runners offline for 10 min — restart?"
-- **Source facts:** discovery and control span `RunningManCore` and
-  `RunningManServices`; the pane's drain engine, polling, notifications and
-  widget publishing are about 7,200 lines in the app target. It has its own
-  unconditional `MenuBarExtra`, login item, `runningman://` scheme and a
-  WidgetKit extension that `scripts/build-app.sh` assembles from SwiftPM.
-  Health states and 48 hours of activity samples exist, but there is no
-  offline-for-10-minutes rule yet.
+- **Status:** available.
+- **Provenance:** RunningMan@21aebe8da5ff20b96fd0bbece1335da2b5ab6778
+- **Migrated:** `RunningManCore` and `RunningManServices` with their tests;
+  the app target became `RunningManModule`: the manager pane (Overview,
+  Runners, Workload, Job history, Cleanup), the stop-after-job drain engine,
+  job logs and lap card, runner registration, a Settings tab and a menu-bar
+  section with runner states and the start and stop controls. The standalone
+  app's menu commands are in the Tool menu.
+- **Left out:** the WidgetKit extension (not shown to work ad-hoc signed and
+  assembled by the suite's script; it would also need its own light-only
+  bundle), the `runningman://` scheme (suite routes instead), the app's own
+  menu-bar extra, login item, notifications and update check, and the
+  `--demo` preview workspace and screenshot capture (kept for tests only).
+  Core's `AppUpdate`, `NotificationPlanner` and `WidgetSnapshot` served only
+  those surfaces and stayed behind.
+- **Polling:** only while the pane or the menu section is on screen, or while
+  a stop-after-job request waits for its runner (the provider owns those, so
+  they continue with the pane closed). Keep-awake follows that polling.
+- **Watcher:** every 15 minutes, local reads only (no `.network`): discovery
+  with privacy-protected folders skipped (Desktop, Documents, Downloads,
+  iCloud Drive, other apps' containers, `/Volumes`), then launchd and the
+  process list without server activity, so it never reads a Keychain token.
+  One `runner-offline` finding per runner that should run and does not: set
+  to start at login, or seen online and stopped without a request from
+  RunningMan. Disabled runners, system services and runners stopped from the
+  pane are not reported; unreadable state and skipped folders are reported as
+  not checked. Evidence: the time it was first seen offline (memory only, so
+  after a relaunch the count starts at the first check).
+- **Rule:** offline for 10 minutes or more → "<runner> has been offline for N
+  min — restart?"; the suggestion stays until the runner is online again.
+  Route: `runningman/runner?id=<runner folder>`.
+- **May preselect:** nothing. The route selects the runner in the pane; it
+  starts only when you choose Start.
+- **State:** `~/Library/Application Support/RunningMan` (history, activity,
+  laps, managed runners, service policy backups), the Keychain items
+  `com.runningman.forgejo-api` and the launchd labels
+  `ch.lkmc.RunningMan.forgejo.*` are read in place and shared with the
+  standalone app. Preferences use the suite's module store under their old
+  keys and start at their defaults: imported runner folders and the Forgejo
+  server list are not carried over from the standalone app.
 
 ### Coreography — effort: medium — phase 3
 
