@@ -33,18 +33,35 @@ public extension OpenWindowAction {
 /// A command the focused pane offers in the suite's Tool menu, with its
 /// keyboard shortcut. Panes publish them with `.moduleCommands(_:)`.
 public struct ModuleCommand: Identifiable {
+    /// Whether the item carries a checkmark, e.g. DockVac's active filter.
+    public enum CheckState: Sendable {
+        /// An ordinary command.
+        case none
+        case checked
+        case unchecked
+    }
+
     public let id: String
     public let title: String
     public let shortcut: KeyboardShortcut?
     public let isEnabled: Bool
+    public let checkState: CheckState
+    /// The item's tooltip.
+    public let help: String?
+    /// Consecutive commands with different groups get a divider between them.
+    public let group: String?
     public let action: @MainActor () -> Void
 
     public init(_ title: String, id: String? = nil, shortcut: KeyboardShortcut? = nil, isEnabled: Bool = true,
+                checkState: CheckState = .none, help: String? = nil, group: String? = nil,
                 action: @escaping @MainActor () -> Void) {
         self.id = id ?? title
         self.title = title
         self.shortcut = shortcut
         self.isEnabled = isEnabled
+        self.checkState = checkState
+        self.help = help
+        self.group = group
         self.action = action
     }
 }

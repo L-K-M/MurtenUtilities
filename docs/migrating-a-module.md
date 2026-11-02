@@ -16,6 +16,9 @@ Tests/<Tool>CoreTests/    the source's tests, moved with the code
 Tests/<Tool>ModuleTests/  the watcher and rule against fixtures, the provider's routes
 ```
 
+- Directories start with the tool's name. A source target whose name does
+  not (DeviceControlDoctor's `DoctorCore`) keeps its name and lives in
+  `Sources/DeviceControlDoctorCore` through `path:`.
 - Keep each source target's Swift language mode (`swiftSettings:
   [.swiftLanguageMode(.v6)]` when the source used 6).
 - Fill in the module's own block in `Package.swift` (`<tool>Targets`,
@@ -96,9 +99,13 @@ Remove these from the migrated code; the suite has exactly one of each:
 - A watcher never writes, never needs privilege and never prompts. A check
   that needs any of those is a pane action.
 - Report every scope it checked; report failures as failures, not as
-  "nothing found" (`WatchObservation`).
+  "nothing found" (`WatchObservation`). When it lists every scope that
+  exists (all runners, all profiles), say so with `coverage: .exhaustive`,
+  so suggestions for a deleted scope resolve.
 - Pick a cadence of at least 15 minutes and declare `.network` when the
-  check talks to a remote host.
+  check talks to a remote host. The coordinator reads `cadence.resources`
+  before every poll, so it may change (an SSH endpoint appears), but reads
+  `interval` only when the watcher is enabled.
 
 ## State
 
