@@ -44,7 +44,8 @@ public actor AssistantProvider {
         self.transport = transport
     }
 
-    public func hasKey() -> Bool { (try? credentials.read()).flatMap { $0 }?.isEmpty == false }
+    /// Answers without reading the secret, so it never prompts for Keychain access.
+    public func hasKey() -> Bool { (try? credentials.contains()) ?? false }
 
     public func saveKey(_ key: String) throws {
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)

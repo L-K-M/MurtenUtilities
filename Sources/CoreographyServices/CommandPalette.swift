@@ -40,6 +40,14 @@ public struct PaletteEntry: Identifiable, Equatable, Sendable {
     public let unavailableReason: String?
 
     public var id: String { title }
+
+    /// For a host that knows more about availability than the model, such as
+    /// a build that cannot run the privileged helper.
+    public init(title: String, action: PaletteAction, unavailableReason: String?) {
+        self.title = title
+        self.action = action
+        self.unavailableReason = unavailableReason
+    }
 }
 
 public enum CommandPalette {

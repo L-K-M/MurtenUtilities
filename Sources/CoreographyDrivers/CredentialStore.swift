@@ -12,6 +12,12 @@ public protocol CredentialStoring: Sendable {
     func read() throws -> String?
     func save(_ secret: String) throws
     func delete() throws
+    /// Whether a non-empty secret is stored, ideally without reading it.
+    func contains() throws -> Bool
+}
+
+extension CredentialStoring {
+    public func contains() throws -> Bool { try read()?.isEmpty == false }
 }
 
 /// The provider key lives only in the login Keychain: never in preferences,
@@ -35,6 +41,25 @@ public struct KeychainCredentialStore: CredentialStoring {
         if status == errSecItemNotFound { return nil }
         guard status == errSecSuccess, let data = item as? Data else { throw CredentialStoreError.keychain(status: status) }
         return String(decoding: data, as: UTF8.self)
+        #else
+        throw CredentialStoreError.unsupportedPlatform
+        #endif
+    }
+
+    /// Asks for the item's attributes only. Reading its data can make macOS
+    /// ask the person to allow access, for instance when another app (the
+    /// standalone Coreography) saved it; showing whether a key exists must
+    /// not prompt, only using it may.
+    public func contains() throws -> Bool {
+        #if os(macOS)
+        var query = baseQuery()
+        query[kSecReturnAttributes as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        if status == errSecItemNotFound { return false }
+        guard status == errSecSuccess else { throw CredentialStoreError.keychain(status: status) }
+        return true
         #else
         throw CredentialStoreError.unsupportedPlatform
         #endif

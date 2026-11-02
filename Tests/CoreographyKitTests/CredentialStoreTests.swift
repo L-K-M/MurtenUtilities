@@ -19,6 +19,7 @@ final class CredentialStoreTests: XCTestCase {
         }
         try store.save("second")
         XCTAssertEqual(try store.read(), "second")
+        XCTAssertTrue(try store.contains(), "presence is answered from attributes")
         // In place: still one item, not the old and the new side by side.
         let everyItem: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
@@ -30,6 +31,7 @@ final class CredentialStoreTests: XCTestCase {
         XCTAssertEqual((items as? [Any])?.count, 1)
         try store.delete()
         XCTAssertNil(try store.read())
+        XCTAssertFalse(try store.contains())
         #else
         throw XCTSkip("The Keychain needs macOS")
         #endif
