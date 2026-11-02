@@ -14,11 +14,10 @@ Docker disk-usage treemap with selective reclaim — deliberately not a broad
 `docker system prune`. Pure SwiftPM today.
 
 - **Migrates:** `DockVacCore` (usage analysis, treemap model, reclaim set)
-  plus the `DockVacDocker` Engine API client the watcher reuses; the treemap
-  pane as its first real suite pane.
-- **Watcher:** the unprivileged Engine API client (`DockVacDocker`) on a
-  slow cadence → "Docker is holding ~X GB" at a configurable threshold. The
-  proof-of-concept for the whole pipeline.
+  plus the `DockVacDocker` Engine API transport the scan service wraps; the
+  treemap pane as its first real suite pane.
+- **Watcher:** `docker system df` on a slow cadence → "Docker is holding ~X GB"
+  at a configurable threshold. The proof-of-concept for the whole pipeline.
 - **Privilege:** none to observe; the Docker socket only on the delete action.
 
 ### RepoMen — effort: medium — phase 3
