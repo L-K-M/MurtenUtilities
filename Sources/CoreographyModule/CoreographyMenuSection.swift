@@ -10,7 +10,7 @@ import CoreographyServices
 struct CoreographyMenuSection: View {
     let session: CoreographySession
     /// Opens Coreography's pane in the suite window.
-    let openPane: () -> Void
+    let openPane: @MainActor () -> Void
 
     var body: some View {
         let model = session.model
@@ -61,7 +61,7 @@ struct CoreographyMenuSection: View {
                     .help(model.displayMode == .live ? "Hold the display" : "Return to live")
                 Button(hud.isShown ? "Hide HUD" : "Show HUD") { hud.toggle() }
                 Spacer()
-                Button("Open Coreography", action: openPane)
+                Button("Open Coreography") { openPane() }
             }
             .controlSize(.small)
         }

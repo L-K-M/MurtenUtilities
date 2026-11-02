@@ -3196,8 +3196,15 @@ private struct ProcessMetricCell: View {
             .monospacedDigit()
             .padding(.horizontal, 4)
             .background(hue.opacity(min(max(heat, 0), 1) * 0.35), in: RoundedRectangle(cornerRadius: 3))
-            .help(reading.reason ?? reading.method ?? note ?? [reading.source?.provider, reading.source?.driver, reading.source?.channel]
-                .compactMap { $0 }.joined(separator: " · "))
+            .help(hoverText)
+    }
+
+    /// Split out of `body`: inline, the `??` chain inside `.help`'s
+    /// overloads exceeds the type checker's time limit on CI.
+    private var hoverText: String {
+        if let explanation = reading.reason ?? reading.method ?? note { return explanation }
+        let source: [String?] = [reading.source?.provider, reading.source?.driver, reading.source?.channel]
+        return source.compactMap { $0 }.joined(separator: " · ")
     }
 
     private var label: String {
