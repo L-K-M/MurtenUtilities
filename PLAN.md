@@ -68,7 +68,7 @@ Per-module migration notes, satellites, and new-module ideas:
 
 0. **Scaffolding** (done): package, home screen listing the registry, Rigi
    wired end-to-end, CI/CD/release plumbing, this plan.
-1. **The spine**: `SuiteCore` contracts, the suggestion store
+1. **The spine**: `MurtenCore` contracts, the suggestion store
    (dedupe/snooze/thresholds), the deep-link router, and **one module
    end-to-end** — DockVac is the easiest proof (pure SwiftPM, cheap watcher).
 2. **SwiftPM migrations**: HallPass, DeviceControlDoctor, RunningMan — their
