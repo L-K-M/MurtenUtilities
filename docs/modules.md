@@ -15,8 +15,10 @@ Docker disk-usage treemap with selective reclaim — deliberately not a broad
 
 - **Migrates:** its core (df parsing, treemap model, reclaim set) as
   `DockVacCore`; the treemap pane as its first real suite pane.
-- **Watcher:** `docker system df` on a slow cadence → "Docker is holding ~X GB"
-  at a configurable threshold. The proof-of-concept for the whole pipeline.
+- **Watcher:** a slow-cadence scan through an observation-only Docker Engine
+  service → "Docker is holding ~X GB" at a configurable threshold. An endpoint
+  requiring interactive authentication is unavailable to background polls.
+  The proof-of-concept for the whole pipeline.
 - **Capability:** scans and deletion both use the Docker Engine connection
   (Unix socket or SSH). A watcher gets a scan-only service interface, not the
   mutation client; the daemon connection itself is not a read-only grant.
@@ -70,9 +72,9 @@ Manages system-wide CIDR exemptions from the macOS local-network privacy
 restriction. Already fleet-standard: `HallPassCore` is pure; writes go through
 privileged osascript with baseline re-check and rollback.
 
-- **Migrates:** `HallPassCore` + pane. Its privileged write path is the case
-  study for "per-module privilege stays per-module" — it keeps its own
-  confirmation flow inside the suite.
+- **Migrates:** `HallPassCore` + pane. Its privileged write path keeps its
+  own confirmation, baseline re-check and rollback inside the suite; this is
+  a repair-flow boundary, not OS-enforced isolation from other modules.
 - **Watcher:** keep it on-demand. The current read service also requests
   administrator access, so it cannot back a watcher. A future "exemptions
   changed" check needs an unprivileged signal first.

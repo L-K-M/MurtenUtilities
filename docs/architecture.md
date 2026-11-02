@@ -87,9 +87,9 @@ Do not promise OS-enforced per-module permissions in the single-process shell.
   DeviceControlDoctor retains its scoped, confirmed `tccutil reset`.
 - DockVac scans already use the Docker Engine API over a Unix socket or SSH.
   The connection can also authorize mutation; a read operation is not a
-  read-only credential. Give the watcher only a scan interface. Never run
-  cleanup through that interface or initiate remote authentication prompts
-  from a background poll.
+  read-only credential. Give the watcher only a scan interface, a guardrail
+  against accidental writes, not process isolation. Never run cleanup through
+  that interface or initiate authentication prompts from a background poll.
 - HallPass currently authorizes both reads and writes through osascript.
   Its existing read service is therefore not a watcher. Any drift watcher
   needs a separate unprivileged signal, or remains on-demand.
