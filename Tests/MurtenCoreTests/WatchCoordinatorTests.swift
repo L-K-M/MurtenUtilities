@@ -12,7 +12,7 @@ private actor Inbox {
 
 /// A watcher whose polls the test releases one at a time.
 private final class GatedWatcher: Watcher, @unchecked Sendable {
-    let moduleID = dockvac
+    let moduleID: String
     let cadence: WatchCadence
     private let clock: ManualClock
     private let lock = NSLock()
@@ -20,7 +20,8 @@ private final class GatedWatcher: Watcher, @unchecked Sendable {
     private var cancelled = 0
     private var pending: [CheckedContinuation<Void, Never>] = []
 
-    init(clock: ManualClock, timeout: TimeInterval = 60) {
+    init(clock: ManualClock, timeout: TimeInterval = 60, moduleID: String = dockvac) {
+        self.moduleID = moduleID
         self.clock = clock
         cadence = WatchCadence(interval: 30 * 60, timeout: timeout)
     }
@@ -169,6 +170,32 @@ final class WatchCoordinatorTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 50_000_000)
 
         XCTAssertEqual(watcher.startedCount, 0)
+        await coordinator.setEnabled([])
+    }
+
+    func testWaitsQuietlyWhileEveryPollSlotIsBusy() async {
+        let clock = ManualClock()
+        let watchers = ["a", "b", "c"].map { GatedWatcher(clock: clock, timeout: 24 * 3600, moduleID: $0) }
+        let inbox = Inbox()
+        let coordinator = WatchCoordinator(
+            registrations: watchers.map { WatcherRegistration(watcher: $0, rule: AlwaysRule()) },
+            clock: clock, gate: { _ in .open }, sink: { observation, _ in await inbox.add(observation) })
+
+        await coordinator.setEnabled(["a", "b", "c"])
+        _ = await eventually { clock.sleeperCount >= 1 }
+        clock.advance(by: WatchSchedule.initialDelay)
+        let twoRunning = await eventually { watchers.map(\.waitingCount).reduce(0, +) == WatchCoordinator.maximumConcurrentPolls }
+        XCTAssertTrue(twoRunning)
+
+        // The third poll is due but has no slot: the loop must wait, not spin.
+        let callsBefore = clock.sleepCalls
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertLessThan(clock.sleepCalls - callsBefore, 5)
+
+        // A finished poll frees a slot for the waiting one.
+        watchers.first { $0.waitingCount == 1 }?.releaseAll()
+        let thirdStarted = await eventually { watchers.allSatisfy { $0.startedCount == 1 } }
+        XCTAssertTrue(thirdStarted)
         await coordinator.setEnabled([])
     }
 

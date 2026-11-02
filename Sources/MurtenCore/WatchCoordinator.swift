@@ -130,7 +130,11 @@ public actor WatchCoordinator {
     }
 
     private func sleepUntilNextDeadline() async {
-        let deadline = schedule.nextDeadline() ?? clock.now().addingTimeInterval(WatchSchedule.pauseRecheckInterval)
+        let idleDeadline = clock.now().addingTimeInterval(WatchSchedule.pauseRecheckInterval)
+        // With every slot busy, a due poll cannot start before one finishes,
+        // and `finish` signals; sleeping until its past deadline would spin.
+        let slotsFull = inFlight.count >= Self.maximumConcurrentPolls
+        let deadline = slotsFull ? idleDeadline : (schedule.nextDeadline() ?? idleDeadline)
         let clock = self.clock
         let task = Task<Void, Never> { _ = try? await clock.sleep(until: deadline) }
         sleeper = task
