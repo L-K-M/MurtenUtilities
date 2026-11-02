@@ -3,11 +3,13 @@ import RepoMenCore
 
 /// RepoMen's part of the suite's menu-bar companion, replacing the standalone
 /// app's own menu-bar extra: whether auto-trash is armed, where, its last pass,
-/// and a switch to turn it off. Background-check findings appear in the
-/// companion's suggestion list, not here.
+/// a switch to turn it off and a way to its log. Background-check findings
+/// appear in the companion's suggestion list, not here.
 struct RepoMenMenuSection: View {
     @ObservedObject var preferences: Preferences
     @ObservedObject var autoTrash: AutoTrashController
+    /// Opens the pane on the auto-trash log and brings the window forward.
+    let openLog: @MainActor () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -24,9 +26,13 @@ struct RepoMenMenuSection: View {
                 Text(statusLine)
                     .font(.caption)
                     .foregroundStyle(autoTrash.isAllowedToRun ? Color.secondary : Color.orange)
-                Button("Turn Off Auto-Trash") { autoTrash.disarmAll() }
-                    .controlSize(.small)
-                    .help("Disarm every watched folder. Watching and suggestions continue.")
+                HStack {
+                    Button("Turn Off Auto-Trash") { autoTrash.disarmAll() }
+                        .help("Disarm every watched folder. Watching and suggestions continue.")
+                    Button("Show Log") { openLog() }
+                        .help("What auto-trash moved to the Trash or left alone")
+                }
+                .controlSize(.small)
             }
             if preferences.lifetimeReclaimedBytes > 0 {
                 Text("Lifetime: \(Format.bytes(preferences.lifetimeReclaimedBytes)) repossessed")

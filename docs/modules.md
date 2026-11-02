@@ -71,8 +71,9 @@ DerivedData, Homebrew caches — and reclaims them by age and size.
   storage or under `/Volumes` are not scanned and are reported unavailable
   (`permissionDenied`); the user scans them in the pane. A scanned folder
   walks around those locations and does not follow Git worktree
-  registrations into them. Removed and paused folders count as checked, so
-  their suggestions resolve. The scan folders' defaults often sit in
+  registrations into them. The observation lists every folder surveyed
+  (`coverage: .exhaustive`), so suggestions for removed or paused folders
+  resolve. The scan folders' defaults often sit in
   `~/Documents`, so for many users part of the check is unavailable until
   they add folders elsewhere.
 - **Auto-trash (user-armed):** armed per watched folder, off by default; the

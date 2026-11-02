@@ -100,7 +100,10 @@ final class RepoMenProvider: SuiteModuleProvider {
     }
 
     func makeMenuSection() -> AnyView? {
-        AnyView(RepoMenMenuSection(preferences: preferences, autoTrash: autoTrash))
+        let openRoute = context.open
+        return AnyView(RepoMenMenuSection(preferences: preferences, autoTrash: autoTrash) {
+            openRoute(ModuleRoute(moduleID: RepoMenRoutes.moduleID, action: RepoMenRoutes.logAction))
+        })
     }
 
     var interruptionWarning: String? {

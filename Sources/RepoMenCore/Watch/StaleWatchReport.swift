@@ -12,19 +12,14 @@ package struct StaleWatchSettings: Equatable, Sendable {
     package var scanRoots: [String]
     /// The pane's idle threshold ("Select Idle"), applied to the scan folders.
     package var scanRootIdleDays: Int
-    /// Folders no longer scanned or watched. Reported as checked, so a
-    /// suggestion about one resolves instead of lingering.
-    package var retiredPaths: [String]
     package var excludedPaths: Set<String>
     package var enabledKinds: Set<ArtifactKind>
 
     package init(folders: [WatchedFolder], scanRoots: [String] = [], scanRootIdleDays: Int = 30,
-                 retiredPaths: [String] = [], excludedPaths: Set<String> = [],
-                 enabledKinds: Set<ArtifactKind> = Set(ArtifactKind.allCases)) {
+                 excludedPaths: Set<String> = [], enabledKinds: Set<ArtifactKind> = Set(ArtifactKind.allCases)) {
         self.folders = folders
         self.scanRoots = scanRoots
         self.scanRootIdleDays = scanRootIdleDays
-        self.retiredPaths = retiredPaths
         self.excludedPaths = excludedPaths
         self.enabledKinds = enabledKinds
     }
@@ -39,14 +34,6 @@ package struct StaleWatchSettings: Equatable, Sendable {
             .map { WatchedFolder(path: $0, maxIdleDays: scanRootIdleDays) }
         return folders.filter(\.isEnabled) + scanned
     }
-
-    /// Paused watched folders and retired paths that are not surveyed.
-    package var unsurveyedPaths: [String] {
-        let surveyed = Set(surveyedFolders.map(\.path))
-        var seen = Set<String>()
-        return (folders.filter { !$0.isEnabled }.map(\.path) + retiredPaths)
-            .filter { !surveyed.contains($0) && seen.insert($0).inserted }
-    }
 }
 
 /// One watched folder's result in a background survey.
@@ -56,8 +43,9 @@ package enum WatchRootStatus: Equatable, Sendable {
 }
 
 /// Turns a survey into the suite's `WatchObservation`: one finding per scanned
-/// folder, one failure per folder that could not be scanned, and the folders no
-/// longer surveyed as completed scopes without findings.
+/// folder and one failure per folder that could not be scanned. Together they
+/// are every folder RepoMen surveys now (`coverage: .exhaustive`), so a
+/// suggestion for a folder the user removed or paused resolves.
 package enum StaleWatchReport {
 
     package static func observation(settings: StaleWatchSettings,
@@ -94,14 +82,8 @@ package enum StaleWatchReport {
             }
         }
 
-        // Not surveyed (any more): nothing there is RepoMen's to report, so the
-        // scope counts as checked and an old suggestion for it resolves.
-        for path in settings.unsurveyedPaths {
-            completed.insert(FindingScope(path))
-        }
-
         return WatchObservation(moduleID: moduleID, observedAt: date, findings: findings,
-                                completedScopes: completed, failures: failures)
+                                completedScopes: completed, failures: failures, coverage: .exhaustive)
     }
 
     private static func failure(for refusal: WatchRootRefusal, scope: FindingScope,

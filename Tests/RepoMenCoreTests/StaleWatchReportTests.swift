@@ -61,7 +61,6 @@ final class StaleWatchReportTests: XCTestCase {
                        [WatchedFolder(path: "/Users/test/dev", maxIdleDays: 7),
                         WatchedFolder(path: "/Users/test/code", maxIdleDays: 45)],
                        "a watched entry governs its path, paused or not")
-        XCTAssertEqual(settings.unsurveyedPaths, ["/Users/test/old"])
 
         let observation = StaleWatchReport.observation(settings: settings, statuses: [
             "/Users/test/dev": .surveyed(StaleArtifactTotals(bytes: 1, count: 1)),
@@ -69,29 +68,50 @@ final class StaleWatchReportTests: XCTestCase {
         ], at: date, home: home)
         let code = try XCTUnwrap(observation.findings.first { $0.scope == FindingScope("/Users/test/code") })
         XCTAssertEqual(code.count("idleDays"), 45)
-        XCTAssertEqual(observation.completedScopes.count, 3)
+        XCTAssertEqual(observation.completedScopes.count, 2, "the paused folder is not surveyed")
     }
 
-    func testUnwatchedFoldersCountAsCheckedSoTheirSuggestionsResolve() {
-        let settings = StaleWatchSettings(
-            folders: [WatchedFolder(path: "/Users/test/paused", isEnabled: false)],
-            retiredPaths: ["/Users/test/removed"])
-        let observation = StaleWatchReport.observation(settings: settings, statuses: [:], at: date, home: home)
+    func testRemovedOrPausedFoldersSuggestionsResolve() {
+        let rule = StaleArtifactRule(home: home)
+        var ledger = SuggestionLedger()
+        let folders = [WatchedFolder(path: "/Users/test/dev"), WatchedFolder(path: "/Users/test/work")]
+        let big = WatchRootStatus.surveyed(StaleArtifactTotals(bytes: 6_000_000_000, count: 2))
+        _ = ledger.apply(StaleWatchReport.observation(
+            settings: StaleWatchSettings(folders: folders),
+            statuses: ["/Users/test/dev": big, "/Users/test/work": big], at: date, home: home), rule: rule)
+        XCTAssertEqual(ledger.suggestions(at: date).count, 2)
 
-        XCTAssertEqual(observation.outcome, .complete)
-        XCTAssertEqual(observation.completedScopes,
-                       [FindingScope("/Users/test/paused"), FindingScope("/Users/test/removed")])
-        XCTAssertTrue(observation.findings.isEmpty)
+        // dev removed, work paused: neither is listed any more.
+        let later = StaleWatchReport.observation(
+            settings: StaleWatchSettings(folders: [WatchedFolder(path: "/Users/test/work", isEnabled: false)]),
+            statuses: [:], at: date.addingTimeInterval(60), home: home)
+        XCTAssertEqual(later.coverage, .exhaustive)
+        let events = ledger.apply(later, rule: rule)
+
+        XCTAssertEqual(Set(events), [
+            .resolved(SuggestionKey(moduleID: "repomen", condition: "stale-artifacts",
+                                    scope: FindingScope("/Users/test/dev"))),
+            .resolved(SuggestionKey(moduleID: "repomen", condition: "stale-artifacts",
+                                    scope: FindingScope("/Users/test/work"))),
+        ])
     }
 
-    func testAnEnabledFolderIsNeverTreatedAsRetired() {
-        let settings = StaleWatchSettings(folders: [WatchedFolder(path: "/Users/test/dev")],
-                                          retiredPaths: ["/Users/test/dev"])
-        let observation = StaleWatchReport.observation(
+    func testAFailedFolderKeepsItsSuggestion() {
+        let rule = StaleArtifactRule(home: home)
+        var ledger = SuggestionLedger()
+        let settings = StaleWatchSettings(folders: [WatchedFolder(path: "/Users/test/dev")])
+        _ = ledger.apply(StaleWatchReport.observation(
+            settings: settings,
+            statuses: ["/Users/test/dev": .surveyed(StaleArtifactTotals(bytes: 6_000_000_000, count: 2))],
+            at: date, home: home), rule: rule)
+
+        let failed = StaleWatchReport.observation(
             settings: settings, statuses: ["/Users/test/dev": .refused(.missing)], at: date, home: home)
-
-        XCTAssertEqual(observation.outcome, .unavailable)
-        XCTAssertTrue(observation.completedScopes.isEmpty, "a failed folder must not look checked")
+        XCTAssertEqual(failed.outcome, .unavailable)
+        XCTAssertTrue(failed.completedScopes.isEmpty, "a failed folder must not look checked")
+        XCTAssertFalse(ledger.apply(failed, rule: rule).contains {
+            if case .resolved = $0 { return true } else { return false }
+        }, "could not look is not nothing found")
     }
 
     func testAStoppedSurveyIsAWholeCheckFailure() {

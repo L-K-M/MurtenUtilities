@@ -19,20 +19,12 @@ final class Preferences: ObservableObject {
         static let watchedFolders = "watchedFolders"
         static let scanAtLaunch = "scanAtLaunch"
         static let lastWatchRun = "lastWatchRun"
-        static let retiredWatchFolders = "retiredWatchFolders"
         static let autoTrashLog = "autoTrashLog"
     }
 
-    /// Removed folders remembered so the background check can resolve their
-    /// suggestions; bounded, oldest dropped first.
-    static let retiredWatchFolderLimit = 64
-
     /// Folders whose trees are deep-scanned for project artifacts (absolute paths).
     @Published var scanRoots: [String] {
-        didSet {
-            defaults.set(scanRoots, forKey: Key.scanRoots)
-            retire(scopesBefore: oldValue + watchedFolders.map(\.path))
-        }
+        didSet { defaults.set(scanRoots, forKey: Key.scanRoots) }
     }
 
     /// Paths the user told us to never suggest again (absolute paths).
@@ -67,10 +59,7 @@ final class Preferences: ObservableObject {
     /// background check reports on them; auto-trash runs only in folders the user
     /// armed one by one.
     @Published var watchedFolders: [WatchedFolder] {
-        didSet {
-            defaults.set(try? JSONEncoder().encode(watchedFolders), forKey: Key.watchedFolders)
-            retire(scopesBefore: scanRoots + oldValue.map(\.path))
-        }
+        didSet { defaults.set(try? JSONEncoder().encode(watchedFolders), forKey: Key.watchedFolders) }
     }
 
     /// Run one scan automatically when the pane first opens.
@@ -81,12 +70,6 @@ final class Preferences: ObservableObject {
     /// The most recent auto-trash pass, for the menu section and Settings.
     @Published var lastWatchRun: WatchRunRecord? {
         didSet { defaults.set(try? JSONEncoder().encode(lastWatchRun), forKey: Key.lastWatchRun) }
-    }
-
-    /// Scan and watched folders the user removed, newest last. The background
-    /// check reports them as checked so their suggestions resolve.
-    @Published private(set) var retiredWatchFolders: [String] {
-        didSet { defaults.set(retiredWatchFolders, forKey: Key.retiredWatchFolders) }
     }
 
     /// What armed auto-trash moved to the Trash or left alone, newest first.
@@ -104,19 +87,7 @@ final class Preferences: ObservableObject {
     /// The settings the background check reads, snapshotted for one poll.
     var watchSettings: StaleWatchSettings {
         StaleWatchSettings(folders: watchedFolders, scanRoots: scanRoots, scanRootIdleDays: idleDays,
-                           retiredPaths: retiredWatchFolders, excludedPaths: Set(excludedPaths),
-                           enabledKinds: enabledKinds)
-    }
-
-    /// Remembers paths that were a background-check scope (a scan or watched
-    /// folder) before a change and are neither now.
-    private func retire(scopesBefore previous: [String]) {
-        let current = Set(scanRoots + watchedFolders.map(\.path))
-        var seen = Set<String>()
-        let removed = previous.filter { !current.contains($0) && seen.insert($0).inserted }
-        let kept = retiredWatchFolders.filter { !current.contains($0) && !removed.contains($0) }
-        let updated = Array((kept + removed).suffix(Self.retiredWatchFolderLimit))
-        if updated != retiredWatchFolders { retiredWatchFolders = updated }
+                           excludedPaths: Set(excludedPaths), enabledKinds: enabledKinds)
     }
 
     init(defaults: UserDefaults) {
@@ -134,7 +105,6 @@ final class Preferences: ObservableObject {
         self.scanAtLaunch = defaults.object(forKey: Key.scanAtLaunch) as? Bool ?? false
         self.lastWatchRun = defaults.data(forKey: Key.lastWatchRun)
             .flatMap { try? JSONDecoder().decode(WatchRunRecord.self, from: $0) }
-        self.retiredWatchFolders = defaults.stringArray(forKey: Key.retiredWatchFolders) ?? []
         self.autoTrashLog = defaults.data(forKey: Key.autoTrashLog)
             .flatMap { try? JSONDecoder().decode([AutoTrashLogEntry].self, from: $0) } ?? []
     }
