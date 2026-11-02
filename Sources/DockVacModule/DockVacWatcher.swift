@@ -23,28 +23,59 @@ struct DockerUsageSnapshot: Sendable {
   let usage: DockerDiskUsage
 }
 
-/// A read that reached an endpoint and then failed.
+/// A read that reached an endpoint and then failed, or was not attempted for one.
 struct DockerUsageReadFailure: Error {
   let endpointAddress: String
   let underlying: any Error
 }
 
+/// The endpoint is an SSH host and the user has not allowed background checks over SSH.
+/// BatchMode keeps ssh itself from prompting, but an SSH agent such as 1Password or
+/// Secretive can still ask to approve the key, and a background check never prompts.
+struct SSHBackgroundCheckDisabled: Error {}
+
+/// Whether the user allows the watcher to reach SSH endpoints. Off by default.
+final class SSHBackgroundPreference: @unchecked Sendable {
+  static let key = "checkSSHEndpointsInBackground"
+
+  // UserDefaults is documented as thread-safe; the watcher reads it off the main actor.
+  private let defaults: UserDefaults
+
+  init(defaults: UserDefaults) {
+    self.defaults = defaults
+  }
+
+  var isOn: Bool { defaults.bool(forKey: Self.key) }
+}
+
 /// The live reader: the locator's automatic search, then the Engine API reads the safe
-/// level needs. SSH runs with BatchMode, so a host needing a password or passphrase fails
-/// instead of prompting.
+/// level needs. An SSH endpoint is reached only when `allowsSSH` says so, and then with
+/// BatchMode, so a host needing a password or passphrase fails instead of prompting.
 struct LiveDockerUsageReader: DockerUsageReading {
   let locator: DockerEndpointLocator
   /// Longest silence tolerated from the daemon; the suite's timeout cancels sooner.
   let readTimeout: TimeInterval
+  let allowsSSH: @Sendable () -> Bool
+
+  /// The SSH host the automatic search would connect to, if it names one.
+  private var configuredSSHHost: DockerSSHHost? {
+    if case .ssh(let host)? = locator.configuredHost()?.host {
+      return host
+    }
+    return nil
+  }
 
   var readsRemoteEndpoint: Bool {
-    if case .ssh? = locator.configuredHost()?.host {
-      return true
-    }
-    return false
+    configuredSSHHost != nil && allowsSSH()
   }
 
   func readUsage() async throws -> DockerUsageSnapshot {
+    if let host = configuredSSHHost, !allowsSSH() {
+      // Scoped to the host, so its suggestion turns stale instead of resolving.
+      throw DockerUsageReadFailure(
+        endpointAddress: DockerEndpoint(sshHost: host).address,
+        underlying: SSHBackgroundCheckDisabled())
+    }
     let connection = try await locator.connect(to: .automatic)
     let address = connection.endpoint.address
     let client = DockerEngineClient(endpoint: connection.endpoint, idleTimeout: readTimeout)
@@ -113,6 +144,11 @@ struct DockVacWatcher: Watcher {
   static func failure(_ error: any Error, scope: FindingScope?) -> ObservationFailure {
     if error is CancellationError {
       return ObservationFailure(kind: .failed, scope: scope, message: "The check was cancelled.")
+    }
+    if error is SSHBackgroundCheckDisabled {
+      return ObservationFailure(
+        kind: .permissionDenied, scope: scope,
+        message: "SSH endpoints are checked when you open DockVac.")
     }
     let message =
       dockerErrorMessage(error).split(separator: "\n").first.map(String.init)

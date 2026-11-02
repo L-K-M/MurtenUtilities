@@ -107,6 +107,15 @@ final class DockVacProviderTests: XCTestCase {
   }
 
   @MainActor
+  func testSettingsOfferTheSSHChoice() throws {
+    let settings = try XCTUnwrap(makeProvider().makeSettings())
+    let host = NSHostingView(rootView: settings)
+    host.frame = NSRect(x: 0, y: 0, width: 460, height: 220)
+    host.layoutSubtreeIfNeeded()
+    XCTAssertEqual(SSHBackgroundPreference.key, "checkSSHEndpointsInBackground")
+  }
+
+  @MainActor
   func testQuitWarningOnlyWhileCleaningAndARecheckAfterwards() async throws {
     let rechecks = Recorder<Void>()
     let service = Self.service(reaching: Self.socket)

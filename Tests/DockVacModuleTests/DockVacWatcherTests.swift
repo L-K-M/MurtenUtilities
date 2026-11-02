@@ -149,16 +149,82 @@ final class DockVacWatcherTests: XCTestCase {
     XCTAssertTrue(watcher(remote).cadence.resources.contains(.network))
   }
 
-  func testLiveReaderDeclaresNetworkForAnSSHDockerHost() {
-    let home = NSTemporaryDirectory() + "dockvac-nohome-\(UUID().uuidString)"
-    func reader(_ environment: [String: String]) -> LiveDockerUsageReader {
-      LiveDockerUsageReader(
-        locator: DockerEndpointLocator(environment: environment, homeDirectory: home),
-        readTimeout: 5)
+  func testLiveReaderDeclaresNetworkOnlyForAnAllowedSSHHost() {
+    func reader(_ environment: [String: String], allowsSSH: Bool) -> LiveDockerUsageReader {
+      Self.liveReader(environment, allowsSSH: allowsSSH)
     }
-    XCTAssertTrue(reader(["DOCKER_HOST": "ssh://deploy@build-box"]).readsRemoteEndpoint)
-    XCTAssertFalse(reader(["DOCKER_HOST": "unix:///var/run/docker.sock"]).readsRemoteEndpoint)
-    XCTAssertFalse(reader([:]).readsRemoteEndpoint)
+    let ssh = ["DOCKER_HOST": "ssh://deploy@build-box"]
+    XCTAssertTrue(reader(ssh, allowsSSH: true).readsRemoteEndpoint)
+    XCTAssertFalse(
+      reader(ssh, allowsSSH: false).readsRemoteEndpoint, "a skipped host uses no network")
+    XCTAssertFalse(
+      reader(["DOCKER_HOST": "unix:///var/run/docker.sock"], allowsSSH: true).readsRemoteEndpoint)
+    XCTAssertFalse(reader([:], allowsSSH: true).readsRemoteEndpoint)
+  }
+
+  // MARK: - SSH endpoints
+
+  func testSSHEndpointIsSkippedUnlessTheUserAllowsIt() async throws {
+    let started = Date()
+    let reader = Self.liveReader(["DOCKER_HOST": "ssh://deploy@build-box:2222"], allowsSSH: false)
+    let observation = await DockVacWatcher(reader: reader).observe()
+
+    XCTAssertLessThan(Date().timeIntervalSince(started), 1, "nothing was dialled")
+    XCTAssertEqual(observation.outcome, .unavailable)
+    XCTAssertTrue(observation.findings.isEmpty)
+    XCTAssertTrue(observation.completedScopes.isEmpty, "skipping never proves resolution")
+    let failure = try XCTUnwrap(observation.failures.first)
+    XCTAssertEqual(failure.kind, .permissionDenied)
+    XCTAssertEqual(failure.scope, FindingScope("ssh://deploy@build-box:2222"))
+    XCTAssertEqual(failure.message, "SSH endpoints are checked when you open DockVac.")
+  }
+
+  func testASkippedSSHEndpointKeepsItsSuggestionStale() async throws {
+    let host = "ssh://deploy@build-box"
+    let store = SuggestionStore(
+      persistence: NoPersistence(), knownModules: [DockVacSuite.moduleID])
+    let rule = RebuildableSpaceRule()
+    let found = Finding(
+      moduleID: DockVacSuite.moduleID, condition: DockVacSuite.reclaimableCondition,
+      scope: FindingScope(host), observedAt: Self.observedAt,
+      evidence: [DockVacSuite.bytesEvidence: .bytes(6_000_000_000)])
+    _ = await store.record(
+      .complete(
+        moduleID: DockVacSuite.moduleID, at: Self.observedAt, scopes: [FindingScope(host)],
+        findings: [found]),
+      rule: rule, at: Self.observedAt)
+
+    let later = Self.observedAt.addingTimeInterval(3600)
+    let skipped = await DockVacWatcher(
+      reader: Self.liveReader(["DOCKER_HOST": host], allowsSSH: false), now: { later }
+    ).observe()
+    _ = await store.record(skipped, rule: rule, at: later)
+
+    let suggestions = await store.suggestions(at: later)
+    XCTAssertEqual(suggestions.count, 1, "the suggestion survives the skipped check")
+    guard case .stale? = suggestions.first?.freshness else {
+      return XCTFail("a skipped check marks it stale: \(String(describing: suggestions.first))")
+    }
+  }
+
+  func testTheSSHPreferenceIsOffByDefault() throws {
+    let suite = "DockVacWatcherTests.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let preference = SSHBackgroundPreference(defaults: defaults)
+    XCTAssertFalse(preference.isOn)
+    defaults.set(true, forKey: SSHBackgroundPreference.key)
+    XCTAssertTrue(preference.isOn)
+  }
+
+  private static func liveReader(_ environment: [String: String], allowsSSH: Bool)
+    -> LiveDockerUsageReader
+  {
+    LiveDockerUsageReader(
+      locator: DockerEndpointLocator(
+        environment: environment,
+        homeDirectory: NSTemporaryDirectory() + "dockvac-nohome-\(UUID().uuidString)"),
+      readTimeout: 5, allowsSSH: { allowsSSH })
   }
 }
 
@@ -228,7 +294,7 @@ final class LiveDockerUsageReaderTests: XCTestCase {
       locator: DockerEndpointLocator(
         environment: ["DOCKER_HOST": "unix://\(socketPath)"],
         homeDirectory: NSTemporaryDirectory() + "dockvac-nohome", probeTimeout: 10),
-      readTimeout: 10)
+      readTimeout: 10, allowsSSH: { false })
     let observation = await DockVacWatcher(reader: reader).observe()
 
     XCTAssertEqual(observation.outcome, .complete, "\(observation.failures)")
@@ -250,6 +316,12 @@ final class LiveDockerUsageReaderTests: XCTestCase {
 }
 
 // MARK: - Fakes
+
+private struct NoPersistence: SuggestionPersisting {
+  func load() throws -> SuggestionLedger? { nil }
+  func save(_ ledger: SuggestionLedger) throws {}
+  func quarantine() throws -> URL? { nil }
+}
 
 private struct FixedReader: DockerUsageReading {
   let result: Result<DockerUsageSnapshot, any Error>

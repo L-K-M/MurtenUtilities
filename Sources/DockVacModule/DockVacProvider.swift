@@ -24,12 +24,16 @@ public final class DockVacProvider: SuiteModuleProvider {
 
   let controller: AppController
   private let locator: DockerEndpointLocator
+  private let context: ModuleContext
 
   public convenience init(context: ModuleContext) {
     let locator = DockerEndpointLocator()
+    let sshPreference = SSHBackgroundPreference(defaults: context.defaults)
     self.init(
       context: context, controller: AppController(), locator: locator,
-      reader: LiveDockerUsageReader(locator: locator, readTimeout: DockVacWatcher.timeout))
+      reader: LiveDockerUsageReader(
+        locator: locator, readTimeout: DockVacWatcher.timeout,
+        allowsSSH: { sshPreference.isOn }))
   }
 
   init(
@@ -38,6 +42,7 @@ public final class DockVacProvider: SuiteModuleProvider {
   ) {
     self.controller = controller
     self.locator = locator
+    self.context = context
     watch = WatcherRegistration(
       watcher: DockVacWatcher(reader: reader), rule: RebuildableSpaceRule())
     // A cleanup changes what the watcher would report; re-check soon so a suggestion the
@@ -55,6 +60,11 @@ public final class DockVacProvider: SuiteModuleProvider {
 
   public func makePane(route: ModuleRoute?) -> AnyView {
     AnyView(DockVacPane(controller: controller, route: route))
+  }
+
+  public func makeSettings() -> AnyView? {
+    let context = self.context
+    return AnyView(DockVacSettings(requestRecheck: { context.requestRecheck() }))
   }
 
   /// Replaces the standalone app's quit alert.

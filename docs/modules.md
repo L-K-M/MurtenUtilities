@@ -59,9 +59,12 @@ Docker disk-usage treemap with selective reclaim — deliberately not a broad
   through a reader with no removal. One finding per endpoint address,
   `reclaimable`, whose bytes are the safe level's plan. The rule opens at
   4 GB and holds until below 3 GB: "Docker is holding ~8 GB you can
-  rebuild". It declares network use when `DOCKER_HOST` or the active context
-  names an SSH host; SSH keeps `BatchMode`, so an endpoint needing a
-  passphrase fails as unavailable instead of prompting.
+  rebuild". An SSH endpoint (`DOCKER_HOST` or the active context) is skipped
+  by default and reported unavailable, so its suggestion turns stale: an SSH
+  agent such as 1Password or Secretive can prompt even under `BatchMode`.
+  DockVac's Settings tab has "Check SSH endpoints in the background", off by
+  default; with it on, the watcher connects with `BatchMode` and declares
+  network use.
 - **Route:** `murten://dockvac/reclaim?endpoint=<address>` re-scans that
   endpoint and, only if the scan reached it, replaces the selection with the
   safe level. The confirmation sheet is unchanged, its acknowledgement box
