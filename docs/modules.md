@@ -74,26 +74,49 @@ DerivedData, Homebrew caches — and reclaims them by age and size.
 ### BootCaptain — effort: medium — phase 3
 
 Inventories launch agents, login items and other startup mechanisms,
-attributes them to installed products, and investigates boot failures. SwiftUI
-app + CLI; **GitHub-only, not yet cloned**.
+attributes them to installed products, and investigates boot failures.
 
-- **Migrates:** inventory/attribution core; its investigator UI as the pane.
-  The CLI could survive as a bundled tool or stay in its repo.
-- **Privilege:** ships a root helper today (`SMAppService.daemon`) whose
-  enabled actions are reversible vault moves — launchd/cron mutations stay
-  gated off in the current build — and the app itself is Developer ID
-  signed, notarized and non-sandboxed. The helper embeds per-module at
-  migration and gates on the signing decision (docs/architecture.md §
+- **Status:** available.
+- **Provenance:** BootCaptain@1fd84a9f6ec8626fa7ef8a5a100554944a733940
+- **Migrated:** `BootCaptainCore` and `BootCaptainKit` with their test
+  suites; the app's views, view model and services as `BootCaptainModule`.
+  The `bootcaptain` CLI stays in its repo. Rescan (⌘R) and Run Boot Audit
+  (⇧⌘R) are in the Tool menu; the pane scans when it appears, as the app
+  did.
+- **Privilege:** the root helper (`SMAppService.daemon`, bundle ID and
+  Team ID pinned both ways) is left out, because ad-hoc suite builds cannot
+  authenticate it. Moving `/Library` items to the root vault, and the
+  launchd/cron toggles the standalone build already gates off, stay visible
+  but disabled: "Needs a signed build of Murten Utilities". User-scope vault
+  moves and login-item removal keep working, with their session undo. The
+  helper embeds per module once the suite is signed (docs/architecture.md §
   Module packaging).
-- **Watcher:** diff the startup inventory on a cadence → "X installed 2 new
-  login items". Boot-failure diagnosis stays an on-demand flow.
-- **Source facts:** the shipping app and helper build from XcodeGen
-  `project.yml`; `Package.swift` builds only the libraries and the CLI. Spawns
-  live in `BootCaptainKit`, so the module needs Kit as well as Core. launchd
-  plist folders are readable unprivileged, but Background Task Management
-  (`sfltool dumpbtm`), the source for modern login items, needs root and
-  likely Full Disk Access, and System Events login-item reads need Automation
-  consent. An unprivileged watcher sees plists only.
+- **State:** Clean Up's vault and journal stay in
+  `~/Library/Application Support/BootCaptain/{Vault,Journal}`. Items the
+  standalone helper moved to `/Library/Application Support/BootCaptain/Vault`
+  can only be restored by the standalone app. Undo history is per session,
+  as before. The reviewed inventory is the module default
+  `reviewedStartupInventory`.
+- **Consent:** login-item reads and removals through System Events
+  (Automation; `NSAppleEventsUsageDescription`), the Full Disk Access probe
+  and Background Task Management (`sfltool dumpbtm` needs root, so the scan
+  reports a coverage gap) stay in the pane's on-demand scan.
+- **Watcher:** hourly, unprivileged read of `/Library/LaunchDaemons`,
+  `/Library/LaunchAgents`, `~/Library/LaunchAgents` and the launchd plists
+  apps embed (`/Applications`, `/Applications/Setapp`, `~/Applications`),
+  compared with the inventory the user last reviewed in the pane → one
+  suggestion per product, "Docker installed 2 new startup items", route
+  `review`. The pane's first completed scan becomes the reviewed inventory;
+  its review bar marks the current list as reviewed. Not watched: Apple's
+  folders and `com.apple.` labels, BTM, login items, other users' homes.
+  Without a reviewed inventory the check is unavailable; an unreadable
+  folder makes it partial, so a suggestion goes stale instead of resolving.
+- **Preselection:** none. `review` opens the "New since last review" filter
+  with nothing selected; Clean Up preselects nothing, as before.
+- **Source facts:** the standalone app and helper build from XcodeGen
+  `project.yml`; `Package.swift` builds only the libraries and the CLI.
+  Spawns live in `BootCaptainKit`, so the module needs Kit as well as Core.
+  The app is Developer ID signed, notarized and non-sandboxed.
 
 ### DeviceControlDoctor — effort: cheap — phase 2
 
@@ -161,15 +184,41 @@ Manages system-wide CIDR exemptions from the macOS local-network privacy
 restriction. Already fleet-standard: `HallPassCore` is pure; writes go through
 privileged osascript with baseline re-check and rollback.
 
-- **Migrates:** `HallPassCore` + pane. Its privileged write path keeps its
-  own confirmation, baseline re-check and rollback inside the suite; this is
-  a repair-flow boundary, not OS-enforced isolation from other modules.
-- **Watcher:** keep it on-demand. The current read service also requests
+- **Status:** available. `HallPassCore` and its Swift Testing suites moved
+  in unchanged apart from English messages; the app target became
+  `HallPassModule` (provider, pane, backup store, privileged service), and
+  its model tests moved to `HallPassModuleTests`. All keep the source's
+  Swift 6 language mode.
+- **Provenance:** HallPass@1ab2ac48ba98bc11d606e509cdedc88a3f8afa70
+- **Migrated:** the Tahoe pane (sidebar, searchable table, inspector,
+  editing and review sheets, Help), preview with sample data, named undo,
+  draft recovery and the backup commands. The privileged write path keeps
+  its own confirmation, baseline re-check and rollback inside the suite;
+  this is a repair-flow boundary, not OS-enforced isolation from other
+  modules.
+- **Changed for the suite:** the UI and every message are English
+  ("WLAN" is "Wi-Fi"). The app delegate, the window takeover and its
+  close and quit guards are gone: the provider's `interruptionWarning`
+  covers an unsaved draft, a load and an apply. The menu commands are
+  Tool menu commands with the same shortcuts; window, full-screen and
+  sidebar commands are the shell's. The `--demo` flag is gone; *Try with
+  Sample Data* remains. The welcome shows the `ticket.fill` symbol
+  instead of the application icon. Undo uses the window's undo manager
+  while the pane is shown and leaves with it; it is not disabled during a
+  load or an apply, which needed the window delegate. osascript waits on
+  a dispatch thread rather than the shared cooperative pool.
+- **State:** `~/Library/Application Support/HallPass/Backups` and
+  `Draft.json` stay where they are, shared with the standalone app, so a
+  draft from one appears in the other; the apply still re-checks the
+  system state first. Quitting the suite keeps a real draft for next
+  time. The restart reminder's keys (`restartRequiredAtUptime`,
+  `restartRequiredBootTime`) live in the module's defaults, so a restart
+  the standalone app asked for is not shown here.
+- **Watcher:** none; HallPass stays on-demand. The read service requests
   administrator access, so it cannot back a watcher. A future "exemptions
   changed" check needs an unprivileged signal first.
-- **Source facts:** every UI string is German and hardcoded; every other
-  module is English. The suite needs a language decision before this pane
-  moves.
+- **Preselection:** nothing. The provider declares no route actions, so
+  only the bare route opens the pane.
 
 ### Zen Backup Manager — effort: medium — phase 3
 

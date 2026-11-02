@@ -47,7 +47,7 @@ public enum ModuleRegistry {
         SuiteModule(
             id: "bootcaptain", name: "BootCaptain",
             summary: "Inventory startup items and investigate boot failures.",
-            systemImage: "power", sourceRepository: "BootCaptain"),
+            systemImage: "power", status: .available, sourceRepository: "BootCaptain"),
         SuiteModule(
             id: "devicecontroldoctor", name: "DeviceControlDoctor",
             summary: "Diagnose privacy permissions that look granted but fail.",
@@ -59,7 +59,7 @@ public enum ModuleRegistry {
         SuiteModule(
             id: "hallpass", name: "HallPass",
             summary: "Exempt trusted networks from local-network privacy prompts.",
-            systemImage: "network", sourceRepository: "HallPass"),
+            systemImage: "network", status: .available, sourceRepository: "HallPass"),
         SuiteModule(
             id: "zenbackupmanager", name: "Zen Backup Manager",
             summary: "Browse and restore Zen Browser session backups on a timeline.",
