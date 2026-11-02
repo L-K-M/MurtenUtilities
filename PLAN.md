@@ -121,6 +121,7 @@ Per-module migration notes, satellites, and new-module ideas:
 - **Standalone app fate.** Keep shipping each tool alongside the suite, or
   does the suite become the product? Recommendation: keep them until the
   suite reaches per-module parity, then decide per tool.
+<<<<<<< HEAD
 - **Obtainintosh scope.** Generic "anything installed from a GitHub/Forgejo
   release" updater, or just the fleet? Leaning generic — the suggestion is
   only useful with the full picture.
@@ -139,6 +140,13 @@ Per-module migration notes, satellites, and new-module ideas:
   opting in; off by default matches "opt-in, never nagware" and leaves
   installs stale. Sparkle would be a second dependency. A fleet-scoped
   Obtainintosh could own this check.
+=======
+- **Obtainintosh scope.** Obtainintosh is already generic: any GitHub or
+  Forgejo repository the user adds. Keep that, narrow it to the fleet, or
+  add vendor pages (its `GENERIC_SOURCES.md`)? Leaning generic — the
+  suggestion is only useful with the full picture. Either way it downloads
+  and reveals; it does not install (docs/modules.md).
+>>>>>>> pr/20
 - **Name.** `MurtenUtilities` is the repo and bundle id; the *displayed* name
   can stay "Murten Utilities" or take a friendlier one later.
 - **Signing.** Ad-hoc now. That limits function, not just distribution.
