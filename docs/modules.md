@@ -37,6 +37,11 @@ app + CLI; **GitHub-only, not yet cloned**.
 
 - **Migrates:** inventory/attribution core; its investigator UI as the pane.
   The CLI could survive as a bundled tool or stay in its repo.
+- **Privilege:** ships a root helper today — `SMAppService.daemon`, mutated
+  launchd/cron behind write-time authorization — and is a Developer ID,
+  notarized, non-sandboxed app. The helper embeds per-module at migration
+  and gates on the signing decision (docs/architecture.md § Module
+  packaging).
 - **Watcher:** diff the startup inventory on a cadence → "X installed 2 new
   login items". Boot-failure diagnosis stays an on-demand flow.
 
@@ -113,6 +118,10 @@ extra, widgets, Shortcuts actions, a `coreo` CLI. `.xcodeproj` today.
   roster — worth it, because its samples feed half the watcher ideas. Its own
   menu-bar presence likely folds into the suite's (one menu face, many
   instruments).
+- **Privilege:** ships a root XPC sampling daemon today (counters, open
+  files, sockets, signal/renice, spindump, BTM dump) that refuses to start
+  under ad-hoc signing. It embeds per-module like BootCaptain's helper —
+  same signing gate (docs/architecture.md § Module packaging).
 - **Watcher:** sustained-pressure signals → "X has pinned a core for an hour";
   thermal/disk-full warnings.
 

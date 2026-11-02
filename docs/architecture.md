@@ -99,6 +99,18 @@ target in this package (or merges into `MurtenCore` when tiny); its pane lives
 in the app. The source repos are small and mostly single-purpose, so code
 moves cleanly; the standalone apps keep working from their own history.
 
+Two roster modules already ship privileged launch-daemon helpers: BootCaptain
+registers a root `SMAppService.daemon` helper for launchd and cron mutation,
+and Coreography runs a root, peer-code-signature-checked XPC daemon for
+privileged sampling (process counters of other users' processes, open files,
+sockets, signals, renice, spindump, the Background Task Management dump).
+Migrating them embeds each helper in the suite bundle —
+`Contents/Library/LaunchDaemons`, one daemon per module, never shared — and
+both gate on the signing decision: Coreography's helper refuses to start
+without a Developer ID team, so ad-hoc suite builds cannot carry phase 3's
+helpers. The signing open question in PLAN.md sits on phase 3's critical
+path, not in a later distribution pass.
+
 Rejected for now: **depend on the tool repos as remote Swift packages.** It
 preserves a single source of truth per core, but it couples the suite's build
 to ten repos' cadences and pins the suite to each repo's release discipline.
