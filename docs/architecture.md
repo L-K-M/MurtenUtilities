@@ -181,7 +181,8 @@ in the app. The source repos are small and mostly single-purpose, so code
 moves cleanly; the standalone apps keep working from their own history.
 
 Two roster modules already ship privileged launch-daemon helpers (see
-Privilege model above): BootCaptain's root helper — reversible vault moves
+Privilege and capability model above): BootCaptain's root helper — reversible
+vault moves
 enabled, launchd/cron mutations gated off in the current build — and
 Coreography's root, peer-code-signature-checked sampling daemon (process
 counters of other users' processes, open files, sockets, signals, renice,
