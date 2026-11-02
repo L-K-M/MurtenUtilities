@@ -1,4 +1,5 @@
 import XCTest
+import AppKit
 import SwiftUI
 import MurtenCore
 import MurtenModuleKit

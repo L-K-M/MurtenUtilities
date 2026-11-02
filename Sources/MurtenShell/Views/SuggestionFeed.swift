@@ -60,7 +60,7 @@ struct SuggestionRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Button("Open \(moduleName)") { model.open(suggestion.route) }
+            Button("Open \(moduleName)") { _ = model.open(suggestion.route) }
             Menu {
                 ForEach(SnoozeDuration.allCases) { duration in
                     Button(duration.title) { Task { await model.snooze(suggestion, for: duration) } }
@@ -71,7 +71,9 @@ struct SuggestionRow: View {
                 Label("More", systemImage: "ellipsis.circle")
                     .labelStyle(.iconOnly)
             }
-            .menuStyle(.borderlessButton)
+            .menuStyle(.button)
+            .buttonStyle(.borderless)
+            .menuIndicator(.hidden)
             .fixedSize()
             .accessibilityLabel("More actions for \(suggestion.title)")
         }
@@ -79,7 +81,7 @@ struct SuggestionRow: View {
         .background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 6))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(moduleName) suggestion: \(suggestion.title)")
-        .accessibilityAction(named: "Open \(moduleName)") { model.open(suggestion.route) }
+        .accessibilityAction(named: "Open \(moduleName)") { _ = model.open(suggestion.route) }
         .accessibilityAction(named: "Snooze for a day") { Task { await model.snooze(suggestion, for: .oneDay) } }
         .accessibilityAction(named: "Dismiss") { Task { await model.dismiss(suggestion) } }
     }

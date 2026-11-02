@@ -38,7 +38,7 @@ struct HomeView: View {
             Banner(systemImage: "arrow.down.circle",
                    message: "Murten Utilities \(update.version) is available.",
                    actionTitle: "View Release") {
-                NSWorkspace.shared.open(update.pageURL)
+                _ = NSWorkspace.shared.open(update.pageURL)
             }
         }
         ForEach(model.diagnostics) { diagnostic in
@@ -57,7 +57,7 @@ struct HomeView: View {
             LazyVGrid(columns: columns, spacing: 12) {
                 ForEach(model.modules) { module in
                     ModuleTile(module: module, state: tileState(for: module)) {
-                        model.open(ModuleRoute(moduleID: module.id))
+                        _ = model.open(ModuleRoute(moduleID: module.id))
                     }
                     .focused($focusedTile, equals: module.id)
                 }
@@ -65,7 +65,7 @@ struct HomeView: View {
         }
     }
 
-    private func tileState(for module: SuiteModule) -> ModuleTile.State {
+    private func tileState(for module: SuiteModule) -> ModuleTile.TileState {
         guard model.isMigrated(module.id) else { return .planned }
         if case .inapplicable(let reason)? = model.applicability[module.id] { return .inapplicable(reason) }
         return .available
@@ -83,14 +83,14 @@ struct HomeView: View {
 /// One tool: icon, name and one-line job. Planned and inapplicable tools
 /// say why they do not open instead of opening a pane that cannot work.
 struct ModuleTile: View {
-    enum State: Equatable {
+    enum TileState: Equatable {
         case available
         case planned
         case inapplicable(String)
     }
 
     let module: SuiteModule
-    let state: State
+    let state: TileState
     let open: () -> Void
 
     var body: some View {
