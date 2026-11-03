@@ -1,0 +1,342 @@
+import AppKit
+import SwiftUI
+import RunningManCore
+
+/// A palette value. The suite is light only (docs/ui-direction.md), so each color keeps
+/// the standalone app's light value and has no dark counterpart.
+struct PaletteColor {
+    let color: NSColor
+
+    init(_ color: NSColor) {
+        self.color = color
+    }
+
+    /// sRGB components from 0 to 1.
+    init(_ rgb: (Double, Double, Double)) {
+        self.init(NSColor(srgbRed: rgb.0, green: rgb.1, blue: rgb.2, alpha: 1))
+    }
+
+    /// Build once and keep it, so a render never creates a new color value.
+    func makeColor() -> Color {
+        Color(nsColor: color)
+    }
+}
+
+enum RunningManStyle {
+    /// Interactive tint: prominent buttons, switches, selection and links.
+    static let accent = Color.indigo
+    /// The accent for small text and symbols.
+    static let accentText = Palette.accentText.makeColor()
+    static let canvas = Palette.canvas.makeColor()
+    static let surface = Palette.surface.makeColor()
+    /// Selected or floating cards; matches `surface`.
+    static let surfaceRaised = Palette.surfaceRaised.makeColor()
+    static let line = Palette.line.makeColor()
+    static let cardShadow = Palette.cardShadow.makeColor()
+
+    /// Raw values, kept apart from the SwiftUI colors so tests can check contrast.
+    enum Palette {
+        static let canvas = PaletteColor((0.953, 0.957, 0.965))
+        static let surface = PaletteColor((1, 1, 1))
+        static let surfaceRaised = PaletteColor((1, 1, 1))
+        static let line = PaletteColor(NSColor.black.withAlphaComponent(0.08))
+        static let cardShadow = PaletteColor(NSColor.black.withAlphaComponent(0.05))
+        static let accentText = PaletteColor((0.31, 0.29, 0.79))
+    }
+}
+
+/// What a state means, whatever it describes. Runner statuses, job outcomes and cleanup
+/// results map onto these, so one color always means one thing.
+enum StatusTone: CaseIterable {
+    /// Idle runners and successful jobs or cleanups.
+    case positive
+    /// Busy runners and running jobs; kept distinct from the indigo accent.
+    case active
+    /// Needs attention, partial results, queued work.
+    case warning
+    /// Failed jobs and failed cleanups.
+    case critical
+    /// Stopped, disabled, cancelled and skipped.
+    case neutral
+    /// Unknown state. It blocks interruption, so it must not look like stopped.
+    case uncertain
+
+    /// The opacity of the tone's tinted backgrounds; `text` keeps 4.5:1 on top of it.
+    static let tintOpacity = 0.12
+
+    /// Text, symbols and thin strokes: at least 4.5:1 on surfaces, on the canvas and
+    /// on this tone's tint over either.
+    var text: Color { Self.colors[self]?.text ?? palette.text.makeColor() }
+    /// Bars, dots and tinted backgrounds.
+    var fill: Color { Self.colors[self]?.fill ?? palette.fill.makeColor() }
+
+    var palette: (text: PaletteColor, fill: PaletteColor) {
+        switch self {
+        case .positive:
+            return (PaletteColor((0.02, 0.43, 0.41)),
+                    PaletteColor((0.10, 0.60, 0.57)))
+        case .active:
+            return (PaletteColor((0.00, 0.40, 0.69)),
+                    PaletteColor((0.04, 0.53, 0.86)))
+        case .warning:
+            return (PaletteColor((0.64, 0.30, 0.00)),
+                    PaletteColor((0.96, 0.52, 0.00)))
+        case .critical:
+            return (PaletteColor((0.76, 0.10, 0.10)),
+                    PaletteColor((0.90, 0.20, 0.18)))
+        case .neutral:
+            return (PaletteColor((0.38, 0.38, 0.41)),
+                    PaletteColor((0.55, 0.55, 0.58)))
+        case .uncertain:
+            return (PaletteColor((0.46, 0.38, 0.00)),
+                    PaletteColor((0.78, 0.62, 0.04)))
+        }
+    }
+
+    private static let colors: [StatusTone: (text: Color, fill: Color)] = Dictionary(
+        uniqueKeysWithValues: allCases.map { ($0, ($0.palette.text.makeColor(), $0.palette.fill.makeColor())) })
+}
+
+extension RunnerStatus {
+    var tone: StatusTone {
+        switch self {
+        case .idle: return .positive
+        case .busy: return .active
+        case .stopped, .disabled: return .neutral
+        case .attention: return .warning
+        case .unknown: return .uncertain
+        }
+    }
+    /// Safe for small text; see `StatusTone.text`.
+    var color: Color { tone.text }
+    var symbol: String {
+        switch self {
+        case .idle: return "checkmark.circle.fill"
+        case .busy: return "arrow.triangle.2.circlepath"
+        case .stopped: return "stop.circle.fill"
+        case .disabled: return "pause.circle"
+        case .attention: return "exclamationmark.triangle.fill"
+        case .unknown: return "questionmark.circle.fill"
+        }
+    }
+}
+
+extension JobOutcome {
+    var tone: StatusTone {
+        switch self {
+        case .running: return .active
+        case .success: return .positive
+        case .failure: return .critical
+        case .cancelled: return .neutral
+        case .unknown: return .uncertain
+        }
+    }
+    /// Safe for small text; see `StatusTone.text`.
+    var color: Color { tone.text }
+    var symbol: String {
+        switch self {
+        case .running: return "arrow.triangle.2.circlepath"
+        case .success: return "checkmark.circle.fill"
+        case .failure: return "xmark.circle.fill"
+        case .cancelled: return "minus.circle.fill"
+        case .unknown: return "questionmark.circle"
+        }
+    }
+}
+
+extension RunnerProvider {
+    /// A typographic mark, not a logo.
+    var monogram: String { self == .github ? "GH" : "FJ" }
+}
+
+/// A runner's tile: provider monogram tinted by status, with a lock for system
+/// services, which RunningMan only observes.
+struct RunnerGlyph: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let runner: InstalledRunner
+    let status: RunnerStatus
+    var size: CGFloat = 34
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+        Text(runner.provider.monogram)
+            .font(.system(size: size * 0.36, weight: .heavy, design: .rounded))
+            .foregroundStyle(status.color)
+            .frame(width: size, height: size)
+            .background(status.tone.fill.opacity(0.14), in: shape)
+            .overlay(shape.strokeBorder(status.tone.fill.opacity(0.22)))
+            .overlay(alignment: .bottomTrailing) {
+                if runner.serviceDomain == .system { lockBadge }
+            }
+            .animation(reduceMotion ? nil : .snappy, value: status)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(runner.provider.title + (runner.serviceDomain == .system ? " runner, system service, read-only" : " runner"))
+    }
+
+    private var lockBadge: some View {
+        Image(systemName: "lock.fill")
+            .font(.system(size: max(7, size * 0.22), weight: .bold))
+            .foregroundStyle(StatusTone.neutral.text)
+            .frame(width: size * 0.44, height: size * 0.44)
+            .background(Circle().fill(RunningManStyle.surfaceRaised))
+            .overlay(Circle().strokeBorder(RunningManStyle.line))
+            .offset(x: size * 0.14, y: size * 0.14)
+            .help(SystemServiceBadge.explanation)
+    }
+}
+
+/// Marks a runner supervised by a system LaunchDaemon.
+struct SystemServiceBadge: View {
+    static let explanation = "System service, monitored read-only"
+    var body: some View {
+        Text("System")
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(StatusTone.neutral.text)
+            .padding(.horizontal, 7).padding(.vertical, 4)
+            .background(Capsule().fill(StatusTone.neutral.fill.opacity(0.10)))
+            .overlay(Capsule().strokeBorder(RunningManStyle.line))
+            .help(Self.explanation)
+            .accessibilityLabel(Self.explanation)
+    }
+}
+
+/// One headline figure with its explanation. Put tiles in an HStack with
+/// `.fixedSize(horizontal: false, vertical: true)` so a row shares one height.
+struct MetricTile: View {
+    let title: String
+    let value: String
+    let footnote: String
+    let symbol: String
+    let tint: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text(title).font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
+                Spacer(minLength: 3)
+                Image(systemName: symbol).font(.system(size: 13)).foregroundStyle(tint)
+            }
+            Text(value).font(.system(size: 28, weight: .semibold, design: .rounded)).monospacedDigit()
+                .lineLimit(1).minimumScaleFactor(0.7)
+                .numericValueTransition(value).padding(.top, 8)
+            Text(footnote).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(2).padding(.top, 2)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .cardStyle()
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Metric tiles side by side, or two per row when the window leaves each tile less than
+/// `minimumTileWidth`. A row of one or two tiles always stays on one line. Tiles in a row
+/// share the height of the tallest one.
+struct MetricRow: Layout {
+    var spacing: CGFloat = 12
+    var minimumTileWidth: CGFloat = 160
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? CGFloat(subviews.count) * minimumTileWidth + CGFloat(max(0, subviews.count - 1)) * spacing
+        let heights = rowHeights(subviews, width: width)
+        return CGSize(width: width, height: heights.reduce(0, +) + CGFloat(max(0, heights.count - 1)) * spacing)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let columns = columnCount(subviews.count, width: bounds.width)
+        let tileWidth = Self.tileWidth(bounds.width, columns: columns, spacing: spacing)
+        var y = bounds.minY
+        for (row, height) in rowHeights(subviews, width: bounds.width).enumerated() {
+            for column in 0..<columns {
+                let index = row * columns + column
+                guard index < subviews.count else { break }
+                subviews[index].place(at: CGPoint(x: bounds.minX + CGFloat(column) * (tileWidth + spacing), y: y),
+                                      proposal: ProposedViewSize(width: tileWidth, height: height))
+            }
+            y += height + spacing
+        }
+    }
+
+    private func columnCount(_ count: Int, width: CGFloat) -> Int {
+        Self.columns(for: count, width: width, spacing: spacing, minimumTileWidth: minimumTileWidth)
+    }
+
+    static func columns(for count: Int, width: CGFloat, spacing: CGFloat, minimumTileWidth: CGFloat) -> Int {
+        guard count > 2 else { return max(count, 1) }
+        return tileWidth(width, columns: count, spacing: spacing) >= minimumTileWidth ? count : 2
+    }
+
+    private func rowHeights(_ subviews: Subviews, width: CGFloat) -> [CGFloat] {
+        let columns = columnCount(subviews.count, width: width)
+        let proposal = ProposedViewSize(width: Self.tileWidth(width, columns: columns, spacing: spacing), height: nil)
+        return stride(from: 0, to: subviews.count, by: columns).map { start in
+            subviews[start..<min(start + columns, subviews.count)].map { $0.sizeThatFits(proposal).height }.max() ?? 0
+        }
+    }
+
+    private static func tileWidth(_ width: CGFloat, columns: Int, spacing: CGFloat) -> CGFloat {
+        max(0, (width - CGFloat(columns - 1) * spacing) / CGFloat(columns))
+    }
+}
+
+/// The title block of a sheet.
+struct SheetHeader: View {
+    let symbol: String
+    let title: String
+    let subtitle: String
+    var body: some View {
+        HStack(alignment: .center, spacing: 14) {
+            Image(systemName: symbol).font(.system(size: 22)).foregroundStyle(RunningManStyle.accentText)
+                .frame(width: 44, height: 44)
+                .background(RunningManStyle.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(.system(size: 20, weight: .bold, design: .rounded))
+                Text(subtitle).font(.system(size: 12)).foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+extension View {
+    /// The card treatment: surface fill, hairline, and a faint shadow.
+    /// A selected card is raised and outlined in the accent.
+    func cardStyle(cornerRadius: CGFloat = 14, isSelected: Bool = false) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        return background {
+            // The shadow belongs to the shape only, so text inside never casts one.
+            shape.fill(isSelected ? RunningManStyle.surfaceRaised : RunningManStyle.surface)
+                .shadow(color: RunningManStyle.cardShadow, radius: 2, y: 1)
+        }
+        .overlay(shape.strokeBorder(isSelected ? RunningManStyle.accent : RunningManStyle.line, lineWidth: isSelected ? 1.5 : 1))
+    }
+
+    /// Bounces a symbol once when its busy state changes, and stays still with Reduce Motion.
+    /// A repeating effect kept the window redrawing for as long as a job ran: about 20% of a
+    /// core with two busy runners in a release build, against 3% without it.
+    func busySymbolEffect(_ isBusy: Bool) -> some View {
+        modifier(BusySymbolEffect(isBusy: isBusy))
+    }
+
+    /// Rolls changed digits instead of swapping the whole figure.
+    func numericValueTransition<Value: Equatable>(_ value: Value) -> some View {
+        modifier(NumericValueTransition(value: value))
+    }
+}
+
+private struct BusySymbolEffect: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let isBusy: Bool
+    func body(content: Content) -> some View {
+        // symbolEffectsRemoved only strips effects applied above it, so it cannot stop this
+        // bounce; a constant trigger value can. It also keeps the view's identity stable.
+        content.symbolEffect(.bounce, value: reduceMotion ? false : isBusy)
+    }
+}
+
+private struct NumericValueTransition<Value: Equatable>: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let value: Value
+    func body(content: Content) -> some View {
+        content.contentTransition(.numericText()).animation(reduceMotion ? nil : .snappy, value: value)
+    }
+}

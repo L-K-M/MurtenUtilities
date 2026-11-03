@@ -70,8 +70,8 @@ public enum ModuleRegistry {
             systemImage: "arrow.down.circle", status: .available, sourceRepository: "Obtainintosh"),
         SuiteModule(
             id: "runningman", name: "RunningMan",
-            summary: "Keep self-hosted CI runners alive and signed in.",
-            systemImage: "figure.run", sourceRepository: "RunningMan"),
+            summary: "Run, watch and register self-hosted GitHub and Forgejo runners.",
+            systemImage: "figure.run", status: .available, sourceRepository: "RunningMan"),
         SuiteModule(
             id: "coreography", name: "Coreography",
             summary: "Watch CPU, memory, disk and network in real time.",
