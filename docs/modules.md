@@ -220,11 +220,41 @@ user-confirmed per service.
 ### Shortking — effort: medium — phase 3
 
 Inventories system and app shortcuts, then uses live capture and diagnostic
-tests to find who owns — or stole — a hotkey. **GitHub-only**.
+tests to find who owns — or stole — a hotkey. **Available.**
 
-- **Migrates:** the inventory/diagnosis core; capture stays in the pane.
-- **Watcher:** inventory diff → "new shortcut conflict: ⌘⇧Space is claimed by
-  two apps". Diagnosis itself is on-demand.
+- **Provenance:** Shortking@d4bf50bd71116998c99d2bfca6b5865449eec8cd
+- **Migrated:** `ShortkingCore` (model, conflict analysis, probe space, the
+  watch rule; pure, split out of the source's kit), `ShortkingKit` (scanners,
+  probe runner, attribution, Detective Mode, SkyLight; moved unchanged),
+  `ShortkingProbe` (embedded as `Contents/MacOS/shortking-probe` by
+  `scripts/build-app.sh`) and `ShortkingModule` (the standalone window as the
+  pane, the provider, the watcher). The source's tests moved with the code.
+- **Watcher:** hourly, unprivileged. Reads the pane's last inventory
+  (`claims.json`, never repaired or created), re-reads macOS's system
+  shortcuts (the symbolic hotkey plist and SkyLight's read-only calls) when
+  the inventory has them, and reports one finding per shortcut that apps
+  fight over. Rule: a conflict not acknowledged in the pane → "⌘⇧Space is
+  claimed by two apps". No inventory yet makes the check unavailable rather
+  than clean; an unreadable system-shortcut read keeps the last inventory but
+  resolves nothing. Menus, event taps, probes and `nm` stay in the pane.
+  The pane records acknowledgements in the module's defaults
+  (`acknowledgedConflicts`), keyed by the shortcut and the owners fighting
+  over it, so another app joining the fight brings the suggestion back.
+- **Preselects:** nothing. A suggestion opens the Conflicts view scrolled to
+  its shortcut; Shortking never rebinds anything, and the pane rescans on
+  open.
+- **State:** `~/Library/Application Support/Shortking/` (inventory,
+  attribution ledger, menu and binary caches) is read and written in place,
+  shared with the standalone app; with both running, the last writer wins.
+  Preferences live in the module's defaults; the standalone `settings.json`
+  is imported once, read-only, except onboarding.
+- **Changes from the standalone app:** Accessibility and Input Monitoring
+  belong to Murten Utilities, and an ad-hoc build loses them on every update;
+  the pane says so wherever it asks. Quitting is the suite's, so "Quit and
+  Reopen" became an instruction. Learning owners from app launches and quits
+  runs only while the pane is open. The blackout test asks before it disables
+  every global hotkey. The menu commands (Rescan ⌘R, Copy inventory ⇧⌘C,
+  Reveal data folder) are in the Tool menu.
 - **Source facts:** bundle id `com.shortking.app`. Needs Accessibility
   (menu shortcuts) and Input Monitoring (capture). `ShortkingKit` mixes AppKit,
   event taps, private SkyLight calls and process spawning; only its models,
