@@ -69,7 +69,7 @@ not a notification center bolted on.
   appearance. Rationale: the classic look *is* light platinum — a dark
   variant is a redesign (charcoal chrome, re-tuned tile colors, re-checked
   engraving contrast), not a reskin, and the suite has no business paying
-  that while modules are still unmigrated. If it is ever revisited it is a
+  that cost without a demonstrated need. If it is ever revisited it is a
   product decision plus Rigi work — not per-screen dark patches, which is how
   apps end up with the worst of both.
   Apple documents the key as a temporary opt-out and tells apps that never

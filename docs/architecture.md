@@ -193,18 +193,13 @@ target in this package (or merges into `MurtenCore` when tiny); its pane lives
 in the app. The source repos are small and mostly single-purpose, so code
 moves cleanly; the standalone apps keep working from their own history.
 
-Two roster modules already ship privileged launch-daemon helpers (see
-Privilege and capability model above): BootCaptain's root helper — reversible
-vault moves
-enabled, launchd/cron mutations gated off in the current build — and
-Coreography's root, peer-code-signature-checked sampling daemon (process
-counters of other users' processes, open files, sockets, signals, renice,
-spindump, the Background Task Management dump). Migrating those modules
-embeds each helper in the suite bundle — `Contents/Library/LaunchDaemons`,
-one daemon per module, never shared between modules — and both gate on the
-signing decision: their code-signing requirements pin a real Team ID, so ad-hoc
-suite builds cannot carry phase 3's helpers. The signing open question in
-PLAN.md sits on phase 3's critical path, not in a later distribution pass.
+Two roster modules ship privileged helpers in their standalone apps (see
+Privilege and capability model above): BootCaptain's root vault helper and
+Coreography's peer-code-signature-checked sampling daemon. Both helpers are
+left out of the current ad-hoc suite build, and their modules disable the
+helper-backed actions. A future Developer ID build can embed one separately
+signed helper per module under `Contents/Library/LaunchDaemons`; signing is a
+distribution task, not a migration blocker.
 
 Rejected for now: **depend on the tool repos as remote Swift packages.** It
 preserves a single source of truth per core, but it couples the suite's build

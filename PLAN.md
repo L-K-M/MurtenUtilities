@@ -57,7 +57,7 @@ The confirmed roster — and what each tool is for — lives in
 | Shortking | `Shortking` (Swift, GitHub-only) | shortcut inventory & diagnosis | new conflict → "X stole ⌘⇧Space" |
 | HallPass | `HallPass` (SwiftPM) | local-network CIDR exemptions | mostly on-demand |
 | Zen Backup Manager | `ZenBackupManager` (Swift, GitHub-only) | browser-session backups | backup staleness → "last snapshot 9 days ago" |
-| Obtainintosh | `Obtainintosh` (Tauri — port or rethink) | release-tracking updater | "3 app updates available" |
+| Obtainintosh | `Obtainintosh` (Tauri source; native Swift port) | release-tracking updater | "3 app updates available" |
 | RunningMan | `RunningMan` (SwiftPM) | self-hosted CI runners | runner offline → "restart?" |
 | Coreography | `Coreography` (SwiftPM+.xcodeproj) | system monitor | sustained pressure → "X has pinned a core for an hour" |
 

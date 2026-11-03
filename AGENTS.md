@@ -235,9 +235,10 @@ confirmed blockers, unresolved human review requests, or required checks.
 
 ### Reviewer integration failures
 
-After two consecutive reviewer-integration failures, stop and report the
-review gap. Do not treat failures as approval. An explicit user instruction
-may waive review; report that waiver rather than claiming review passed.
+After two consecutive reviewer timeouts on a PR, waive automated review and
+continue once required checks pass and no human blocker remains. Report the
+waiver; never claim review passed. After two other consecutive integration
+failures, stop and report the review gap.
 
 ## Ending a task
 
