@@ -63,11 +63,7 @@ struct CommandPaletteView: View {
     }
 
     private var entries: [PaletteEntry] {
-        guard let helperUnavailable else { return model.paletteEntries }
-        return model.paletteEntries.map { entry in
-            guard entry.action == .spindumpSelected, entry.unavailableReason == nil else { return entry }
-            return PaletteEntry(title: entry.title, action: entry.action, unavailableReason: helperUnavailable)
-        }
+        CommandPalette.disablingPrivilegedActions(in: model.paletteEntries, reason: helperUnavailable)
     }
 
     private func move(_ step: Int, in results: [PaletteEntry]) -> KeyPress.Result {

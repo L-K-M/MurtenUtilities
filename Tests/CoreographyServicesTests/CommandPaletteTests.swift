@@ -18,6 +18,23 @@ final class CommandPaletteTests: XCTestCase {
         XCTAssertTrue(CommandPalette.matches("zzz", in: entries).isEmpty)
     }
 
+    func testUnavailableHelperDisablesEveryPrivilegedAction() {
+        let reason = "Needs a signed build"
+        let entries = [
+            PaletteEntry(title: "Spindump", action: .spindumpSelected, unavailableReason: nil),
+            PaletteEntry(title: "Raise Priority", action: .processAction(.raisePriority), unavailableReason: nil),
+            PaletteEntry(title: "Lower Priority", action: .processAction(.lowerPriority), unavailableReason: nil),
+            PaletteEntry(title: "Already unavailable", action: .spindumpSelected, unavailableReason: "Select a process first")
+        ]
+
+        let disabled = CommandPalette.disablingPrivilegedActions(in: entries, reason: reason)
+
+        XCTAssertEqual(disabled[0].unavailableReason, reason)
+        XCTAssertEqual(disabled[1].unavailableReason, reason)
+        XCTAssertNil(disabled[2].unavailableReason)
+        XCTAssertEqual(disabled[3].unavailableReason, "Select a process first")
+    }
+
     @MainActor
     func testEntriesNameTheirTargetAndRunThroughTheModel() async throws {
         let model = DashboardModel(

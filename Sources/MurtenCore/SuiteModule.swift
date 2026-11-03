@@ -1,9 +1,8 @@
 import Foundation
 
 /// A tool offered by the suite: a pane the user can open and, optionally, a
-/// background `Watcher` that feeds the suggestion feed. Modules here are
-/// descriptors only — their implementations migrate in one at a time
-/// (see docs/modules.md).
+/// background `Watcher` that feeds the suggestion feed. These descriptors stay
+/// pure; the executable's module catalog owns their providers.
 public struct SuiteModule: Identifiable, Equatable, Sendable {
     public enum Status: String, Equatable, Sendable {
         /// Registry placeholder; the tool has not been migrated yet.
@@ -34,7 +33,7 @@ public struct SuiteModule: Identifiable, Equatable, Sendable {
 }
 
 public enum ModuleRegistry {
-    /// The planned roster in home-screen order (see PLAN.md / docs/modules.md).
+    /// The confirmed roster in home-screen order (see PLAN.md / docs/modules.md).
     public static let all: [SuiteModule] = [
         SuiteModule(
             id: "dockvac", name: "DockVac",

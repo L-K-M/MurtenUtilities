@@ -77,6 +77,25 @@ public enum CommandPalette {
         return ranked.sorted { ($0.0, $0.1) < ($1.0, $1.1) }.map(\.2)
     }
 
+    /// A host may know the privileged helper is unavailable after the model
+    /// builds its entries, so it disables those actions without hiding them.
+    package static func disablingPrivilegedActions(
+        in entries: [PaletteEntry], reason: String?
+    ) -> [PaletteEntry] {
+        guard let reason else { return entries }
+
+        return entries.map { entry in
+            guard entry.unavailableReason == nil else { return entry }
+
+            switch entry.action {
+            case .spindumpSelected, .processAction(.raisePriority): break
+            default: return entry
+            }
+
+            return PaletteEntry(title: entry.title, action: entry.action, unavailableReason: reason)
+        }
+    }
+
     private static func rank(_ word: String, in title: String) -> Rank? {
         if title.hasPrefix(word) { return .titlePrefix }
         let titleWords = title.split { !$0.isLetter && !$0.isNumber }

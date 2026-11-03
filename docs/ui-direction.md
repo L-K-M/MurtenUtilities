@@ -69,7 +69,7 @@ not a notification center bolted on.
   appearance. Rationale: the classic look *is* light platinum — a dark
   variant is a redesign (charcoal chrome, re-tuned tile colors, re-checked
   engraving contrast), not a reskin, and the suite has no business paying
-  that while modules are still unmigrated. If it is ever revisited it is a
+  that cost without a demonstrated need. If it is ever revisited it is a
   product decision plus Rigi work — not per-screen dark patches, which is how
   apps end up with the worst of both.
   Apple documents the key as a temporary opt-out and tells apps that never
@@ -87,7 +87,7 @@ not a notification center bolted on.
 
 ## Accessibility acceptance
 
-Before the first module ships, verify the home window, suggestion feed,
+Before a release ships, verify the home window, suggestion feed,
 menu-bar companion (`MenuBarView`) and pane together on macOS:
 
 - Keyboard-only: reach every action, open a suggestion, cancel confirmation
@@ -111,9 +111,9 @@ Build success and a screenshot alone do not prove accessibility; Rigi's own
 [verification guide](https://github.com/L-K-M/Rigi/blob/dcfc91e3b72aee612b2b48aed4a744397b78dc77/docs/verification.md)
 makes the same distinction.
 
-## First milestone for the eye
+## Current visual checkpoint
 
-The scaffolding's home screen is SwiftUI-flat today. The first "does it feel
-right" checkpoint: home window with `ClassicInsetBox`-wrapped grid, Rigi
-status bar, suggestion feed section, one migrated pane (DockVac's treemap) —
-that screenshot should be unmistakably "Norton, but polite".
+The home window now has an inset tool grid, Rigi status bar, suggestion feed
+and ten panes. Before release, capture the home and representative panes on
+macOS and complete the keyboard, VoiceOver and visual checks above. The result
+should be unmistakably "Norton, but polite".

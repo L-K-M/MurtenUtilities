@@ -57,7 +57,7 @@ The confirmed roster — and what each tool is for — lives in
 | Shortking | `Shortking` (Swift, GitHub-only) | shortcut inventory & diagnosis | new conflict → "X stole ⌘⇧Space" |
 | HallPass | `HallPass` (SwiftPM) | local-network CIDR exemptions | mostly on-demand |
 | Zen Backup Manager | `ZenBackupManager` (Swift, GitHub-only) | browser-session backups | backup staleness → "last snapshot 9 days ago" |
-| Obtainintosh | `Obtainintosh` (Tauri — port or rethink) | release-tracking updater | "3 app updates available" |
+| Obtainintosh | `Obtainintosh` (Tauri source; native Swift port) | release-tracking updater | "3 app updates available" |
 | RunningMan | `RunningMan` (SwiftPM) | self-hosted CI runners | runner offline → "restart?" |
 | Coreography | `Coreography` (SwiftPM+.xcodeproj) | system monitor | sustained pressure → "X has pinned a core for an hour" |
 
@@ -68,18 +68,14 @@ Per-module migration notes, satellites, and new-module ideas:
 
 0. **Scaffolding** (done): package, home screen listing the registry, Rigi
    wired end-to-end, CI/CD/release plumbing, this plan.
-1. **The spine**: `MurtenCore` contracts, the suggestion store
+1. **The spine** (done): `MurtenCore` contracts, the suggestion store
    (dedupe/snooze/thresholds), the deep-link router, the Settings section
-   for launch at login and watcher pauses (docs/architecture.md §Resident
-   mode wants it before the first watcher ships), and **one module
-   end-to-end** — DockVac is the easiest proof (pure SwiftPM, cheap watcher).
-2. **SwiftPM migrations**: HallPass, DeviceControlDoctor, RunningMan — their
-   `*Core` targets move in nearly unchanged.
-3. **Ports**: RepoMen and Coreography (`.xcodeproj` → SwiftPM cores);
-   clone-and-migrate the GitHub-only apps (BootCaptain, Shortking,
-   ZenBackupManager).
-4. **Obtainintosh** as the updater module. Its scope, fleet only or any
-   GitHub/Forgejo release, is still open (see Open questions).
+   for launch at login and watcher pauses, and DockVac end-to-end.
+2. **SwiftPM migrations** (done): HallPass, DeviceControlDoctor and RunningMan,
+   with their `*Core` targets moved in nearly unchanged.
+3. **Ports** (done): RepoMen and Coreography moved from `.xcodeproj` to
+   SwiftPM; BootCaptain, Shortking and ZenBackupManager cloned and migrated.
+4. **Obtainintosh** (done): a native, generic GitHub/Forgejo updater module.
 5. **Satellites & new modules** — deferred fleet candidates and greenfield
    tools from the ideas list.
 

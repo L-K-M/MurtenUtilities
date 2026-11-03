@@ -13,14 +13,15 @@ pane. Detection and repair stay separate: nothing is cleaned, reset or removed
 without an explicit click.
 
 The design and migration plan lives in [PLAN.md](PLAN.md) and [docs/](docs/).
-The app is early scaffolding: the home window already lists the planned
-modules, and the first real tool migrates next.
+All ten rostered tools now open from the home window; eligible tools also
+feed the opt-in suggestion companion. Ad-hoc builds omit BootCaptain and
+Coreography's privileged helpers, so their helper-backed actions stay disabled.
 
 ## Building
 
 ```sh
 swift build              # the package
-swift test               # MurtenCore tests
+swift test               # full test suite
 ./scripts/build-app.sh   # dist/MurtenUtilities.app, ad-hoc signed (--debug, --universal)
 ```
 
