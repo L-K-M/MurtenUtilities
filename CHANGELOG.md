@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All ten rostered tools: DockVac, RepoMen, BootCaptain,
   DeviceControlDoctor, Shortking, HallPass, Zen Backup Manager, Obtainintosh,
   RunningMan and Coreography, with their panes, tests and eligible watchers.
+- Ad-hoc builds omit BootCaptain and Coreography's privileged helpers; their
+  helper-backed actions remain disabled until a Developer ID build.
 
 ### Changed
 
