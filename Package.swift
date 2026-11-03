@@ -206,8 +206,52 @@ let runningManTargets: [Target] = [
 let runningManModule: [Target.Dependency] = ["RunningManModule"]
 
 // MARK: Coreography
-let coreographyTargets: [Target] = []
-let coreographyModule: [Target.Dependency] = []
+// The engine moved as SwiftPM targets (Coreography@f9820e6). Its sources
+// are Swift 6, so every Coreography target keeps that language mode.
+// CSQLite became CoreographySQLite: target names are package-wide.
+let coreographySwift6: [SwiftSetting] = [.swiftLanguageMode(.v6)]
+let coreographyTargets: [Target] = [
+    .target(name: "CoreographySystem", linkerSettings: [
+        .linkedFramework("IOKit", .when(platforms: [.macOS]))
+    ]),
+    .systemLibrary(name: "CoreographySQLite", path: "Sources/CoreographySQLite"),
+    .target(
+        name: "CoreographyDrivers",
+        dependencies: [.target(name: "CoreographySystem", condition: .when(platforms: [.macOS])), "CoreographySQLite"],
+        swiftSettings: coreographySwift6
+    ),
+    .target(name: "CoreographyKit", dependencies: ["CoreographyDrivers"], swiftSettings: coreographySwift6),
+    .target(name: "CoreographyServices", dependencies: ["CoreographyKit"], swiftSettings: coreographySwift6),
+    // The suite-facing core: the watcher's observation-only interface,
+    // its CPU and pressure bookkeeping, and the pure suggestion rule.
+    .target(name: "CoreographyCore", dependencies: ["MurtenCore"], swiftSettings: coreographySwift6),
+    .testTarget(name: "CoreographyCoreTests", dependencies: ["CoreographyCore", "MurtenCore"],
+                swiftSettings: coreographySwift6),
+    // The Xcode app shell's views plus the provider, session and live
+    // watcher reads: the pane, the menu section and Settings.
+    .target(
+        name: "CoreographyModule",
+        dependencies: ["MurtenCore", "MurtenModuleKit", "CoreographyCore", "CoreographyServices",
+                       "CoreographyKit", "CoreographyDrivers"],
+        swiftSettings: coreographySwift6
+    ),
+    .testTarget(
+        name: "CoreographyKitTests",
+        dependencies: ["CoreographyKit", "CoreographyDrivers"],
+        swiftSettings: coreographySwift6
+    ),
+    .testTarget(
+        name: "CoreographyServicesTests",
+        dependencies: ["CoreographyServices", "CoreographyKit", "CoreographyDrivers"],
+        swiftSettings: coreographySwift6
+    ),
+    .testTarget(
+        name: "CoreographyModuleTests",
+        dependencies: ["CoreographyModule", "CoreographyCore", "MurtenCore", "MurtenModuleKit"],
+        swiftSettings: coreographySwift6
+    )
+]
+let coreographyModule: [Target.Dependency] = ["CoreographyModule"]
 
 // MARK: - Assembly
 
