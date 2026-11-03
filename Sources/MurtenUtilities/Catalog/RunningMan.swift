@@ -1,6 +1,7 @@
 import MurtenModuleKit
+import RunningManModule
 
 extension ModuleCatalog {
-    /// RunningMan's provider; nil until it migrates (docs/migrating-a-module.md).
-    static let runningMan: ModuleFactory? = nil
+    /// RunningMan's provider (docs/modules.md, RunningMan).
+    static let runningMan: ModuleFactory? = ModuleFactory(moduleID: "runningman") { RunningManProvider(context: $0) }
 }

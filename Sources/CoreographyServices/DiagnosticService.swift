@@ -1,0 +1,393 @@
+import Foundation
+import CoreographyKit
+
+public typealias CapturedSnapshot = SystemSnapshot
+public typealias DashboardReading = MetricReading
+public typealias CapturedMemoryPressure = MemoryPressureLevel
+public typealias CapturedThermalPressure = ThermalPressureLevel
+public typealias CapturedGPU = GPUSnapshot
+public typealias CapturedGPUDevice = GPUDeviceReading
+public typealias CapturedPower = PowerSnapshot
+public typealias CapturedSensors = SensorSnapshot
+public typealias CapturedSilicon = SiliconSnapshot
+public typealias CapturedCPUTier = CPUTierReading
+
+public enum NativeSamplingSupport: String, Codable, Sendable {
+    case supported
+    case unsupported
+}
+
+/// One `coreo diagnose` answer: facts and coverage for a person or an assistant.
+public struct DiagnosisReport: Codable, Sendable {
+    public let summary: SystemSummary
+    public let topCPUApps: TopAppsPage
+    public let topDiskApps: TopAppsPage
+    /// Absent when per-process network could not be read.
+    public let topNetworkApps: TopAppsPage?
+    /// Absent when no process in the range had an energy counter.
+    public let topEnergyApps: TopAppsPage?
+    public let dataSources: [DataSourceStatus]
+}
+
+/// Stored readings for `coreo history`.
+public struct HistoryReport: Codable, Sendable {
+    public struct Sample: Codable, Sendable {
+        public let time: Date
+        public let value: Double?
+        public let availability: MetricAvailability
+    }
+
+    public let metric: String
+    public let storedSamples: Int
+    public let samples: [Sample]
+}
+
+/// App totals from the stored ledger for `coreo apps`, by CPU-seconds.
+public struct StoredAppsReport: Codable, Sendable {
+    public let windowStart: Date
+    public let windowEnd: Date
+    /// The span of stored intervals counted (midpoint inside the window); absent when none were.
+    public let coveredFrom: Date?
+    public let coveredTo: Date?
+    /// Stored intervals ending inside the window, counted or not.
+    public let intervals: Int
+    public let apps: [AppRangeTotal]
+}
+
+/// Per-app totals by local day from the Month tier, for `coreo apps --days`.
+public struct StoredAppDaysReport: Codable, Sendable {
+    public struct App: Codable, Sendable {
+        public let app: String
+        public let cpuSeconds: Double
+        public let diskBytes: Double
+        public let networkBytes: Double
+        /// Modeled CPU energy over the day's energy-covered intervals.
+        public let energyJoules: Double
+        /// Some interval counted only readable members.
+        public let isLowerBound: Bool
+    }
+
+    public struct Day: Codable, Sendable {
+        /// Local midnight starting the day.
+        public let day: Date
+        /// By CPU-seconds, at most 50.
+        public let apps: [App]
+    }
+
+    public let windowStart: Date
+    public let windowEnd: Date
+    /// Oldest first; days without recorded activity are absent.
+    public let days: [Day]
+}
+
+public struct DiagnosticReport: Codable, Sendable {
+    public let schemaVersion: Int
+    public let buildVersion: String
+    public let nativeSampling: NativeSamplingSupport
+    public let snapshot: CapturedSnapshot
+}
+
+public actor DiagnosticService {
+    private static let schemaVersion = 1
+    private static let warmupInterval: Duration = .seconds(1)
+    private let monitor: SystemMonitor
+    private let processMonitor: ProcessMonitor
+    private let networkMonitor: NetworkMonitor
+    private let diskMonitor: DiskMonitor
+    private let gpuMonitor: GPUMonitor
+    private let powerMonitor: PowerMonitor
+    private let sensorMonitor: SensorMonitor
+    private let siliconMonitor: SiliconMonitor
+    private let trafficMonitor: ProcessTrafficMonitor
+    private let connectionMonitor = ConnectionMonitor()
+    /// Whether `top` has its rate baseline.
+    private var topPrimed = false
+    public static let maximumTopRows = DiagnosticTools.maximumRows
+
+    public init() throws {
+        monitor = try SystemMonitor()
+        processMonitor = try ProcessMonitor()
+        networkMonitor = try NetworkMonitor()
+        diskMonitor = try DiskMonitor()
+        gpuMonitor = try GPUMonitor()
+        powerMonitor = try PowerMonitor()
+        sensorMonitor = try SensorMonitor()
+        siliconMonitor = try SiliconMonitor()
+        trafficMonitor = try ProcessTrafficMonitor()
+    }
+
+    public func report() async throws -> DiagnosticReport {
+        DiagnosticReport(
+            schemaVersion: Self.schemaVersion,
+            buildVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString")
+                as? String ?? "development",
+            nativeSampling: Self.nativeSamplingSupport,
+            snapshot: try await monitor.sample()
+        )
+    }
+
+    /// Rates need a baseline; the one-shot CLI waits for a real second sample.
+    public func captureOnce() async throws -> CapturedSnapshot {
+        _ = try await monitor.sample()
+        try await Task.sleep(for: Self.warmupInterval)
+        return try await monitor.sample()
+    }
+
+    public func captureProcessesOnce() async throws -> CapturedProcesses {
+        _ = try await processMonitor.sample()
+        try await Task.sleep(for: .seconds(2))
+        return try await processMonitor.sample()
+    }
+
+    public func captureNetworkOnce() async throws -> CapturedNetwork {
+        _ = try await networkMonitor.sample()
+        try await Task.sleep(for: Self.warmupInterval)
+        return try await networkMonitor.sample()
+    }
+
+    public func captureDisksOnce() async throws -> CapturedDisks {
+        _ = try await diskMonitor.sample()
+        try await Task.sleep(for: Self.warmupInterval)
+        return try await diskMonitor.sample()
+    }
+
+    /// GPU utilization is a driver gauge; one read needs no baseline.
+    public func captureGPUOnce() async throws -> CapturedGPU {
+        try await gpuMonitor.sample()
+    }
+
+    /// Battery and adapter values are gauges; one read needs no baseline.
+    public func capturePowerOnce() async throws -> CapturedPower {
+        try await powerMonitor.sample()
+    }
+
+    /// SMC temperatures, fans and power rails are gauges; one read suffices.
+    public func captureSensorsOnce() async throws -> CapturedSensors {
+        try await sensorMonitor.sample()
+    }
+
+    /// Energy and residency are deltas: a baseline, one second, then the interval.
+    public func captureSiliconOnce() async throws -> CapturedSilicon {
+        await siliconMonitor.reset()
+        _ = try await siliconMonitor.sample()
+        try await Task.sleep(for: Self.warmupInterval)
+        return try await siliconMonitor.sample()
+    }
+
+    /// Every visible volume's capacity; one read, no baseline needed.
+    public func volumes() async -> CapturedVolumes { await VolumeMonitor().volumes() }
+
+    /// Per-process network rates: a baseline, two seconds, then the interval.
+    public func captureTrafficOnce() async throws -> CapturedTraffic {
+        await trafficMonitor.reset()
+        _ = try await trafficMonitor.sample()
+        try await Task.sleep(for: .seconds(2))
+        return try await trafficMonitor.sample()
+    }
+
+    /// The busiest apps, for `coreo top`. Rates need a baseline, so the first
+    /// call waits two seconds; later calls rate the time since the one before.
+    public func top(count: Int, sortedBy sort: ProcessSort) async throws -> TopReport {
+        guard (1...Self.maximumTopRows).contains(count) else {
+            throw DiagnosticError.invalidArgument("count must be 1-\(Self.maximumTopRows)")
+        }
+        if !topPrimed {
+            _ = try await processMonitor.sample()
+            await trafficMonitor.reset()
+            _ = try await trafficMonitor.sample()
+            try await Task.sleep(for: .seconds(2))
+            topPrimed = true
+        }
+        let processes = try await processMonitor.sample()
+        let traffic = try await trafficMonitor.sample()
+        return TopReport.make(processes: processes, traffic: traffic, sortedBy: sort, count: count)
+    }
+
+    /// Your processes with a TCP or UDP socket on `port` (plan P23: reverse lookup).
+    public func holders(ofPort port: UInt16) async throws -> HolderLookup {
+        let processes = try await processMonitor.sample()
+        return HolderLookups.port(port, in: processes, connections: await connectionMonitor.sample(processes))
+    }
+
+    /// Your processes with an open file whose path contains `text`; `~` is the home folder.
+    public func holders(ofFile text: String) async throws -> HolderLookup {
+        guard !text.trimmingCharacters(in: .whitespaces).isEmpty else {
+            throw DiagnosticError.invalidArgument("file needs part of a path or name")
+        }
+        let processes = try await processMonitor.sample()
+        let files = await OpenFileMonitor().sample(processes)
+        return HolderLookups.file(ProcessFilter.expandingHome(text), in: processes, files: files)
+    }
+
+    /// Sockets need process identities, not rates, so one process sample suffices.
+    public func captureConnectionsOnce() async throws -> CapturedConnections {
+        await connectionMonitor.sample(try await processMonitor.sample())
+    }
+
+    /// Sample every monitor for a bounded window, then answer from one snapshot.
+    /// Example: `coreo diagnose --json` waits 5 s and reports summary, top apps and sources.
+    public func diagnose(seconds: Int) async throws -> DiagnosisReport {
+        let bounded = min(max(seconds, Self.minimumDiagnosisSeconds), Self.maximumDiagnosisSeconds)
+        var ledger = AppLedger(capacity: bounded)
+        var processes: CapturedProcesses?
+        for second in 0...bounded {
+            _ = try await monitor.sample()
+            _ = try await networkMonitor.sample()
+            _ = try await gpuMonitor.sample()
+            _ = try await powerMonitor.sample()
+            _ = try await sensorMonitor.sample()
+            _ = try await siliconMonitor.sample()
+            if second.isMultiple(of: Self.processEverySeconds) {
+                let sample = try await processMonitor.sample()
+                processes = sample
+                let traffic = try await trafficMonitor.sample()
+                ledger.record(sample, traffic: traffic, logicalCPUCount: await monitor.history().last?.inventory.logicalCPUCount)
+            }
+            if second < bounded { try await Task.sleep(for: Self.warmupInterval) }
+        }
+        let snapshot = DiagnosticSnapshot(
+            takenAt: Date(), host: await monitor.history(), network: await networkMonitor.history(),
+            gpu: await gpuMonitor.history(), power: await powerMonitor.history(),
+            sensors: await sensorMonitor.history(), processes: processes, ledger: ledger,
+            maintenance: await MaintenanceStatusProvider().load(), silicon: await siliconMonitor.history()
+        )
+        // Only unread network leaves the network list out; any other failure is reported.
+        let topNetworkApps: TopAppsPage?
+        do {
+            topNetworkApps = try DiagnosticTools.topApps(snapshot, metric: .network)
+        } catch DiagnosticError.unavailable {
+            topNetworkApps = nil
+        }
+        let topEnergyApps: TopAppsPage?
+        do {
+            topEnergyApps = try DiagnosticTools.topApps(snapshot, metric: .energy)
+        } catch DiagnosticError.unavailable {
+            topEnergyApps = nil
+        }
+        return DiagnosisReport(
+            summary: DiagnosticTools.summary(snapshot),
+            topCPUApps: try DiagnosticTools.topApps(snapshot, metric: .cpu),
+            topDiskApps: try DiagnosticTools.topApps(snapshot, metric: .disk),
+            topNetworkApps: topNetworkApps,
+            topEnergyApps: topEnergyApps,
+            dataSources: DiagnosticTools.dataSources(snapshot)
+        )
+    }
+
+    /// Read what the app has recorded; the CLI never writes history.
+    public func history(metric name: String, minutes: Int) async throws -> HistoryReport {
+        guard let metric = HistoryMetric.allCases.first(where: { "\($0)" == name }) else {
+            throw DiagnosticError.invalidArgument("Unknown metric; use one of " + HistoryMetric.allCases.map { "\($0)" }.joined(separator: ", "))
+        }
+        let recorder = try Self.storedHistory()
+        let window = Self.storedWindow(minutes: minutes)
+        let samples = try await recorder.samples(metric, from: window.lowerBound, to: window.upperBound)
+        return HistoryReport(
+            metric: name, storedSamples: samples.count,
+            samples: samples.map { HistoryReport.Sample(time: $0.time, value: $0.value, availability: $0.availability) }
+        )
+    }
+
+    /// Statistics of every recorded metric over the last N minutes; the CLI never writes history.
+    public func stats(minutes: Int) async throws -> HistoryStatsReport {
+        let recorder = try Self.storedHistory()
+        let window = Self.storedWindow(minutes: minutes)
+        var metrics: [MetricStats] = []
+        for metric in HistoryMetric.allCases {
+            let samples = try await recorder.samples(metric, from: window.lowerBound, to: window.upperBound)
+            metrics.append(HistoryStats.stats(metric, samples))
+        }
+        return HistoryStatsReport(windowStart: window.lowerBound, windowEnd: window.upperBound, metrics: metrics)
+    }
+
+    /// Every recorded metric's samples over the last N minutes; the CLI never writes history.
+    public func export(minutes: Int) async throws -> HistoryExport.Document {
+        let recorder = try Self.storedHistory()
+        let window = Self.storedWindow(minutes: minutes)
+        var samples: [HistoryMetric: [HistorySample]] = [:]
+        for metric in HistoryMetric.allCases {
+            samples[metric] = try await recorder.samples(metric, from: window.lowerBound, to: window.upperBound)
+        }
+        return HistoryExport.document(window: window, samples: samples)
+    }
+
+    /// Import the power-management log now; the CLI has no live samples.
+    public func sleepHistory(hours: Int) async throws -> SleepHistoryReport {
+        let state: SleepHistoryState
+        do {
+            state = .imported(try await SleepHistoryProvider().load())
+        } catch SleepHistoryError.unavailable(let reason) {
+            state = .failed(reason)
+        }
+        let snapshot = DiagnosticSnapshot(
+            takenAt: Date(), host: [], network: [], gpu: [], power: [], sensors: [], processes: nil,
+            ledger: AppLedger(capacity: 1), sleep: state, assertions: await AssertionReader().read()
+        )
+        return try DiagnosticTools.sleepHistory(snapshot, hours: hours)
+    }
+
+    /// What apps did in the recorded ledger; the CLI never writes history.
+    public func storedApps(minutes: Int) async throws -> StoredAppsReport {
+        let recorder = try Self.storedHistory()
+        let window = Self.storedWindow(minutes: minutes)
+        let intervals = try await recorder.ledger(from: window.lowerBound, to: window.upperBound)
+        let (apps, covered) = AppLedger(stored: intervals).totals(in: window)
+        return StoredAppsReport(
+            windowStart: window.lowerBound, windowEnd: window.upperBound,
+            coveredFrom: covered?.lowerBound, coveredTo: covered?.upperBound, intervals: intervals.count,
+            apps: Array(apps.sorted { $0.cpuSeconds > $1.cpuSeconds }.prefix(Self.maximumStoredApps))
+        )
+    }
+
+    /// Per-app daily totals over the last N days (1 through the longest Month retention).
+    public func storedAppDays(days: Int) async throws -> StoredAppDaysReport {
+        let recorder = try Self.storedHistory()
+        let end = Date()
+        let longest = Int(HistoryRetention.longestMonth / Self.secondsPerDay)
+        let span = Double(min(max(days, 1), longest)) * Self.secondsPerDay
+        // Whole local days: the window starts at the midnight N days back.
+        let start = Calendar.current.startOfDay(for: end.addingTimeInterval(-span + Self.secondsPerDay))
+        let totals = try await recorder.appDays(from: start, to: end)
+        let byDay = Dictionary(grouping: totals, by: \.day)
+        return StoredAppDaysReport(
+            windowStart: start, windowEnd: end,
+            days: byDay.keys.sorted().map { day in
+                StoredAppDaysReport.Day(day: day, apps: (byDay[day] ?? [])
+                    .sorted { $0.cpuSeconds > $1.cpuSeconds }
+                    .prefix(Self.maximumStoredApps)
+                    .map { .init(
+                        app: $0.app, cpuSeconds: $0.cpuSeconds, diskBytes: $0.diskBytes, networkBytes: $0.networkBytes,
+                        energyJoules: $0.energyJoules, isLowerBound: $0.isLowerBound
+                    ) })
+            }
+        )
+    }
+
+    private static let secondsPerDay: TimeInterval = 86_400
+
+    private static func storedHistory() throws -> HistoryRecorder {
+        let (recorder, problem) = HistoryRecorder.makeDefault()
+        guard let recorder else { throw DiagnosticError.unavailable(problem ?? "History store unavailable") }
+        return recorder
+    }
+
+    /// The last N minutes, clamped to 1 minute through the longest 1 s retention.
+    private static func storedWindow(minutes: Int) -> ClosedRange<Date> {
+        let end = Date()
+        let window = TimeInterval(min(max(minutes, 1), Int(HistoryRetention.longestRecent / 60)) * 60)
+        return end.addingTimeInterval(-window)...end
+    }
+
+    private static let maximumStoredApps = 50
+    private static let minimumDiagnosisSeconds = 3
+    private static let maximumDiagnosisSeconds = 60
+    private static let processEverySeconds = 2
+
+    public static var nativeSamplingSupport: NativeSamplingSupport {
+        #if os(macOS)
+        .supported
+        #else
+        .unsupported
+        #endif
+    }
+}

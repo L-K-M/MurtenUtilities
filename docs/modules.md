@@ -390,40 +390,126 @@ Discovers self-hosted GitHub Actions and Forgejo runners in place, starts and
 stops them, sets launch-at-login, registers new ones, follows job logs.
 SwiftPM.
 
-- **Migrates:** its discovery/control core + the manager pane.
-- **Watcher:** runner health → "2 of 4 runners offline for 10 min — restart?"
-- **Source facts:** discovery and control span `RunningManCore` and
-  `RunningManServices`; the pane's drain engine, polling, notifications and
-  widget publishing are about 7,200 lines in the app target. It has its own
-  unconditional `MenuBarExtra`, login item, `runningman://` scheme and a
-  WidgetKit extension that `scripts/build-app.sh` assembles from SwiftPM.
-  Health states and 48 hours of activity samples exist, but there is no
-  offline-for-10-minutes rule yet.
+- **Status:** available.
+- **Provenance:** RunningMan@248772f7e0aeeaed4eecbc35a3f1a2ebf7ec798c (release 1.5.1)
+- **Migrated:** `RunningManCore` and `RunningManServices` with their tests;
+  the app target became `RunningManModule`: the manager pane (Overview,
+  Runners, Workload, Job history, Cleanup), the stop-after-job drain engine,
+  job logs and lap card, runner registration, a Settings tab and a menu-bar
+  section with runner states and the start and stop controls. The standalone
+  app's menu commands are in the Tool menu.
+- **Left out:** the WidgetKit extension (not shown to work ad-hoc signed and
+  assembled by the suite's script; it would also need its own light-only
+  bundle), the `runningman://` scheme (suite routes instead), the app's own
+  menu-bar extra, login item, notifications and update check, and the
+  `--demo` preview workspace and screenshot capture (kept for tests only).
+  Core's `AppUpdate`, `NotificationPlanner` and `WidgetSnapshot` served only
+  those surfaces and stayed behind, as did the `release-job.swift` CI helper
+  the standalone repository vendors into other projects, with its tests.
+- **Polling:** only while the pane or the menu section is on screen, or while
+  a stop-after-job request waits for its runner (the provider owns those, so
+  they continue with the pane closed). Keep-awake follows that polling.
+- **Watcher:** every 15 minutes, local reads only (no `.network`): discovery
+  with privacy-protected folders skipped (Desktop, Documents, Downloads,
+  iCloud Drive, other apps' containers, `/Volumes`), then launchd and the
+  process list without server activity, so it never reads a Keychain token.
+  One `runner-offline` finding per runner that should run and does not: set
+  to start at login, or seen online and stopped without a request from
+  RunningMan. Disabled runners, system services and runners stopped from the
+  pane are not reported; unreadable state and skipped folders are reported as
+  not checked. Evidence: the time it was first seen offline (memory only, so
+  after a relaunch the count starts at the first check). Complete discovery
+  with no skipped folders is exhaustive, so suggestions for removed runners
+  resolve. Incomplete reads and skipped folders retain unobserved runners'
+  suggestions and offline history; checked runners still resolve normally.
+- **Rule:** offline for 10 minutes or more → "<runner> has been offline for N
+  min — restart?"; the suggestion stays until the runner is online again.
+  Route: `runningman/runner?id=<runner folder>`.
+- **May preselect:** nothing. The route selects the runner in the pane; it
+  starts only when you choose Start.
+- **State:** `~/Library/Application Support/RunningMan` (history, activity,
+  laps, managed runners, service policy backups), the Keychain items
+  `com.runningman.forgejo-api` and the launchd labels
+  `ch.lkmc.RunningMan.forgejo.*` are read in place and shared with the
+  standalone app. Preferences use the suite's module store under their old
+  keys. While that store has no imported runner folders and no Forgejo
+  servers, the pane offers once to import both from the standalone app's
+  domain (`ch.lkmc.RunningMan`); the standalone domain is only read.
 
-### Coreography — effort: medium — phase 3
+### Coreography — effort: medium — phase 3 — migrated
 
 The system monitor: CPU/memory/disk/network lanes, process table, menu-bar
 extra, widgets, Shortcuts actions, a `coreo` CLI. `.xcodeproj` today.
 
-- **Migrates:** the sampling/rendering core is the biggest port in the
-  roster — worth it, because its samples feed half the watcher ideas. Its own
-  menu-bar presence likely folds into the suite's (one menu face, many
-  instruments).
-- **Privilege:** ships a root XPC sampling daemon today (counters, open
-  files, sockets, signal/renice, spindump, BTM dump) that refuses to start
-  under ad-hoc signing. It embeds per-module like BootCaptain's helper —
-  same signing gate (docs/architecture.md § Module packaging).
-- **Watcher:** sustained-pressure signals → "X has pinned a core for an hour";
-  thermal/disk-full warnings.
-- **Source facts:** the engine is already SwiftPM (`CoreographyKit`,
-  `CoreographyServices`, `CoreographyDrivers`, plus the `coreo` and helper
-  executables); Xcode builds only the app shell, widgets and packaging. Its
-  menu-bar extra is the primary surface, not chrome. It keeps a one-hour
-  in-memory history and SQLite rollups, and already ships its own alerts and
-  notifications (memory, thermal, battery, disk). Unmentioned surfaces: App
-  Intents, a `coreography://` scheme, a local MCP server (off by default) and
-  "Ask", which sends system context to Anthropic or an OpenAI-compatible
-  endpoint on request.
+- **Status:** available. The pane is the monitor window: a sidebar of
+  sections (Overview cards, CPU, Memory, GPU, Storage, Network, Power &
+  Thermals, Processes, Timeline, Startup, Recordings), with lanes, the
+  process table, inspector, connections, sensors, the startup volume's
+  space lens, Ask and the command palette. The menu section is its
+  menu-bar extra (CPU, memory, network and disk mini lanes, the top
+  process, pause, hold, HUD). Settings has a Coreography tab.
+- **Provenance:** Coreography@f9820e66467e0991d2130a9d4d0c7ea6b00e3b8b
+- **Targets:** `CoreographySystem` (C), `CoreographySQLite` (the source's
+  `CSQLite`, renamed because target names are package-wide),
+  `CoreographyDrivers`, `CoreographyKit`, `CoreographyServices` with their
+  test suites; `CoreographyCore` (watcher, rule); `CoreographyModule`
+  (provider, pane, menu section, settings). All Swift 6, as in the source.
+  The C bridge contract tests moved to `scripts/coreography-bridge-tests/`
+  (`run.sh`); `swift test` does not run them.
+- **Sampling:** one model serves every surface, as in the standalone app,
+  but it samples only while the pane or the menu section shows, the HUD is
+  up, a recording runs or an MCP client is connected. History (the same
+  SQLite rollups, `~/Library/Application Support/Coreography/History`)
+  therefore covers the time Coreography was in use, not the whole session.
+  Its alert rules still tint lanes while it samples; they no longer notify.
+- **Watcher:** every 15 minutes, unprivileged, local (no `.network`), behind
+  `SystemObserving`. Four checks, each its own scope: `processes` (a process
+  averaging ≥ 0.8 of a core over the last hour, from CPU-time deltas between
+  polls kept in memory; stays open while ≥ 0.5), `memory` (critical pressure
+  at two checks in a row; stays open while warning or worse), `thermal`
+  (heavy pressure at two checks in a row; stays open while moderate or
+  worse), `startup-volume` (under 10 % free; clears at 12 %). It reads only
+  the person's own processes: other users' need the helper. The process
+  name sits in the condition (`sustained-cpu:<name>`) under the single
+  `processes` scope, so an exited process resolves at the next complete
+  check, and nothing resolves before the watcher has measured a full hour.
+  The standalone battery alert stays out: macOS warns itself and watchers
+  pause on battery by default.
+- **Preselection:** nothing. Routes only navigate: `process?name=` opens
+  Processes filtered by name and sorted by CPU; `memory` and `storage` open
+  their sections with the process table by memory or disk writes;
+  `thermal` opens Power & Thermals with the sensors. No row is selected, no
+  action is armed and no space survey starts; quitting or signalling a
+  process keeps its own confirmation.
+- **Privilege:** the root XPC helper is Team-ID pinned, so ad-hoc suite
+  builds leave it out (not embedded). Features behind it (other users'
+  processes, spindump, raising priority, login and background items) show
+  "Needs a signed build"; Settings shows the helper as unavailable.
+- **Left out:** the helper; the widgets, their refresh and the briefing
+  writer that feeds them; App Intents (SwiftPM cannot extract their
+  metadata); the `coreo` CLI; the self update checker; the background
+  mode, its login item and Dock presence, and the menu's Settings and Quit
+  buttons (the suite's resident mode, login item and companion cover
+  them); the Dock tile graph and the menu-bar title items (the shell owns
+  the Dock and the status item); `coreography://` links and opening
+  `.coreotrace` from Finder (the suite registers no URL scheme or document
+  type; Open Recording… in the Tool menu reads them).
+- **State:** preferences use the module's store under their old keys, so
+  the standalone app's settings do not carry over. History, sessions
+  (`…/Coreography/Sessions`), the MCP socket (`…/Coreography/mcp.sock`) and
+  the Keychain items (`ch.lkmc.Coreography.provider`) keep their places.
+  Whether an Ask key exists is read from Keychain attributes, so opening
+  the pane does not prompt; using a key the standalone app saved may.
+  The space lens walks only folders that never prompt until the person
+  asks it to include Desktop, Documents, Downloads, app data and cloud
+  drives; that choice (`spaceAccess`) is kept in the module's store.
+- **MCP and Ask:** kept, off by default and on request as before. The suite
+  does not ship `coreo`; clients use the standalone app's
+  `Coreography.app/Contents/Helpers/coreo mcp --stdio`, which the client
+  resolver treats as the bridge, so approvals still name the app behind it.
+  An approval request opens the pane; with the window closed it times out.
+- **Coexistence:** with the standalone app running too, both write the same
+  history store and only the first to listen gets the MCP socket.
 
 ## What a suggestion may preselect
 
