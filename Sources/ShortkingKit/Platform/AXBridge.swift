@@ -109,7 +109,8 @@ public enum AXBridge {
         let rawModifiers = (try read(menuItem, MenuAttribute.cmdModifiers) as? NSNumber)?.intValue
         let modifiers = Modifiers(axMenuItemModifiers: rawModifiers ?? 0)
 
-        if let char = try read(menuItem, MenuAttribute.cmdChar) as? String, !char.isEmpty {
+        if let char = try read(menuItem, MenuAttribute.cmdChar) as? String,
+           isTypeableShortcutCharacter(char) {
             // AX reports the *unshifted* character; a shift in the modifier mask is
             // authoritative, so we do not re-derive it from letter case here.
             return KeyCombo(keyCode: nil, character: char, modifiers: modifiers)
@@ -126,6 +127,14 @@ public enum AXBridge {
         }
 
         return nil
+    }
+
+    private static func isTypeableShortcutCharacter(_ character: String) -> Bool {
+        // Function-key and control characters need AX's virtual key or glyph.
+        !character.isEmpty && character.unicodeScalars.allSatisfy {
+            !CharacterSet.controlCharacters.contains($0)
+                && $0.properties.generalCategory != .privateUse
+        }
     }
 
     public static func title(of element: AXUIElement) -> String? {

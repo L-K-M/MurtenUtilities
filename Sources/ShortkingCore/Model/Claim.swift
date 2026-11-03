@@ -52,7 +52,10 @@ public struct Claim: Codable, Hashable, Sendable, Identifiable {
     public var identity: String {
         let ownerPart = owner?.identity ?? "unattributed"
         let labelPart = label ?? ""
-        return "\(layer.rawValue)|\(ownerPart)|\(combo.groupingKey)|\(labelPart)"
+        // Lengths keep delimiters in app names and labels from merging records.
+        return [String(layer.rawValue), ownerPart, combo.groupingKey, labelPart]
+            .map { "\($0.count):\($0)" }
+            .joined()
     }
 
     public var ownerName: String {
