@@ -1,6 +1,7 @@
 import MurtenModuleKit
+import RepoMenModule
 
 extension ModuleCatalog {
-    /// RepoMen's provider; nil until it migrates (docs/migrating-a-module.md).
-    static let repoMen: ModuleFactory? = nil
+    /// RepoMen's provider (docs/migrating-a-module.md).
+    static let repoMen: ModuleFactory? = RepoMenModuleFactory.factory
 }
