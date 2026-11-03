@@ -107,8 +107,27 @@ let deviceControlDoctorTargets: [Target] = [
 let deviceControlDoctorModule: [Target.Dependency] = ["DeviceControlDoctorModule"]
 
 // MARK: Shortking
-let shortkingTargets: [Target] = []
-let shortkingModule: [Target.Dependency] = []
+// Moved from Shortking (docs/modules.md, Provenance). ShortkingCore is the pure
+// model and conflict analysis split out of the source's ShortkingKit, which keeps
+// the AppKit, Carbon, SkyLight and process side. ShortkingProbe is the
+// short-lived probe helper; scripts/build-app.sh embeds it as
+// Contents/MacOS/shortking-probe.
+let shortkingTargets: [Target] = [
+    .target(name: "ShortkingCore", dependencies: ["MurtenCore"]),
+    .target(name: "ShortkingKit", dependencies: ["ShortkingCore"]),
+    .executableTarget(name: "ShortkingProbe", dependencies: ["ShortkingKit", "ShortkingCore"]),
+    .target(
+        name: "ShortkingModule",
+        dependencies: ["ShortkingCore", "ShortkingKit", "MurtenCore", "MurtenModuleKit"]
+    ),
+    .testTarget(name: "ShortkingCoreTests", dependencies: ["ShortkingCore", "MurtenCore"]),
+    .testTarget(name: "ShortkingKitTests", dependencies: ["ShortkingKit", "ShortkingCore"]),
+    .testTarget(
+        name: "ShortkingModuleTests",
+        dependencies: ["ShortkingModule", "ShortkingKit", "ShortkingCore", "MurtenCore", "MurtenModuleKit"]
+    )
+]
+let shortkingModule: [Target.Dependency] = ["ShortkingModule"]
 
 // MARK: HallPass
 // The source package (tools 6.0, no explicit mode) builds in Swift 6.

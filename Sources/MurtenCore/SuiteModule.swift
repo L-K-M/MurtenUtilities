@@ -55,7 +55,7 @@ public enum ModuleRegistry {
         SuiteModule(
             id: "shortking", name: "Shortking",
             summary: "Find out who owns — or stole — a keyboard shortcut.",
-            systemImage: "keyboard", sourceRepository: "Shortking"),
+            systemImage: "keyboard", status: .available, sourceRepository: "Shortking"),
         SuiteModule(
             id: "hallpass", name: "HallPass",
             summary: "Exempt trusted networks from local-network privacy prompts.",

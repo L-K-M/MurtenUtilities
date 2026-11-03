@@ -39,6 +39,18 @@ rm -rf "$APP_PATH"
 mkdir -p "$APP_PATH/Contents/MacOS" "$APP_PATH/Contents/Resources"
 cp "$BIN_DIR/MurtenUtilities" "$APP_PATH/Contents/MacOS/MurtenUtilities"
 
+# Shortking's hotkey probes run in this short-lived helper, never in the app,
+# so a crash mid-sweep cannot leave a combination registered. ProbeRunner finds
+# it with Bundle.main.url(forAuxiliaryExecutable:). Nested code is signed
+# before the bundle that contains it.
+SHORTKING_PROBE="$APP_PATH/Contents/MacOS/shortking-probe"
+cp "$BIN_DIR/ShortkingProbe" "$SHORTKING_PROBE"
+if [[ -n "${CODE_SIGN_IDENTITY:-}" ]]; then
+    codesign --force --options runtime --sign "$CODE_SIGN_IDENTITY" "$SHORTKING_PROBE"
+else
+    codesign --force --sign - "$SHORTKING_PROBE"
+fi
+
 # SwiftPM resource bundles (one per target with resources) go to
 # Contents/Resources, where code signing expects them. SwiftPM's generated
 # Bundle.module looks at the bundle root instead, so modules load resources

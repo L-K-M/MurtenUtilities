@@ -1,0 +1,774 @@
+import AppKit
+import Combine
+import Foundation
+import MurtenCore
+import ShortkingKit
+import SwiftUI
+import ShortkingCore
+
+/// The sidebar destinations.
+enum Destination: String, Hashable, CaseIterable, Identifiable {
+    case home
+    case inventory
+    case conflicts
+    case detective
+    case suspects
+    case health
+    case settings
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .home:      return "Overview"
+        case .inventory: return "All combos"
+        case .conflicts: return "Conflicts"
+        case .detective: return "Detective"
+        case .suspects:  return "Suspects"
+        case .health:    return "Health"
+        case .settings:  return "Settings"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .home:      return "sparkles"
+        case .inventory: return "keyboard"
+        case .conflicts: return "exclamationmark.triangle"
+        case .detective: return "magnifyingglass"
+        case .suspects:  return "eye"
+        case .health:    return "stethoscope"
+        case .settings:  return "gearshape"
+        }
+    }
+
+    var section: String {
+        switch self {
+        case .home:                  return "Start here"
+        case .inventory, .conflicts: return "Inventory"
+        case .detective, .suspects:  return "Investigate"
+        case .health, .settings:     return "System"
+        }
+    }
+}
+
+/// How the inventory table is grouped.
+enum GroupingMode: String, CaseIterable, Identifiable {
+    case combo
+    case owner
+    case layer
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .combo: return "By combo"
+        case .owner: return "By owner"
+        case .layer: return "By layer"
+        }
+    }
+}
+
+/// Everything the UI reads.
+///
+/// The provider owns the one instance and keeps it for the app's lifetime; the
+/// pane views are rebuilt whenever the user navigates, so nothing long-lived
+/// may live in them.
+@MainActor
+final class AppState: ObservableObject {
+
+    // MARK: - Published state
+
+    @Published var destination: Destination = .home
+    @Published private(set) var result = ScanResult() {
+        // Every derived cache in this class keys off this counter rather than off
+        // the contents of `result`, which is far too large to compare.
+        didSet { resultGeneration &+= 1 }
+    }
+    @Published private(set) var health = HealthReport(checks: [])
+    @Published private(set) var isScanning = false
+    @Published private(set) var scanPhase = ""
+    @Published var settings: AppSettings {
+        didSet { settingsStore.update { $0 = settings } }
+    }
+
+    // Inventory filters
+    @Published var searchText = ""
+    @Published var grouping: GroupingMode = .combo
+    @Published var conflictsOnly = false
+    @Published var enabledOnly = false
+    @Published var layerFilter: Set<ClaimLayer> = []
+    @Published var statusFilter: Set<ClaimStatus> = []
+    @Published var selectedComboKey: String?
+    /// The row selected in a grouped (by owner / by layer) list.
+    ///
+    /// Separate from ``selectedComboKey`` because those lists flatten to *claims*:
+    /// one combination legitimately appears under several owners, so a row's identity
+    /// has to carry its bucket too. `List` needs globally unique tags — tagging
+    /// several rows with the same combination key made it highlight all of them at
+    /// once and left the detail pane's selection ambiguous.
+    @Published var selectedRowKey: String?
+    /// The conflict a suggestion opened the pane on, as `KeyCombo.groupingKey`.
+    /// The Conflicts view scrolls to it; it selects nothing for an action.
+    @Published var focusedConflictKey: String?
+    /// `Conflict.acknowledgementSignature`s, mirrored from the defaults so the
+    /// Conflicts view updates when one changes.
+    @Published private(set) var acknowledgedConflicts: Set<String>
+
+    // MARK: - Collaborators
+
+    let attribution: AttributionStore
+    let detective: DetectiveSession
+    private let coordinator: ScanCoordinator
+    private let settingsStore: ShortkingSettingsStore
+    private let acknowledgements: ConflictAcknowledgements
+    /// Asks the suite to re-run the watcher, so an acknowledged conflict's
+    /// suggestion goes away now rather than at the next interval.
+    private let requestRecheck: @MainActor () -> Void
+    /// Pane views currently on screen. Differential learning runs only while
+    /// one is: the suite's background work is its watcher, which never probes.
+    /// A count rather than a flag, because a pane rebuilt for a new route can
+    /// appear before the old one disappears.
+    private var visiblePanes = 0
+    private let adapterRegistry = AdapterRegistry()
+    /// Held here, not left to the scanners' defaults, so that "Clear caches" can
+    /// clear the instances the scan is actually using.
+    private let menuCache: MenuCache
+    private let triageCache: TriageCache
+    private var differential: DifferentialEngine?
+    private var previouslyEnabledTapIDs: Set<UInt32> = []
+    private var scanTask: Task<Void, Never>?
+
+    /// Bumped whenever ``result`` is replaced. Derived caches compare against it.
+    private var resultGeneration: UInt64 = 0
+
+    // Memoisation for `filteredGroups` and its search index. Deliberately not
+    // `@Published`: they are derived state, and publishing them would re-render the
+    // world every time a cache warmed.
+    private var filterCacheKey: String?
+    private var filterCacheValue: [ComboGroup] = []
+    private var searchIndexGeneration: UInt64 = .max
+    private var searchIndexValue: [String: String] = [:]
+
+    init(
+        settingsStore: ShortkingSettingsStore,
+        acknowledgements: ConflictAcknowledgements,
+        requestRecheck: @escaping @MainActor () -> Void
+    ) {
+        // One store, shared by the coordinator (which folds inferences into scans)
+        // and the detective session (which records live captures into it).
+        let store = AttributionStore()
+        let menuCache = MenuCache()
+        let triageCache = TriageCache()
+
+        self.attribution = store
+        self.detective = DetectiveSession(store: store)
+        self.menuCache = menuCache
+        self.triageCache = triageCache
+        self.coordinator = ScanCoordinator(
+            sources: ScanCoordinator.defaultSources(menuCache: menuCache, triageCache: triageCache),
+            attribution: store
+        )
+        self.settingsStore = settingsStore
+        self.settings = settingsStore.current
+        self.acknowledgements = acknowledgements
+        self.acknowledgedConflicts = acknowledgements.signatures
+        self.requestRecheck = requestRecheck
+
+        // Show the last known inventory immediately rather than an empty window
+        // while the first scan runs.
+        let cached = ClaimDatabase().load()
+        if !cached.isEmpty {
+            let groups = ConflictAnalyzer.analyze(ClaimMerger.group(cached))
+            result = ScanResult(
+                claims: cached,
+                groups: groups,
+                conflicts: ConflictAnalyzer.conflicts(in: groups)
+            )
+        }
+    }
+
+    // MARK: - Scanning
+
+    func rescan() {
+        guard !isScanning else { return }
+        scanTask?.cancel()
+
+        isScanning = true
+        scanPhase = "Collecting running applications…"
+
+        let options = settings.scanOptions
+        let context = ScanContext.capture(options: options)
+
+        scanTask = Task { [weak self] in
+            guard let self else { return }
+            // `defer` rather than a trailing assignment: an early return on
+            // cancellation used to leave `isScanning` true forever, and `rescan()`
+            // guards on it, so a single cancelled scan would have wedged every
+            // future one for the life of the process.
+            defer {
+                self.isScanning = false
+                self.scanPhase = ""
+            }
+
+            self.scanPhase = "Reading menus, configs and system shortcuts…"
+
+            let scanResult = await self.coordinator.scan(context: context)
+            guard !Task.isCancelled else { return }
+
+            self.result = scanResult
+            // The scan just saved the inventory the watcher reads, so let the
+            // suite's suggestions catch up now instead of at the next interval.
+            self.requestRecheck()
+            self.previouslyEnabledTapIDs = Set(
+                scanResult.eventTaps.filter(\.enabled).map(\.tapID)
+            )
+
+            if let report = scanResult.probeReport {
+                self.settings.probingVerified = report.probingVerified
+                self.settings.probingVerifiedAt = Date()
+                if self.visiblePanes > 0 {
+                    self.startDifferentialLearning(baseline: report)
+                }
+            }
+
+            self.health = await Self.runHealthChecks(
+                eventTaps: scanResult.eventTaps,
+                probeReport: scanResult.probeReport,
+                previouslyEnabledTapIDs: self.previouslyEnabledTapIDs
+            )
+        }
+    }
+
+    /// Health checks, off the main actor.
+    ///
+    /// `HealthChecker.run` walks our own menu bar through the Accessibility API with
+    /// a one-second messaging timeout, creates an event tap, and — when secure input
+    /// is on — shells out to `ioreg`. Running that on the main actor stalled the UI
+    /// at the end of every single scan, which is exactly when the user is watching.
+    /// None of it touches AppKit view state, so a detached task is safe.
+    private static func runHealthChecks(
+        eventTaps: [EventTapInfo],
+        probeReport: ProbeReport?,
+        previouslyEnabledTapIDs: Set<UInt32>
+    ) async -> HealthReport {
+        await Task.detached(priority: .userInitiated) {
+            HealthChecker.run(
+                eventTaps: eventTaps,
+                probeReport: probeReport,
+                previouslyEnabledTapIDs: previouslyEnabledTapIDs
+            )
+        }.value
+    }
+
+    // MARK: - Pane lifecycle
+
+    func paneDidAppear() {
+        visiblePanes += 1
+        if let report = result.probeReport {
+            startDifferentialLearning(baseline: report)
+        }
+    }
+
+    func paneDidDisappear() {
+        visiblePanes = max(0, visiblePanes - 1)
+        guard visiblePanes == 0 else { return }
+        differential?.stop()
+    }
+
+    /// Applies the route a suggestion or link opened the pane with. It only
+    /// navigates; the pane's rescan and the user decide everything else.
+    func show(_ route: ModuleRoute?) {
+        guard let route, route.action == ShortkingSuite.conflictAction else {
+            focusedConflictKey = nil
+            return
+        }
+        focusedConflictKey = route.context[ShortkingSuite.comboContextKey]
+        destination = .conflicts
+    }
+
+    private func startDifferentialLearning(baseline: ProbeReport) {
+        guard settings.differentialLearningEnabled else {
+            differential?.stop()
+            differential = nil
+            return
+        }
+        if differential == nil {
+            let engine = DifferentialEngine(store: attribution)
+            engine.onAttributionChanged = { [weak self] in
+                // New attributions only change inferred claims, so a full rescan is
+                // wasteful — but the inventory does need to reflect them.
+                MainActor.assumeIsolated { self?.refreshInferences() }
+            }
+            differential = engine
+        }
+        differential?.start(baseline: baseline)
+    }
+
+    private func refreshInferences() {
+        let unattributed = result.claims
+            .filter { $0.status == .probedClaimed }
+            .map(\.combo)
+        guard !unattributed.isEmpty else { return }
+
+        let inferred = attribution.inferredClaims(for: unattributed)
+        guard !inferred.isEmpty else { return }
+
+        let merged = ClaimMerger.merge(result.claims + inferred)
+        let groups = ConflictAnalyzer.analyze(ClaimMerger.group(merged))
+        result = ScanResult(
+            claims: merged,
+            groups: groups,
+            conflicts: ConflictAnalyzer.conflicts(in: groups),
+            outcomes: result.outcomes,
+            eventTaps: result.eventTaps,
+            probeReport: result.probeReport,
+            startedAt: result.startedAt,
+            finishedAt: result.finishedAt
+        )
+    }
+
+    // MARK: - Derived views of the data
+
+    /// The inventory, narrowed by the current search and filters.
+    ///
+    /// Memoised, because this is read at least twice per render of `InventoryView` —
+    /// once for the rows and once for the "N of M" counter — and re-evaluated on
+    /// every keystroke. The uncached version called `claim.searchTokens` for every
+    /// claim on every pass, and that property *builds a fresh array of lowercased
+    /// Strings each time*: roughly sixteen thousand allocations per pass on a
+    /// machine with two thousand claims, twice per keystroke.
+    var filteredGroups: [ComboGroup] {
+        let key = filterKey
+        if filterCacheKey == key { return filterCacheValue }
+
+        var groups = result.groups
+
+        if conflictsOnly {
+            groups = groups.filter(\.hasConflict)
+        }
+        if enabledOnly {
+            groups = groups.filter { group in group.claims.contains(where: \.enabled) }
+        }
+        if !layerFilter.isEmpty {
+            groups = groups.filter { group in
+                group.claims.contains { layerFilter.contains($0.layer) }
+            }
+        }
+        if !statusFilter.isEmpty {
+            groups = groups.filter { group in
+                group.claims.contains { statusFilter.contains($0.status) }
+            }
+        }
+
+        let query = searchText.trimmingCharacters(in: .whitespaces).lowercased()
+        if !query.isEmpty {
+            let index = searchIndex()
+            groups = groups.filter { group in
+                index[group.id]?.contains(query) ?? false
+            }
+        }
+
+        filterCacheKey = key
+        filterCacheValue = groups
+        return groups
+    }
+
+    /// Everything `filteredGroups` depends on, as one comparable value.
+    private var filterKey: String {
+        [
+            "\(resultGeneration)",
+            searchText.trimmingCharacters(in: .whitespaces).lowercased(),
+            conflictsOnly ? "c" : "",
+            enabledOnly ? "e" : "",
+            layerFilter.map { "\($0.rawValue)" }.sorted().joined(separator: ","),
+            statusFilter.map(\.rawValue).sorted().joined(separator: ","),
+        ].joined(separator: "\u{1}")
+    }
+
+    /// One lowercased haystack per combination, rebuilt only when a scan lands.
+    private func searchIndex() -> [String: String] {
+        guard searchIndexGeneration != resultGeneration else { return searchIndexValue }
+
+        var index: [String: String] = [:]
+        index.reserveCapacity(result.groups.count)
+        for group in result.groups {
+            var parts = [group.combo.displayString.lowercased()]
+            for claim in group.claims { parts.append(contentsOf: claim.searchTokens) }
+            index[group.id] = parts.joined(separator: "\u{1}")
+        }
+
+        searchIndexValue = index
+        searchIndexGeneration = resultGeneration
+        return index
+    }
+
+    /// The combination whose detail pane is showing.
+    ///
+    /// Which selection binding is authoritative depends on the grouping: the by-combo
+    /// list selects a combination directly, while the grouped lists select a
+    /// `bucket|combination` row because one combination can appear in several buckets.
+    var selectedGroup: ComboGroup? {
+        // The fallback matters: the Overview navigates here by setting
+        // `selectedComboKey` directly, and it should still land on the right detail
+        // pane when the inventory happens to be in a grouped mode.
+        let key: String? = grouping == .combo
+            ? selectedComboKey
+            : (selectedRowKey.map(Self.comboKey(fromRowKey:)) ?? selectedComboKey)
+        guard let key, !key.isEmpty else { return nil }
+        return result.groups.first { $0.id == key }
+    }
+
+    /// Grouped-list rows are tagged `"<bucket>\u{1}<combination key>"`.
+    static func comboKey(fromRowKey rowKey: String) -> String {
+        String(rowKey.split(separator: "\u{1}", maxSplits: 1).last ?? "")
+    }
+
+    static func rowKey(bucket: String, comboKey: String) -> String {
+        "\(bucket)\u{1}\(comboKey)"
+    }
+
+    /// Capability records — processes that *could* take a key, with no known binding.
+    var capabilityClaims: [Claim] {
+        result.claims.filter { $0.status == .capability }
+    }
+
+    // MARK: - Overview
+
+    /// Two apps fighting over the same shortcut. The answer to "why does this do
+    /// the wrong thing".
+    ///
+    /// Includes `.shadowed` as well as `.definite`: from the user's side, "macOS
+    /// takes ⌃⌘S and Karabiner never gets it" is two apps fighting, whatever the
+    /// analyzer calls the shape of it. Only `.contextual` is left out, because that
+    /// one genuinely reads as "works everywhere except here" and has its own
+    /// section.
+    var appConflicts: [Conflict] {
+        result.conflicts.filter(\.isBetweenApps)
+    }
+
+    // MARK: - Acknowledgements
+
+    /// Whether the suite stays quiet about this conflict. Only conflicts the
+    /// watcher reports can be acknowledged.
+    func isAcknowledged(_ conflict: Conflict) -> Bool {
+        acknowledgedConflicts.contains(conflict.acknowledgementSignature)
+    }
+
+    func setAcknowledged(_ acknowledged: Bool, for conflict: Conflict) {
+        let signature = conflict.acknowledgementSignature
+        if acknowledged {
+            acknowledgements.acknowledge(signature)
+        } else {
+            acknowledgements.withdraw(signature)
+        }
+        acknowledgedConflicts = acknowledgements.signatures
+        requestRecheck()
+    }
+
+    /// Shortcuts that fire everywhere except where the user expects. The answer to
+    /// "why does this work only sometimes".
+    var intermittentConflicts: [Conflict] {
+        result.conflicts.filter { !$0.isSystemDefault && $0.kind == .contextual }
+    }
+
+    /// Collisions between macOS's own shortcuts — real, but Apple's, and not what
+    /// anyone opens the app to find out.
+    var systemConflicts: [Conflict] {
+        result.conflicts.filter(\.isSystemDefault)
+    }
+
+    var unknownOwnerGroups: [ComboGroup] {
+        result.groups.filter { $0.conflict?.kind == .unattributed }
+    }
+
+    /// Health problems that specifically cause a working shortcut to stop or
+    /// misfire, as opposed to Shortking's own permission state.
+    var intermittencyWarnings: [HealthCheck] {
+        health.checks.filter { check in
+            guard check.status == .warning || check.status == .failing else { return false }
+            return ["secure-input", "dead-taps", "option-hardening"].contains(check.id)
+        }
+    }
+
+    /// Event taps grouped by the process that installed them.
+    ///
+    /// One process routinely installs several taps — universalaccessd has three —
+    /// so a raw tap count and a process count are different numbers, and quoting
+    /// one while showing the other is how "6 processes" ended up above a list of 21
+    /// rows.
+    struct TapProcess: Identifiable {
+        var pid: Int32
+        var owner: Owner
+        var taps: [EventTapInfo]
+
+        var id: Int32 { pid }
+
+        /// Installs at least one enabled, active filter that asks for key events.
+        var canSwallowKeys: Bool {
+            taps.contains { $0.canSwallowKeys }
+        }
+
+        /// Sees key events, even if only to observe them.
+        var watchesKeys: Bool {
+            taps.contains { EventTapScanner.masksKeyEvents($0.eventMask) }
+        }
+
+        var hasDisabledTap: Bool {
+            taps.contains { !$0.enabled }
+        }
+    }
+
+    var tapProcesses: [TapProcess] {
+        var byPID: [Int32: [EventTapInfo]] = [:]
+        for tap in result.eventTaps {
+            byPID[tap.tappingPID, default: []].append(tap)
+        }
+
+        return byPID.compactMap { pid, taps -> TapProcess? in
+            guard let first = taps.first else { return nil }
+            return TapProcess(pid: pid, owner: first.owner, taps: taps)
+        }
+        .sorted { lhs, rhs in
+            // Most dangerous first: swallowers, then key watchers, then the rest.
+            if lhs.canSwallowKeys != rhs.canSwallowKeys { return lhs.canSwallowKeys }
+            if lhs.watchesKeys != rhs.watchesKeys { return lhs.watchesKeys }
+            return lhs.owner.name.localizedStandardCompare(rhs.owner.name) == .orderedAscending
+        }
+    }
+
+    var processesThatCanSwallowKeys: Int {
+        tapProcesses.filter(\.canSwallowKeys).count
+    }
+
+    /// True when nothing on the overview needs the user's attention.
+    var everythingLooksFine: Bool {
+        appConflicts.isEmpty
+            && intermittentConflicts.isEmpty
+            && intermittencyWarnings.isEmpty
+            && !result.claims.isEmpty
+    }
+
+    // MARK: - Instant verdict
+
+    /// What Shortking can say about a combination without running anything.
+    struct Verdict {
+        enum Tone {
+            case good
+            case conflict
+            case unknown
+            case blocked
+        }
+
+        var tone: Tone
+        var headline: String
+        var detail: String
+        /// Whether a live investigation would add anything.
+        var offersInvestigation: Bool
+    }
+
+    /// The answer to "I pressed this and the wrong thing happened", straight from
+    /// the inventory. Detective Mode is for when this isn't enough — which the
+    /// verdict says explicitly rather than leaving the user to guess.
+    func verdict(for combo: KeyCombo) -> Verdict {
+        if combo.isRestrictedByOptionHardening {
+            return Verdict(
+                tone: .blocked,
+                headline: "No app can claim \(combo.displayString)",
+                detail: "Since macOS 15, shortcuts whose only modifiers are ⌥ or ⌥⇧ are refused "
+                    + "system-wide as an anti-keylogging measure. If this one used to work, that "
+                    + "is why — it is not a conflict, and rebinding the app won't help.",
+                offersInvestigation: false
+            )
+        }
+
+        guard let group = result.groups.first(where: { $0.combo == combo }) else {
+            return Verdict(
+                tone: .unknown,
+                headline: "Nothing Shortking can see claims \(combo.displayString)",
+                detail: "No config file, menu bar, preference domain or hotkey registration "
+                    + "accounts for it. That points at the frontmost app's own handling, or at a "
+                    + "tool that pattern-matches keys in its own code and registers nothing.",
+                offersInvestigation: true
+            )
+        }
+
+        if let conflict = group.conflict {
+            switch conflict.kind {
+            case .unattributed:
+                return Verdict(
+                    tone: .unknown,
+                    headline: "Something holds \(combo.displayString), and it won't say what",
+                    detail: conflict.explanation,
+                    offersInvestigation: true
+                )
+            default:
+                return Verdict(
+                    tone: .conflict,
+                    headline: conflict.kind == .contextual
+                        ? "\(conflict.winner?.ownerName ?? "Something") takes \(combo.displayString) first"
+                        : "\(combo.displayString) is claimed more than once",
+                    detail: conflict.explanation,
+                    offersInvestigation: true
+                )
+            }
+        }
+
+        guard let winner = group.winner else {
+            return Verdict(
+                tone: .unknown,
+                headline: "\(combo.displayString) is claimed, but everything holding it is disabled",
+                detail: "Every claim Shortking found on this combination is switched off, so "
+                    + "pressing it should do nothing at all.",
+                offersInvestigation: true
+            )
+        }
+
+        return Verdict(
+            tone: .good,
+            headline: "\(winner.ownerName) has \(combo.displayString)",
+            detail: [winner.label, winner.layer.explanation]
+                .compactMap { $0 }
+                .joined(separator: " — "),
+            offersInvestigation: winner.confidence < 1.0
+        )
+    }
+
+    var unattributedCount: Int {
+        result.groups.filter { $0.conflict?.kind == .unattributed }.count
+    }
+
+    var runningApps: [RunningApp] {
+        ScanContext.capture(options: .unprivileged).runningApps
+    }
+
+    var adapterStatuses: [AdapterRegistry.AdapterStatus] {
+        adapterRegistry.statuses()
+    }
+
+    // MARK: - Actions
+
+    func investigate(combo: KeyCombo) {
+        detective.investigate(
+            combo: combo,
+            knownClaims: result.claims,
+            probeReport: result.probeReport
+        )
+        destination = .detective
+    }
+
+    func startDetectiveCapture() {
+        detective.startCapture(
+            eventTaps: result.eventTaps,
+            capabilityClaims: capabilityClaims,
+            runningApps: runningApps
+        )
+    }
+
+    func requestAccessibility() {
+        AXBridge.requestTrust()
+    }
+
+    /// Whether Accessibility is granted *and* actually works.
+    ///
+    /// `AXIsProcessTrusted()` can flip to `true` the moment the grant lands while
+    /// the process still cannot read anything, so onboarding waits on a real menu
+    /// read rather than on the permission bit.
+    ///
+    /// `async` deliberately: the underlying call is an Accessibility round trip with
+    /// a one-second messaging timeout, and onboarding polls it once a second. As a
+    /// synchronous main-actor property that was up to a second of frozen UI per
+    /// second, for as long as the sheet was open.
+    var accessibilityWorks: Bool {
+        get async {
+            await Task.detached(priority: .userInitiated) {
+                AXBridge.canReadOwnMenuBar()
+            }.value
+        }
+    }
+
+    func openSettingsPane(_ pane: String) {
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)")
+        if let url { NSWorkspace.shared.open(url) }
+    }
+
+    func revealStoreFolder() {
+        NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: StoreLocation.directory.path)
+    }
+
+    func resetAttribution() {
+        attribution.reset()
+        dropInferredClaims()
+    }
+
+    /// Removes the claims that existed only because of the attribution ledger.
+    ///
+    /// `refreshInferences()` only ever *adds*, so resetting the ledger left every
+    /// previously inferred owner on screen until the next full scan — while the
+    /// confirmation sheet promised they would go back to "unknown". A claim that was
+    /// inferred and has since been confirmed directly is `.known` by then, so it
+    /// correctly survives.
+    private func dropInferredClaims() {
+        let remaining = result.claims.filter { $0.status != .inferred }
+        guard remaining.count != result.claims.count else { return }
+
+        let groups = ConflictAnalyzer.analyze(ClaimMerger.group(remaining))
+        result = ScanResult(
+            claims: remaining,
+            groups: groups,
+            conflicts: ConflictAnalyzer.conflicts(in: groups),
+            outcomes: result.outcomes,
+            eventTaps: result.eventTaps,
+            probeReport: result.probeReport,
+            startedAt: result.startedAt,
+            finishedAt: result.finishedAt
+        )
+    }
+
+    func clearCaches() {
+        menuCache.clear()
+        triageCache.clear()
+    }
+
+    /// Exports the inventory as Markdown — the format people paste into a bug report.
+    func exportMarkdown() -> String {
+        var lines = [
+            "# Shortking inventory",
+            "",
+            "Generated \(ISO8601DateFormatter().string(from: Date()))",
+            "",
+            "\(result.claims.count) claims · \(result.conflicts.count) conflicts · "
+                + "\(unattributedCount) unattributed",
+            "",
+            "| Combination | Layer | Owner | Label | Status | Confidence |",
+            "|---|---|---|---|---|---|",
+        ]
+
+        for group in result.groups {
+            for claim in group.claims {
+                lines.append(
+                    "| `\(group.combo.displayString)` | \(claim.layer.displayName) "
+                        + "| \(claim.ownerName) | \(claim.label ?? "—") "
+                        + "| \(claim.status.displayName) "
+                        + "| \(String(format: "%.2f", claim.confidence)) |"
+                )
+            }
+        }
+
+        if !result.conflicts.isEmpty {
+            lines.append(contentsOf: ["", "## Conflicts", ""])
+            for conflict in result.conflicts {
+                lines.append("- **\(conflict.combo.displayString)** "
+                    + "(\(conflict.kind.displayName)) — \(conflict.explanation)")
+            }
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    func copyExportToPasteboard() {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(exportMarkdown(), forType: .string)
+    }
+}
