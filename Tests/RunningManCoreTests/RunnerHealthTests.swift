@@ -157,6 +157,53 @@ final class RunnerHealthTests: XCTestCase {
         XCTAssertEqual(memory.entries[runner.id]?.offlineSince, start)
     }
 
+    func testASkippedAliasKeepsTheCanonicalRunnerSuggestionAndHistory() {
+        var ledger = SuggestionLedger()
+        var memory = RunnerHealthMemory()
+        let runner = snapshot("builder", status: .stopped, startsAtLogin: true)
+        _ = RunnerHealthCheck.observation(of: [runner], memory: &memory, at: start)
+        ledger.apply(RunnerHealthCheck.observation(of: [runner], memory: &memory, at: start + 900), rule: rule)
+        let key = SuggestionKey(moduleID: "runningman", condition: RunnerHealthCheck.condition, scope: FindingScope(runner.id))
+        let persistedLedger = ledger
+
+        // A link inside a protected folder is skipped without resolving its target.
+        let alias = URL(fileURLWithPath: "/Users/example/Documents/builder-link")
+
+        let skipped = RunnerHealthCheck.observation(of: [], skippedDirectories: [alias],
+                                                    discoveryComplete: true, memory: &memory, at: start + 1800)
+        ledger.apply(skipped, rule: rule)
+
+        XCTAssertEqual(skipped.coverage, .listed)
+        XCTAssertFalse(skipped.completedScopes.contains(key.scope))
+        XCTAssertEqual(ledger.records[key]?.isActive, true)
+        XCTAssertEqual(memory.entries[runner.id]?.offlineSince, start)
+
+        // Persisted suggestions also survive a read after relaunch, with no remembered IDs.
+        var relaunched = RunnerHealthMemory()
+        var relaunchedLedger = persistedLedger
+        relaunchedLedger.apply(RunnerHealthCheck.observation(of: [], skippedDirectories: [alias], discoveryComplete: true,
+                                                           memory: &relaunched, at: start + 2700), rule: rule)
+        XCTAssertEqual(relaunchedLedger.records[key]?.isActive, true)
+    }
+
+    func testCheckedRunnersStillResolveWhenAnotherFolderIsSkipped() {
+        var ledger = SuggestionLedger()
+        var memory = RunnerHealthMemory()
+        let runner = snapshot("builder", status: .stopped, startsAtLogin: true)
+        _ = RunnerHealthCheck.observation(of: [runner], memory: &memory, at: start)
+        ledger.apply(RunnerHealthCheck.observation(of: [runner], memory: &memory, at: start + 900), rule: rule)
+        let key = SuggestionKey(moduleID: "runningman", condition: RunnerHealthCheck.condition, scope: FindingScope(runner.id))
+        let online = snapshot("builder", status: .idle, processID: 3, startsAtLogin: true)
+
+        let checked = RunnerHealthCheck.observation(of: [online],
+            skippedDirectories: [URL(fileURLWithPath: "/Users/example/Documents/other-runner")],
+            discoveryComplete: true, memory: &memory, at: start + 1800)
+        ledger.apply(checked, rule: rule)
+
+        XCTAssertEqual(checked.completedScopes, [key.scope])
+        XCTAssertEqual(ledger.records[key]?.isActive, false)
+    }
+
     func testSkippedFoldersAreReportedAsNotChecked() {
         var memory = RunnerHealthMemory()
         let folder = URL(fileURLWithPath: "/Users/example/Documents/runner")

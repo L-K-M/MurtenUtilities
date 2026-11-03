@@ -11,8 +11,8 @@ public struct RunnerStateReading: Sendable {
     public var snapshots: [RunnerSnapshot]
     /// Candidate runner folders left unread because macOS protects them.
     public var skippedDirectories: [URL]
-    /// Discovery read every candidate it found (no unreadable runner settings, no folder
-    /// listing cut short), so `snapshots` are all the runners there are.
+    /// Discovery read every unskipped candidate without unreadable runner settings or
+    /// truncated folder listings. Skipped folders are recorded separately.
     public var discoveryComplete: Bool
 
     public init(snapshots: [RunnerSnapshot], skippedDirectories: [URL] = [], discoveryComplete: Bool = false) {

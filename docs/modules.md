@@ -358,10 +358,10 @@ SwiftPM.
   RunningMan. Disabled runners, system services and runners stopped from the
   pane are not reported; unreadable state and skipped folders are reported as
   not checked. Evidence: the time it was first seen offline (memory only, so
-  after a relaunch the count starts at the first check). When discovery read
-  every candidate, the observation is exhaustive, so a suggestion for a runner
-  removed in the meantime resolves. Incomplete reads and skipped folders retain
-  existing suggestions and their offline history.
+  after a relaunch the count starts at the first check). Complete discovery
+  with no skipped folders is exhaustive, so suggestions for removed runners
+  resolve. Incomplete reads and skipped folders retain unobserved runners'
+  suggestions and offline history; checked runners still resolve normally.
 - **Rule:** offline for 10 minutes or more → "<runner> has been offline for N
   min — restart?"; the suggestion stays until the runner is online again.
   Route: `runningman/runner?id=<runner folder>`.

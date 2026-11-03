@@ -101,8 +101,8 @@ public enum RunnerHealthCheck {
     /// - Parameters:
     ///   - snapshots: every runner discovery found, with its process and launchd state.
     ///   - skippedDirectories: runner folders the check may not read (privacy-protected).
-    ///   - discoveryComplete: discovery read every candidate it found, so `snapshots` are all
-    ///     the runners there are and a suggestion for any other runner can resolve.
+    ///   - discoveryComplete: discovery read every unskipped candidate without unreadable
+    ///     settings or truncated listings. Absence proves removal only with no skipped folders.
     ///   - memory: updated with this look; the caller keeps it for the next one.
     public static func observation(of snapshots: [RunnerSnapshot], skippedDirectories: [URL] = [],
                                    discoveryComplete: Bool = false,
@@ -129,9 +129,10 @@ public enum RunnerHealthCheck {
             }
         }
 
-        // Only complete discovery proves a runner was removed; skipped folders still exist.
-        if discoveryComplete {
-            let present = Set(snapshots.map(\.id)).union(skippedDirectories.map(\.path))
+        // Skipped aliases cannot prove a runner's canonical path is absent.
+        let coversAllRunners = discoveryComplete && skippedDirectories.isEmpty
+        if coversAllRunners {
+            let present = Set(snapshots.map(\.id))
             for runnerID in memory.entries.keys where !present.contains(runnerID) {
                 completed.insert(FindingScope(runnerID))
             }
@@ -143,11 +144,10 @@ public enum RunnerHealthCheck {
                 message: "\(directory.lastPathComponent) is in a folder macOS protects, so the background check skips it. Open RunningMan to check it."))
         }
 
-        // Skipped folders and unreadable runners are listed as failures, so they count as
-        // existing; only runners discovery no longer finds resolve.
+        // Unreadable runners remain failed scopes even when discovery is exhaustive.
         return WatchObservation(moduleID: moduleID, observedAt: now, findings: findings,
                                 completedScopes: completed, failures: failures,
-                                coverage: discoveryComplete ? .exhaustive : .listed)
+                                coverage: coversAllRunners ? .exhaustive : .listed)
     }
 
     /// System services are left out: RunningMan only observes them and cannot restart them.
