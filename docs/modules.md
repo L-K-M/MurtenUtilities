@@ -22,7 +22,7 @@ PLAN.md, *Deployment floor*). The source repos declare these floors
 | Shortking | 14 | `Package.swift` | fits the suite |
 | RunningMan | 14 | `Package.swift` | fits the suite |
 | Zen Backup Manager | 14 | `.xcodeproj` | fits the suite |
-| HallPass | 26 | `Package.swift` | The pane uses Tahoe-only SwiftUI (`ToolbarSpacer`). The feature needs 15.5: local network privacy arrived in macOS 15 and the exemption defaults in 15.5 (TN3179). |
+| HallPass | 26 | `Package.swift` | The source deliberately adopts the suite floor; local-network exemption APIs require macOS 15.5. |
 | Coreography | 26 | `Package.swift`, `.xcodeproj` | A product decision in its own plan (`docs/plan.md`, decision 1), not an API gate: the tree has no `#available` checks. Its private NetworkStatistics keys are verified only "as the framework publishes them on macOS 26". |
 | Obtainintosh | Tauri app | `tauri.conf.json` | a port; no Swift floor yet |
 

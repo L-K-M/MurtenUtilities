@@ -10,8 +10,8 @@ HallPass, ZenBackupManager, Obtainintosh, RunningMan, Coreography) behind a
 Norton-Utilities-style home screen, plus an opt-in menu-bar companion that
 suggests when a tool would help. The product plan is [PLAN.md](PLAN.md); the
 contracts are [docs/architecture.md](docs/architecture.md); per-module status
-is [docs/modules.md](docs/modules.md). Today it is scaffolding: the home
-window lists the planned modules, none migrated yet.
+is [docs/modules.md](docs/modules.md). All ten rostered tools are available;
+eligible tools also contribute opt-in watchers and suggestion routes.
 
 ## Tech Stack
 
@@ -41,7 +41,7 @@ window lists the planned modules, none migrated yet.
 
 ```sh
 swift build            # package (fetches Rigi on first run)
-swift test             # MurtenCoreTests
+swift test             # full test suite
 ./scripts/build-app.sh # dist/MurtenUtilities.app, ad-hoc signed (--debug, --universal)
 ```
 
