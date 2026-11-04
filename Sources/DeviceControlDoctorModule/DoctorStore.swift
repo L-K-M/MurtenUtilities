@@ -31,6 +31,7 @@ import UniformTypeIdentifiers
     }
     private let defaults: UserDefaults
     private let runner: any ProcessRunning
+    private let resetAll: ResetAllPermissions
     /// Tells the suite to re-run the watcher after a change the user made,
     /// so a suggestion that change settled resolves soon.
     private let watchListChanged: @MainActor () -> Void
@@ -43,9 +44,13 @@ import UniformTypeIdentifiers
 
     /// Loads the watch list; spawns nothing until a check is asked for.
     init(defaults: UserDefaults, runner: any ProcessRunning = ProcessRunner(),
-         storageURL: URL = WatchListFile.defaultURL, watchListChanged: @escaping @MainActor () -> Void = {}) {
+         storageURL: URL = WatchListFile.defaultURL,
+         lifecycle: (any ApplicationLifecycleManaging)? = nil,
+         watchListChanged: @escaping @MainActor () -> Void = {}) {
         self.defaults = defaults
         self.runner = runner
+        self.resetAll = ResetAllPermissions(runner: runner,
+            lifecycle: lifecycle ?? WorkspaceApplicationLifecycle())
         self.storageURL = storageURL
         self.watchListChanged = watchListChanged
         if defaults.object(forKey: Self.monitorEnabledKey) != nil {
@@ -350,6 +355,51 @@ import UniformTypeIdentifiers
             + (failures.isEmpty ? "" : "\n\n" + failures.joined(separator: "\n"))
         refresh(appID: appID)
         return failures.isEmpty
+    }
+
+    /// Reads the complete service-wide client scope for the Reset All sheet.
+    /// When the OS cannot provide that scope, the broad repair stays disabled.
+    func inspectResetAll() async -> ResetAllPermissions.Preparation? {
+        guard !isChecking, !isRepairing else { return nil }
+        do {
+            return try await resetAll.inspect()
+        } catch {
+            notice = error.localizedDescription
+            return nil
+        }
+    }
+
+    /// Called only by the Reset All confirmation. The coordinator owns the
+    /// quit-and-verify invariant and never runs from monitoring.
+    func resetAllPermissions() async -> Bool {
+        guard !isChecking, !isRepairing else { return false }
+        isRepairing = true
+        let result = await resetAll.apply()
+
+        let attempted = result.outcomes.map(\.service.title)
+        let succeeded = result.outcomes.filter { $0.failure == nil }.map(\.service.title)
+        if !attempted.isEmpty {
+            for index in apps.indices { apps[index].functionalTest = nil }
+            events.insert(.init(appName: "All apps", message:
+                "Reset All attempted \(attempted.joined(separator: ", ")). All affected apps were required to be closed first."), at: 0)
+            events = Array(events.prefix(200))
+            save()
+            watchListChanged()
+        }
+
+        isRepairing = false
+        if !attempted.isEmpty {
+            openSettings(.accessibility)
+            refresh()
+        }
+
+        if result.succeeded {
+            notice = "Reset all Device Control and Data Access settings. Re-enable each app in System Settings before opening it again."
+        } else {
+            let completed = succeeded.isEmpty ? "" : "\n\nCompleted before stopping: \(succeeded.joined(separator: ", "))."
+            notice = (result.failure ?? "Reset All did not complete.") + completed
+        }
+        return result.succeeded
     }
 
     func recordTest(appID: UUID, outcome: FunctionalOutcome, note: String) {

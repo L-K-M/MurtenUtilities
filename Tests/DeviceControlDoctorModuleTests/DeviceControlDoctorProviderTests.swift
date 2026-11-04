@@ -13,11 +13,13 @@ final class DeviceControlDoctorProviderTests: XCTestCase {
 
     @MainActor
     private func makeProvider(mac: FixtureMac, runner: FakeProcessRunner, rechecks: Rechecks = Rechecks(),
-                              defaults: UserDefaults? = nil) -> DeviceControlDoctorProvider {
+                              defaults: UserDefaults? = nil,
+                              lifecycle: (any ApplicationLifecycleManaging)? = nil) -> DeviceControlDoctorProvider {
         let defaults = defaults ?? UserDefaults(suiteName: "DeviceControlDoctorModuleTests.\(UUID().uuidString)")!
         let context = ModuleContext(moduleID: DoctorRoute.moduleID, defaults: defaults,
                                     requestRecheck: { rechecks.count += 1 }, open: { _ in })
-        return DeviceControlDoctorProvider(context: context, runner: runner, watchList: mac.watchList, home: mac.home.path)
+        return DeviceControlDoctorProvider(context: context, runner: runner, watchList: mac.watchList,
+                                           home: mac.home.path, lifecycle: lifecycle)
     }
 
     @MainActor
@@ -141,4 +143,93 @@ final class DeviceControlDoctorProviderTests: XCTestCase {
         guard case .loaded(let saved) = WatchListFile.read(at: mac.watchList) else { return XCTFail("list not saved") }
         XCTAssertTrue(saved.apps.isEmpty)
     }
+
+    @MainActor
+    func testResetAllClearsFunctionalEvidenceAndRequestsARecheck() async throws {
+        let mac = try FixtureMac()
+        defer { mac.remove() }
+        let app = try mac.installApp("PopChar", bundleID: "de.ergonis.PopChar")
+        try mac.saveWatchList([app])
+        let runner = resetAllRunner()
+        let lifecycle = StoreLifecycle()
+        let rechecks = Rechecks()
+        let provider = makeProvider(mac: mac, runner: runner, rechecks: rechecks, lifecycle: lifecycle)
+        provider.store.apps[0].functionalTest = .init(outcome: .passed, note: "Worked",
+                                                       appPath: app.path, appVersion: app.version)
+
+        let result = await provider.store.resetAllPermissions()
+
+        XCTAssertTrue(result)
+        XCTAssertNil(provider.store.apps[0].functionalTest)
+        XCTAssertEqual(rechecks.count, 1)
+        XCTAssertTrue(provider.store.notice?.contains("Reset all") == true)
+        XCTAssertFalse(provider.store.isRepairing)
+    }
+
+    @MainActor
+    func testResetAllFailurePreservesFunctionalEvidence() async throws {
+        let mac = try FixtureMac()
+        defer { mac.remove() }
+        let app = try mac.installApp("PopChar", bundleID: "de.ergonis.PopChar")
+        try mac.saveWatchList([app])
+        let runner = FakeProcessRunner()
+        runner.withholdListing()
+        let rechecks = Rechecks()
+        let provider = makeProvider(mac: mac, runner: runner, rechecks: rechecks, lifecycle: StoreLifecycle())
+        provider.store.apps[0].functionalTest = .init(outcome: .passed, note: "Worked",
+                                                       appPath: app.path, appVersion: app.version)
+
+        let result = await provider.store.resetAllPermissions()
+
+        XCTAssertFalse(result)
+        XCTAssertNotNil(provider.store.apps[0].functionalTest)
+        XCTAssertEqual(rechecks.count, 0)
+        XCTAssertFalse(runner.ranReset)
+    }
+
+    @MainActor
+    func testUncertainResetClearsEvidenceAndRequestsARecheck() async throws {
+        let mac = try FixtureMac()
+        defer { mac.remove() }
+        let app = try mac.installApp("PopChar", bundleID: "de.ergonis.PopChar")
+        try mac.saveWatchList([app])
+        let runner = resetAllRunner()
+        let listed = CommandResult(output: "de.ergonis.PopChar", exitCode: 0)
+        runner.respond(to: [SystemTool.tccutil, "list", "-s", "Accessibility"], with: [
+            listed, listed, listed, listed, listed,
+            CommandResult(output: "", exitCode: -1, timedOut: true)
+        ])
+        let rechecks = Rechecks()
+        let provider = makeProvider(mac: mac, runner: runner, rechecks: rechecks,
+                                    lifecycle: StoreLifecycle())
+        provider.store.apps[0].functionalTest = .init(outcome: .passed, note: "Worked",
+                                                       appPath: app.path, appVersion: app.version)
+
+        let result = await provider.store.resetAllPermissions()
+
+        XCTAssertFalse(result)
+        XCTAssertNil(provider.store.apps[0].functionalTest,
+                     "a reset command may have changed TCC even when verification failed")
+        XCTAssertEqual(rechecks.count, 1)
+        XCTAssertTrue(provider.store.notice?.contains("Completed before stopping") == false)
+    }
+
+    private func resetAllRunner() -> FakeProcessRunner {
+        let runner = FakeProcessRunner()
+        runner.clearListedServiceAfterReset()
+        runner.offerListing()
+        for service in PermissionService.allCases {
+            runner.respond(to: [SystemTool.tccutil, "list", "-s", service.rawValue],
+                           with: CommandResult(output: "de.ergonis.PopChar", exitCode: 0))
+            runner.respond(to: [SystemTool.tccutil, "reset", service.rawValue],
+                           with: CommandResult(output: "", exitCode: 0))
+        }
+        return runner
+    }
+}
+
+@MainActor
+private final class StoreLifecycle: ApplicationLifecycleManaging {
+    func runningProcesses(matching clients: Set<String>) async throws -> [AffectedProcess] { [] }
+    func requestTermination(of processes: [AffectedProcess]) {}
 }

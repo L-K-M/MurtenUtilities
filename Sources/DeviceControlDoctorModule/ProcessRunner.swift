@@ -5,6 +5,7 @@ struct CommandResult: Sendable {
     var output: String
     var exitCode: Int32
     var timedOut: Bool = false
+    var outputTruncated: Bool = false
 }
 
 /// The fixed system tools the module runs. Never a path from user input.
@@ -65,15 +66,25 @@ struct ProcessRunner: ProcessRunning {
                     }
                     timer.resume()
                     var data = Data()
+                    var outputTruncated = false
                     // Drain even after the retained-output limit so a full pipe cannot deadlock.
                     while let chunk = try? pipe.fileHandleForReading.read(upToCount: 4096), !chunk.isEmpty {
-                        if data.count < 131_072 { data.append(chunk.prefix(131_072 - data.count)) }
+                        if data.count < 131_072 {
+                            let remaining = 131_072 - data.count
+                            data.append(chunk.prefix(remaining))
+                            if chunk.count > remaining { outputTruncated = true }
+                        } else {
+                            outputTruncated = true
+                        }
                     }
                     process.waitUntilExit()
                     timer.cancel()
                     try? pipe.fileHandleForReading.close()
                     let output = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-                    continuation.resume(returning: CommandResult(output: output, exitCode: process.terminationStatus, timedOut: state.didTimeOut))
+                    continuation.resume(returning: CommandResult(output: output,
+                                                                  exitCode: process.terminationStatus,
+                                                                  timedOut: state.didTimeOut,
+                                                                  outputTruncated: outputTruncated))
                 }
             }
         } onCancel: {

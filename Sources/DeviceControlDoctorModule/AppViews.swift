@@ -744,14 +744,24 @@ struct TestPadView: View {
 
 struct SettingsView: View {
     @EnvironmentObject private var doctor: DoctorStore
+    @State private var showsResetAll = false
+
     var body: some View {
         Form {
             Section("Monitoring") {
                 Toggle("Check permissions every minute while App Permission Checkup is open", isOn: $doctor.monitorEnabled)
-                Text("Checks read authorization records. App Permission Checkup never resets permissions, quits another app, or grants access automatically.")
+                Text("Automatic checks only read authorization records. They never reset permissions, quit another app, or grant access.")
                     .font(.caption).foregroundStyle(.secondary)
                 Text("Checks while App Permission Checkup is closed are set in the Background Checks tab.")
                     .font(.caption).foregroundStyle(.secondary)
+            }
+            Section("Device Control and Data Access") {
+                Text("Reset every app’s Accessibility, event-generation, and input-monitoring decisions when repairing individual apps is not enough.")
+                    .font(.callout)
+                Text("This is service-wide. Every affected app must be closed before any setting is cleared, and each app must be approved again afterward.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Button("Reset All…", role: .destructive) { showsResetAll = true }
+                    .disabled(doctor.isChecking || doctor.isRepairing)
             }
             Section("Privacy and scope") {
                 Text("The watch list, app identities, permission results, and your test observations are stored locally. Reports are exported only when you choose Export Report.")
@@ -762,6 +772,157 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .tint(DoctorStyle.accent)
+        .sheet(isPresented: $showsResetAll) { ResetAllView() }
+    }
+}
+
+private struct ResetAllView: View {
+    @EnvironmentObject private var doctor: DoctorStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var preparation: ResetAllPermissions.Preparation?
+    @State private var isLoading = true
+    @State private var inspectionFailure: String?
+    @State private var attempted = false
+    @State private var completed = false
+
+    private var canReset: Bool {
+        !isLoading
+            && preparation?.clients.isEmpty == false
+            && inspectionFailure == nil
+            && !doctor.isChecking
+            && !doctor.isRepairing
+            && !attempted
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: completed ? "checkmark.circle" : "exclamationmark.triangle")
+                    .font(.system(size: 29, weight: .light))
+                    .foregroundStyle(completed ? DoctorStyle.accent : DoctorStyle.warning)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(completed ? "Reset completed" : "Reset all access decisions")
+                        .font(.title2.weight(.semibold))
+                    Text("Device Control and Data Access")
+                        .font(.headline)
+                }
+            }
+
+            if completed {
+                Text("All three permission services were reset. Affected apps were not reopened automatically. Approve each app again in System Settings before opening it.")
+                    .font(.callout)
+                Button("Open Device Control Settings") { doctor.openSettings(.accessibility) }
+            } else {
+                Text("This clears Accessibility, event-generation, and input-monitoring decisions for every recorded app. Completed resets cannot be undone.")
+                    .font(.callout)
+
+                safetySummary
+
+                if attempted, let notice = doctor.notice {
+                    Text(notice)
+                        .font(.callout)
+                        .foregroundStyle(DoctorStyle.warning)
+                        .textSelection(.enabled)
+                } else if let inspectionFailure {
+                    Text(inspectionFailure)
+                        .font(.callout)
+                        .foregroundStyle(DoctorStyle.warning)
+                        .textSelection(.enabled)
+                    Button("Check Again") { Task { await inspect() } }
+                        .disabled(isLoading || doctor.isChecking || doctor.isRepairing)
+                }
+            }
+
+            Divider()
+            HStack {
+                if doctor.isRepairing {
+                    ProgressView().controlSize(.small)
+                    Text("Quitting affected apps and verifying they stay closed…")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button(completed ? "Done" : "Cancel") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                    .disabled(doctor.isRepairing)
+                if !completed {
+                    Button("Quit Apps and Reset All", role: .destructive) {
+                        attempted = true
+                        Task { completed = await doctor.resetAllPermissions() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!canReset)
+                }
+            }
+        }
+        .padding(26)
+        .frame(width: 610)
+        .interactiveDismissDisabled(doctor.isRepairing)
+        .tint(DoctorStyle.accent)
+        .task { await inspect() }
+    }
+
+    @ViewBuilder
+    private var safetySummary: some View {
+        if isLoading {
+            HStack(spacing: 9) {
+                ProgressView().controlSize(.small)
+                Text("Reading the complete permission-client list…")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+        } else if let preparation {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("\(preparation.clients.count) recorded \(preparation.clients.count == 1 ? "client" : "clients") will lose these decisions", systemImage: "person.2")
+                    .font(.callout.weight(.medium))
+                DisclosureGroup("Review recorded clients") {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 5) {
+                            ForEach(preparation.clients.sorted(), id: \.self) { client in
+                                Text(client)
+                                    .font(.caption.monospaced())
+                                    .textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
+                        .padding(.top, 6)
+                    }
+                    .frame(maxHeight: 150)
+                }
+                .font(.caption)
+                if preparation.runningProcesses.isEmpty {
+                    Label("No affected apps are running now", systemImage: "checkmark.circle")
+                        .font(.callout).foregroundStyle(DoctorStyle.accent)
+                } else {
+                    Label("The following apps will receive a normal quit request:", systemImage: "power")
+                        .font(.callout.weight(.medium))
+                    ForEach(preparation.runningProcesses) { process in
+                        Text("• \(process.name)")
+                            .font(.callout)
+                    }
+                }
+                Text("No reset starts until every affected process has remained closed. The operation checks again before each service and stops if an app is detected running. Apps are not reopened automatically.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if preparation.clients.isEmpty {
+                    Text("There are no recorded settings to reset.")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 10))
+        }
+    }
+
+    private func inspect() async {
+        isLoading = true
+        inspectionFailure = nil
+        let result = await doctor.inspectResetAll()
+        preparation = result
+        if result == nil {
+            inspectionFailure = doctor.notice
+                ?? "The complete affected-app list could not be verified. Reset All is unavailable, and no permissions were reset."
+        }
+        isLoading = false
     }
 }
 

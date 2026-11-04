@@ -179,7 +179,8 @@ attributes them to installed products, and investigates boot failures.
 Diagnoses Device Control / Data Access (TCC) permission records that look
 granted but fail functionally. `DoctorCore` is pure, `ProcessRunning` is the
 only subprocess boundary, `tccutil`/`codesign` run via fixed paths, repair is
-user-confirmed per service.
+user-confirmed per service. Settings also offers an explicitly confirmed,
+service-wide Reset All for recovery when individual repairs are insufficient.
 
 - **Status:** available. `DoctorCore` (in `Sources/DeviceControlDoctorCore`)
   and `DeviceControlDoctorModule`; the source's tests run as
@@ -191,7 +192,8 @@ user-confirmed per service.
   (`test-pad`); the File-menu commands are Tool-menu commands with the same
   shortcuts (⌘O, ⌘R, ⇧⌘E); the menu-bar extra is a companion section
   (watched apps, apps needing review, Refresh, Test Pad). Launch at login
-  is the suite's.
+  is the suite's. Reset All lives in Settings, separate from the per-app
+  repair sheet; it has no skip-quit or reopen option.
 - **Watcher:** every 30 minutes (120 s timeout, local), per watched app:
   `tccutil list` for its expected permissions and `codesign` against the
   identity the pane saved. One finding per app (scope: its watch-list id)
@@ -206,6 +208,20 @@ user-confirmed per service.
 - **Preselection:** the route selects the named app in the watch list and
   nothing else. The repair sheet opens only on the user's click, with the
   app's expected permissions checked, as in the standalone app.
+- **Reset All safety:** before clearing Accessibility, event-generation and
+  input-monitoring decisions for every client, the module requires complete,
+  strictly parsed `tccutil list` output. It inventories every process through
+  libproc and Security.framework signing identifiers, requests a normal quit
+  for affected apps, and requires a stable all-closed interval. The complete
+  cumulative client set is checked again around every service reset; a
+  relaunch, incomplete inventory, changing scope, command failure or
+  unverifiable postcondition stops the remaining resets. Apps are not
+  reopened automatically.
+  Responsibility checks include other login sessions. Denied lookups,
+  missing owners and cyclic ownership chains block the reset. Hosts that
+  cannot expose a complete process inventory cannot use this operation.
+  Where `tccutil list` is unavailable, Reset All is disabled and changes
+  nothing.
 - **State:** the watch list stays at
   `~/Library/Application Support/DeviceControlDoctor/watchlist.json`, read
   and written in place; `monitorEnabled` is in the module's defaults.

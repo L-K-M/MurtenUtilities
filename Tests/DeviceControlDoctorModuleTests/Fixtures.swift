@@ -8,8 +8,11 @@ import DoctorCore
 final class FakeProcessRunner: ProcessRunning, @unchecked Sendable {
     private let lock = NSLock()
     private var responses: [[String]: CommandResult] = [:]
+    private var responseSequences: [[String]: [CommandResult]] = [:]
     private var recorded: [[String]] = []
     private var cancelsCallingTask = false
+    private var clearsListedServices = false
+    private var clearedServices = Set<String>()
 
     var calls: [[String]] {
         lock.lock(); defer { lock.unlock() }
@@ -21,11 +24,23 @@ final class FakeProcessRunner: ProcessRunning, @unchecked Sendable {
         responses[command] = result
     }
 
+    func respond(to command: [String], with sequence: [CommandResult]) {
+        lock.lock(); defer { lock.unlock() }
+        responseSequences[command] = sequence
+    }
+
     /// Cancels the task that makes the next call, as the coordinator does
     /// when a watcher is switched off mid-poll.
     func cancelCallingTask() {
         lock.lock(); defer { lock.unlock() }
         cancelsCallingTask = true
+    }
+
+    /// Models `tccutil reset SERVICE` removing that service's records, so
+    /// Reset All can verify the postcondition with another list command.
+    func clearListedServiceAfterReset() {
+        lock.lock(); defer { lock.unlock() }
+        clearsListedServices = true
     }
 
     func run(_ executable: String, _ arguments: [String], timeout: TimeInterval) async -> CommandResult {
@@ -40,7 +55,29 @@ final class FakeProcessRunner: ProcessRunning, @unchecked Sendable {
         recorded.append(command)
         let cancel = cancelsCallingTask
         cancelsCallingTask = false
-        return (responses[command], cancel)
+        if var sequence = responseSequences[command], !sequence.isEmpty {
+            let response = sequence.removeFirst()
+            responseSequences[command] = sequence
+            return (response, cancel)
+        }
+        if clearsListedServices,
+           command.count == 4,
+           command[0] == SystemTool.tccutil,
+           command[1] == "list",
+           command[2] == "-s",
+           clearedServices.contains(command[3]) {
+            return (CommandResult(output: "", exitCode: 0), cancel)
+        }
+        let response = responses[command]
+        if clearsListedServices,
+           command.count == 3,
+           command[0] == SystemTool.tccutil,
+           command[1] == "reset",
+           response?.exitCode == 0,
+           response?.timedOut == false {
+            clearedServices.insert(command[2])
+        }
+        return (response, cancel)
     }
 
     // MARK: - tccutil and codesign fixtures
