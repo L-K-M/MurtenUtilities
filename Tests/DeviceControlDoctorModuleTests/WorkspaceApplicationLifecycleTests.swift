@@ -1,3 +1,4 @@
+import Darwin
 import XCTest
 @testable import DeviceControlDoctorModule
 
@@ -68,6 +69,22 @@ final class WorkspaceApplicationLifecycleTests: XCTestCase {
         XCTAssertNil(userIdentifier)
     }
 
+    func testMissingExecutablePathIsSkippedWhenProcessIsConfirmedAbsent() {
+        XCTAssertNoThrow(try SystemProcessInventory.validateExecutablePathFailure(
+            errorNumber: ENOENT,
+            processIdentifier: 98_768,
+            processConfirmedAbsent: true
+        ))
+    }
+
+    func testMissingExecutablePathFailsClosedWhileProcessMayStillExist() {
+        XCTAssertThrowsError(try SystemProcessInventory.validateExecutablePathFailure(
+            errorNumber: ENOENT,
+            processIdentifier: 98_769,
+            processConfirmedAbsent: false
+        ))
+    }
+
     func testResponsibleHelperRemainsAffectedAfterItsMainAppExits() async throws {
         let main = ProcessIdentity(processIdentifier: 701,
                                    executablePath: "/Applications/Main.app/Contents/MacOS/Main",
@@ -110,7 +127,9 @@ final class WorkspaceApplicationLifecycleTests: XCTestCase {
 
     func testLiveLifecycleCanProveAnAbsentClientHasNoRunningProcesses() async throws {
         let lifecycle = WorkspaceApplicationLifecycle()
-        let running = try await lifecycle.runningProcesses(matching: ["com.example.DefinitelyAbsent"])
+        let running = try await lifecycle.runningProcesses(
+            matching: ["/definitely/not/a/live/executable"]
+        )
         XCTAssertTrue(running.isEmpty)
     }
 }

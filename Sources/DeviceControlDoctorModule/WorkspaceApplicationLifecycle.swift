@@ -118,8 +118,28 @@ struct SystemProcessInventory: ProcessInventoryReading {
         if length > 0 {
             return String(cString: buffer)
         }
-        if errno == ESRCH { return nil }
-        throw LifecycleError.processPathUnavailable(processIdentifier, errno)
+        let pathError = errno
+        let processConfirmedAbsent = pathError == ENOENT
+            && isProcessConfirmedAbsent(processIdentifier)
+        try validateExecutablePathFailure(
+            errorNumber: pathError,
+            processIdentifier: processIdentifier,
+            processConfirmedAbsent: processConfirmedAbsent
+        )
+        return nil
+    }
+
+    static func validateExecutablePathFailure(errorNumber: Int32,
+                                              processIdentifier: Int32,
+                                              processConfirmedAbsent: Bool) throws {
+        if errorNumber == ESRCH { return }
+        if errorNumber == ENOENT, processConfirmedAbsent { return }
+        throw LifecycleError.processPathUnavailable(processIdentifier, errorNumber)
+    }
+
+    private static func isProcessConfirmedAbsent(_ processIdentifier: Int32) -> Bool {
+        errno = 0
+        return kill(processIdentifier, 0) < 0 && errno == ESRCH
     }
 
     private static func userIdentifier(for processIdentifier: Int32) throws -> uid_t? {
@@ -162,9 +182,9 @@ struct SystemProcessInventory: ProcessInventoryReading {
         let responsible = responsibleFunction(processIdentifier)
         if responsible >= 0 { return responsible }
         if errno == ESRCH { return nil }
-        // Another user's processes do not participate in this user's TCC
-        // database. Their own identifiers are still inspected and matched;
-        // only private responsibility attribution may be inaccessible.
+        // Another user's private responsibility chain may be inaccessible.
+        // Preserve the process so its own identity is still inspected and
+        // matched instead of dropping a possibly affected app.
         if (errno == EPERM || errno == EACCES), userIdentifier != getuid() {
             return processIdentifier
         }
