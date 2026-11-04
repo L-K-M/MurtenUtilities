@@ -70,7 +70,7 @@ struct SystemProcessInventory: ProcessInventoryReading {
                     continue
                 }
                 guard let responsibleProcessIdentifier = try responsibleProcessIdentifier(
-                    for: processIdentifier, userIdentifier: userIdentifier
+                    for: processIdentifier
                 ) else {
                     continue // It exited after its path was read.
                 }
@@ -173,22 +173,24 @@ struct SystemProcessInventory: ProcessInventoryReading {
         throw LifecycleError.processIdentityReadFailed(processIdentifier, errorNumber)
     }
 
-    private static func responsibleProcessIdentifier(for processIdentifier: Int32,
-                                                     userIdentifier: uid_t) throws -> Int32? {
+    private static func responsibleProcessIdentifier(for processIdentifier: Int32) throws -> Int32? {
         guard let responsibleFunction else {
             throw LifecycleError.responsibilityUnavailable
         }
         errno = 0
         let responsible = responsibleFunction(processIdentifier)
+        return try interpretResponsibilityResult(responsible: responsible,
+                                                 errorNumber: errno,
+                                                 processIdentifier: processIdentifier)
+    }
+
+    static func interpretResponsibilityResult(responsible: Int32, errorNumber: Int32,
+                                               processIdentifier: Int32) throws -> Int32? {
         if responsible >= 0 { return responsible }
-        if errno == ESRCH { return nil }
-        // Another user's private responsibility chain may be inaccessible.
-        // Preserve the process so its own identity is still inspected and
-        // matched instead of dropping a possibly affected app.
-        if (errno == EPERM || errno == EACCES), userIdentifier != getuid() {
-            return processIdentifier
-        }
-        throw LifecycleError.responsibilityReadFailed(processIdentifier, errno)
+        if errorNumber == ESRCH { return nil }
+        // A denied responsibility lookup cannot prove that a helper is
+        // unrelated to an affected app, including in another login session.
+        throw LifecycleError.responsibilityReadFailed(processIdentifier, errorNumber)
     }
 
     private static func signingIdentity(for processIdentifier: Int32,
@@ -277,24 +279,27 @@ final class WorkspaceApplicationLifecycle: ApplicationLifecycleManaging {
                 process.enclosingAppIdentifier,
                 running?.bundleIdentifier
             ].compactMap { $0 })
-            var responsible = process.responsibleProcessIdentifier
+            var attributedProcess = process
             var visited = Set<Int32>()
-            if responsible != process.processIdentifier,
-               byProcessIdentifier[responsible] == nil,
-               process.userIdentifier == getuid(),
-               !implicatedProcesses.contains(keyFor(process)) {
-                throw LifecycleError.responsibleProcessMissing(process.processIdentifier,
-                                                               responsible)
-            }
-            while responsible != process.processIdentifier,
-                  visited.insert(responsible).inserted,
-                  let owner = byProcessIdentifier[responsible] {
+            while attributedProcess.responsibleProcessIdentifier != attributedProcess.processIdentifier {
+                let responsible = attributedProcess.responsibleProcessIdentifier
+                guard visited.insert(attributedProcess.processIdentifier).inserted,
+                      !visited.contains(responsible) else {
+                    throw LifecycleError.responsibilityCycle(process.processIdentifier)
+                }
+                guard let owner = byProcessIdentifier[responsible] else {
+                    // An already-attributed helper must stay affected after
+                    // its main app exits. Otherwise the missing owner leaves
+                    // the process's relationship to affected apps unknown.
+                    if implicatedProcesses.contains(keyFor(process)) { break }
+                    throw LifecycleError.responsibleProcessMissing(process.processIdentifier,
+                                                                   responsible)
+                }
                 attributedIdentifiers.formUnion([
                     owner.signingIdentifier,
                     owner.enclosingAppIdentifier
                 ].compactMap { $0 })
-                if owner.responsibleProcessIdentifier == responsible { break }
-                responsible = owner.responsibleProcessIdentifier
+                attributedProcess = owner
             }
 
             let key = ProcessKey(processIdentifier: process.processIdentifier,
@@ -351,6 +356,7 @@ enum LifecycleError: LocalizedError {
     case processIdentityUnavailable(Int32)
     case responsibilityUnavailable
     case responsibilityReadFailed(Int32, Int32)
+    case responsibilityCycle(Int32)
     case responsibleProcessMissing(Int32, Int32)
 
     var errorDescription: String? {
@@ -371,6 +377,8 @@ enum LifecycleError: LocalizedError {
             return "macOS did not provide process-responsibility information. No further permissions were reset."
         case .responsibilityReadFailed(let processIdentifier, let code):
             return "Process \(processIdentifier)'s responsible app could not be identified (error \(code)). No further permissions were reset."
+        case .responsibilityCycle(let processIdentifier):
+            return "Process \(processIdentifier)'s responsibility chain contains a cycle. No further permissions were reset."
         case .responsibleProcessMissing(let processIdentifier, let responsibleProcessIdentifier):
             return "Process \(processIdentifier)'s responsible app (process \(responsibleProcessIdentifier)) is no longer available to inspect. No further permissions were reset."
         }

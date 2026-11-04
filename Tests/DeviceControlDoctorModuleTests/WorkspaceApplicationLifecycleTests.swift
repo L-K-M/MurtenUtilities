@@ -85,6 +85,20 @@ final class WorkspaceApplicationLifecycleTests: XCTestCase {
         ))
     }
 
+    func testDeniedResponsibilityLookupFailsClosed() {
+        for code in [EPERM, EACCES] {
+            XCTAssertThrowsError(try SystemProcessInventory.interpretResponsibilityResult(
+                responsible: -1, errorNumber: code, processIdentifier: 98_770
+            ))
+        }
+    }
+
+    func testExitedProcessDuringResponsibilityLookupIsSkipped() throws {
+        XCTAssertNil(try SystemProcessInventory.interpretResponsibilityResult(
+            responsible: -1, errorNumber: ESRCH, processIdentifier: 98_771
+        ))
+    }
+
     func testResponsibleHelperRemainsAffectedAfterItsMainAppExits() async throws {
         let main = ProcessIdentity(processIdentifier: 701,
                                    executablePath: "/Applications/Main.app/Contents/MacOS/Main",
@@ -120,6 +134,82 @@ final class WorkspaceApplicationLifecycleTests: XCTestCase {
         }
     }
 
+    func testMissingResponsibleAppInAnotherSessionFailsClosed() async {
+        let helper = ProcessIdentity(processIdentifier: 704,
+                                     executablePath: "/tmp/other-session-helper",
+                                     signingIdentifier: "com.example.Main.Helper",
+                                     responsibleProcessIdentifier: 705,
+                                     userIdentifier: getuid() + 1)
+        let lifecycle = WorkspaceApplicationLifecycle(inventory: InventoryFixture(processes: [helper]))
+
+        do {
+            _ = try await lifecycle.runningProcesses(matching: ["com.example.Main"])
+            XCTFail("an unavailable responsible app must not hide an affected helper in another session")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("responsible app"))
+        }
+    }
+
+    func testMissingResponsibleAncestorFailsClosed() async {
+        let helper = ProcessIdentity(processIdentifier: 706,
+                                     executablePath: "/tmp/nested-helper",
+                                     signingIdentifier: "com.example.Main.Helper",
+                                     responsibleProcessIdentifier: 707)
+        let owner = ProcessIdentity(processIdentifier: 707,
+                                    executablePath: "/tmp/intermediate-owner",
+                                    signingIdentifier: "com.example.Main.Owner",
+                                    responsibleProcessIdentifier: 708)
+        let lifecycle = WorkspaceApplicationLifecycle(inventory: InventoryFixture(processes: [helper, owner]))
+
+        do {
+            _ = try await lifecycle.runningProcesses(matching: ["com.example.Main"])
+            XCTFail("an incomplete responsibility chain must not prove that no affected helper is running")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("responsible app"))
+        }
+    }
+
+    func testCyclicResponsibilityFailsClosed() async {
+        let helper = ProcessIdentity(processIdentifier: 709,
+                                     executablePath: "/tmp/cyclic-helper",
+                                     signingIdentifier: "com.example.Main.Helper",
+                                     responsibleProcessIdentifier: 710)
+        let owner = ProcessIdentity(processIdentifier: 710,
+                                    executablePath: "/tmp/cyclic-owner",
+                                    signingIdentifier: "com.example.Main.Owner",
+                                    responsibleProcessIdentifier: 709)
+        let lifecycle = WorkspaceApplicationLifecycle(inventory: InventoryFixture(processes: [helper, owner]))
+
+        do {
+            _ = try await lifecycle.runningProcesses(matching: ["com.example.Main"])
+            XCTFail("a cyclic responsibility chain must not prove that no affected helper is running")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("responsib"))
+        }
+    }
+
+    func testFindsAnAffectedHelpersCompleteChainInAnotherSession() async throws {
+        let helper = ProcessIdentity(processIdentifier: 711,
+                                     executablePath: "/tmp/foreign-helper",
+                                     signingIdentifier: "com.example.Main.Helper",
+                                     responsibleProcessIdentifier: 712,
+                                     userIdentifier: getuid() + 1)
+        let owner = ProcessIdentity(processIdentifier: 712,
+                                    executablePath: "/tmp/foreign-owner",
+                                    signingIdentifier: "com.example.Main.Owner",
+                                    responsibleProcessIdentifier: 713,
+                                    userIdentifier: getuid() + 1)
+        let app = ProcessIdentity(processIdentifier: 713,
+                                  executablePath: "/tmp/foreign-app",
+                                  signingIdentifier: "com.example.Main",
+                                  userIdentifier: getuid() + 1)
+        let lifecycle = WorkspaceApplicationLifecycle(inventory: InventoryFixture(processes: [helper, owner, app]))
+
+        let running = try await lifecycle.runningProcesses(matching: ["com.example.Main"])
+
+        XCTAssertEqual(Set(running.map(\.processIdentifier)), [711, 712, 713])
+    }
+
     func testLiveInventoryContainsTheTestProcess() async throws {
         let processes = try await liveSnapshot()
         XCTAssertTrue(processes.contains { $0.processIdentifier == ProcessInfo.processInfo.processIdentifier })
@@ -138,12 +228,19 @@ final class WorkspaceApplicationLifecycleTests: XCTestCase {
     private func liveSnapshot() async throws -> [ProcessIdentity] {
         do {
             return try await SystemProcessInventory().snapshot()
-        } catch LifecycleError.processPathUnavailable(let processIdentifier, let code)
-            where [ENOENT, EACCES, EPERM].contains(code) {
-            // Some hosts keep live processes whose executable path cannot
-            // be read. Production must refuse the reset there; these
-            // success-path checks require a complete, readable inventory.
-            throw XCTSkip("Host prevents a complete process inventory: PID \(processIdentifier), error \(code). Reset All fails closed on this host.")
+        } catch let error as LifecycleError {
+            switch error {
+            case .processPathUnavailable(_, let code) where [ENOENT, EACCES, EPERM].contains(code):
+                break
+            case .responsibilityReadFailed(_, let code) where [EACCES, EPERM].contains(code):
+                break
+            default:
+                throw error
+            }
+            // Some hosts restrict executable paths or responsibility queries.
+            // Production must refuse the reset there; these success-path
+            // checks require a complete, readable inventory.
+            throw XCTSkip("Host prevents a complete process inventory: \(error.localizedDescription)")
         }
     }
 }

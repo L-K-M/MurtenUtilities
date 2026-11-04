@@ -217,6 +217,9 @@ service-wide Reset All for recovery when individual repairs are insufficient.
   relaunch, incomplete inventory, changing scope, command failure or
   unverifiable postcondition stops the remaining resets. Apps are not
   reopened automatically.
+  Responsibility checks include other login sessions. Denied lookups,
+  missing owners and cyclic ownership chains block the reset. Hosts that
+  cannot expose a complete process inventory cannot use this operation.
   Where `tccutil list` is unavailable, Reset All is disabled and changes
   nothing.
 - **State:** the watch list stays at
