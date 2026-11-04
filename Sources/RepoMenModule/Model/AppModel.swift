@@ -295,10 +295,8 @@ final class AppModel: ObservableObject {
                 self.scanStatus = "Measuring \(discovered.count) items…"
             }
 
-            await Self.measureAll(discovered) { id, measurement in
-                Task { @MainActor [weak self] in
-                    self?.enqueue(measurement, for: id, generation: generation)
-                }
+            await Self.measureAll(discovered) { [weak self] id, measurement in
+                self?.enqueue(measurement, for: id, generation: generation)
             }
 
             guard !Task.isCancelled else { return }
@@ -394,7 +392,7 @@ final class AppModel: ObservableObject {
     /// (partial) measurements are discarded, never reported.
     private nonisolated static func measureAll(
         _ items: [CleanableItem],
-        apply: @escaping @Sendable (String, DirectorySizer.Measurement) -> Void
+        apply: @escaping @MainActor @Sendable (String, DirectorySizer.Measurement) -> Void
     ) async {
         let width = min(8, max(2, ProcessInfo.processInfo.activeProcessorCount / 2))
         await withTaskGroup(of: Void.self) { group in
@@ -406,7 +404,7 @@ final class AppModel: ObservableObject {
                     // An aborted walk returns partial counts — dropping them keeps an
                     // undersized artifact from ever being presented as fully measured.
                     guard measurement.isComplete else { return }
-                    apply(item.id, measurement)
+                    await apply(item.id, measurement)
                 }
             }
             for _ in 0..<width { addNext() }
@@ -537,13 +535,14 @@ final class AppModel: ObservableObject {
             // Best-effort, unprivileged, near-instant: only when something was freed
             // (a failed batch has nothing for snapshots to hold on to), and any
             // failure simply leaves the hint out.
-            let listing = outcomes.contains { $0.failure == nil }
+            let completedOutcomes = outcomes
+            let listing = completedOutcomes.contains { $0.failure == nil }
                 ? ((try? await SnapshotTool.listAll()) ?? .empty) : .empty
             await MainActor.run { [weak self] in
                 guard let self else { return }
                 self.isReclaiming = false
                 self.reclaimProgress = nil
-                let reclaimed = outcomes.filter { $0.failure == nil }
+                let reclaimed = completedOutcomes.filter { $0.failure == nil }
                 let reclaimedPaths = Set(reclaimed.map(\.item.path))
                 let reclaimedPrefixes = reclaimed.map { $0.item.path + "/" }
                 self.items.removeAll { item in
@@ -561,7 +560,7 @@ final class AppModel: ObservableObject {
                     freedBytes: freedBytes,
                     reclaimedCount: reclaimed.count,
                     unmeasuredReclaimed: reclaimed.filter { !$0.item.isMeasured }.count,
-                    failures: outcomes.compactMap { outcome in
+                    failures: completedOutcomes.compactMap { outcome in
                         outcome.failure.map { "\(outcome.item.label): \($0)" }
                     },
                     systemDeleted: reclaimed.filter(\.item.isSystemArea).count,

@@ -396,7 +396,11 @@ final class ObtainintoshModel {
             downloadProgress = DownloadProgress(appID: app.id, fileName: release.fileName, downloaded: 0,
                                                 total: release.fileSize ?? 0)
 
-            let file = try await environment.downloader.download(release, auth: auth, appKey: app.id) { done, total in
+            let file = try await environment.downloader.download(
+                release,
+                auth: auth,
+                appKey: app.id
+            ) { [self] done, total in
                 Task { @MainActor [weak self] in
                     guard let self, self.downloadGeneration == generation else { return }
                     self.showDownloadProgress(done, of: total)

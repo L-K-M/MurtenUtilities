@@ -12,44 +12,48 @@ import BootCaptainCore
 /// implementation would add `F_FULLFSYNC` — noted as a hardening follow-up.
 public struct FileJournal: Sendable {
     public let directory: String
-    private let fileManager: FileManager
+    private let fileManager: LockedFileManager
 
     public init(directory: String, fileManager: FileManager = .default) {
         self.directory = directory
-        self.fileManager = fileManager
+        self.fileManager = LockedFileManager(fileManager)
     }
 
     /// Write (or overwrite) a record durably. Returns false on failure.
     @discardableResult
     public func write(_ record: JournalRecord) -> Bool {
-        do {
-            try fileManager.createDirectory(atPath: directory,
+        fileManager.withLock { manager in
+            do {
+                try manager.createDirectory(atPath: directory,
                                             withIntermediateDirectories: true)
-            let url = URL(fileURLWithPath: directory).appendingPathComponent("\(record.id).json")
-            let data = try JSONEncoder().encode(record)
-            try data.write(to: url, options: .atomic)
-            return true
-        } catch {
-            return false
+                let url = URL(fileURLWithPath: directory).appendingPathComponent("\(record.id).json")
+                let data = try JSONEncoder().encode(record)
+                try data.write(to: url, options: .atomic)
+                return true
+            } catch {
+                return false
+            }
         }
     }
 
     /// Load every journal record currently on disk.
     public func all() -> [JournalRecord] {
-        guard let names = try? fileManager.contentsOfDirectory(atPath: directory) else { return [] }
-        let decoder = JSONDecoder()
-        return names.filter { $0.hasSuffix(".json") }.compactMap { name in
-            let path = directory + "/" + name
-            guard let data = fileManager.contents(atPath: path) else { return nil }
-            do {
-                return try decoder.decode(JournalRecord.self, from: data)
-            } catch {
-                // A journal file that will not decode (schema drift, disk
-                // corruption) must not vanish silently: unfinished() feeds
-                // startup reconciliation, and a hidden prepared record is the
-                // exact failure reconciliation exists to surface. Log and skip.
-                NSLog("BootCaptain: ignoring undecodable journal record \(name): \(error)")
-                return nil
+        fileManager.withLock { manager in
+            guard let names = try? manager.contentsOfDirectory(atPath: directory) else { return [] }
+            let decoder = JSONDecoder()
+            return names.filter { $0.hasSuffix(".json") }.compactMap { name in
+                let path = directory + "/" + name
+                guard let data = manager.contents(atPath: path) else { return nil }
+                do {
+                    return try decoder.decode(JournalRecord.self, from: data)
+                } catch {
+                    // A journal file that will not decode (schema drift, disk
+                    // corruption) must not vanish silently: unfinished() feeds
+                    // startup reconciliation, and a hidden prepared record is the
+                    // exact failure reconciliation exists to surface. Log and skip.
+                    NSLog("BootCaptain: ignoring undecodable journal record \(name): \(error)")
+                    return nil
+                }
             }
         }
     }
@@ -89,5 +93,20 @@ public struct FileJournal: Sendable {
         updated.status = status
         updated.completedAt = time
         return write(updated)
+    }
+}
+
+/// `FileJournal` is Sendable, so an injected manager must never be entered
+/// concurrently even when its caller moves the journal between tasks.
+private final class LockedFileManager: @unchecked Sendable {
+    private let manager: FileManager
+    private let lock = NSLock()
+
+    init(_ manager: FileManager) {
+        self.manager = manager
+    }
+
+    func withLock<Result>(_ operation: (FileManager) -> Result) -> Result {
+        lock.withLock { operation(manager) }
     }
 }
