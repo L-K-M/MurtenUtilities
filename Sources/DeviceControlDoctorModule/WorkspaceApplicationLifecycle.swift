@@ -342,7 +342,7 @@ final class WorkspaceApplicationLifecycle: ApplicationLifecycleManaging {
     }
 }
 
-private enum LifecycleError: LocalizedError {
+enum LifecycleError: LocalizedError {
     case processInventoryUnavailable(Int32)
     case processInventoryTruncated
     case processInventoryUnstable

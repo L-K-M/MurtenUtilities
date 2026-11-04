@@ -121,16 +121,30 @@ final class WorkspaceApplicationLifecycleTests: XCTestCase {
     }
 
     func testLiveInventoryContainsTheTestProcess() async throws {
-        let processes = try await SystemProcessInventory().snapshot()
+        let processes = try await liveSnapshot()
         XCTAssertTrue(processes.contains { $0.processIdentifier == ProcessInfo.processInfo.processIdentifier })
     }
 
     func testLiveLifecycleCanProveAnAbsentClientHasNoRunningProcesses() async throws {
-        let lifecycle = WorkspaceApplicationLifecycle()
+        let lifecycle = WorkspaceApplicationLifecycle(
+            inventory: InventoryFixture(processes: try await liveSnapshot())
+        )
         let running = try await lifecycle.runningProcesses(
             matching: ["/definitely/not/a/live/executable"]
         )
         XCTAssertTrue(running.isEmpty)
+    }
+
+    private func liveSnapshot() async throws -> [ProcessIdentity] {
+        do {
+            return try await SystemProcessInventory().snapshot()
+        } catch LifecycleError.processPathUnavailable(let processIdentifier, let code)
+            where [ENOENT, EACCES, EPERM].contains(code) {
+            // Some hosts keep live processes whose executable path cannot
+            // be read. Production must refuse the reset there; these
+            // success-path checks require a complete, readable inventory.
+            throw XCTSkip("Host prevents a complete process inventory: PID \(processIdentifier), error \(code). Reset All fails closed on this host.")
+        }
     }
 }
 
