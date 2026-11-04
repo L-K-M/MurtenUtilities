@@ -14,7 +14,7 @@
     <key>NSRequiresAquaSystemAppearance</key><true/>
     <key>NSHumanReadableCopyright</key><string>Public domain (Unlicense)</string>
     <key>NSPrincipalClass</key><string>NSApplication</string>
-    <key>NSAppleEventsUsageDescription</key><string>BootCaptain reads your "Open at Login" items through System Events, and removes or restores one only when you ask it to.</string>
+    <key>NSAppleEventsUsageDescription</key><string>Startup Manager reads your "Open at Login" items through System Events, and removes or restores one only when you ask it to.</string>
     <!-- Plain HTTP only to the local network (a LAN Forgejo for Obtainintosh
          or RunningMan); public hosts stay HTTPS-only. -->
     <key>NSAppTransportSecurity</key><dict>

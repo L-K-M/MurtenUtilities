@@ -47,7 +47,7 @@ final class ConfirmationSheetController: NSWindowController, NSTableViewDataSour
       count == 1 ? "Remove 1 item from Docker?" : "Remove \(count) items from Docker?", size: 17,
       weight: .bold)
     let intro = Theme.wrappingLabel(
-      "DockVac will run the operations below in this order. Nothing is forced, so Docker still refuses anything that is in use. Removed data cannot be recovered.",
+      "Docker Cleaner will run the operations below in this order. Nothing is forced, so Docker still refuses anything that is in use. Removed data cannot be recovered.",
       size: 12, color: .secondaryLabelColor)
     intro.isSelectable = false
     intro.preferredMaxLayoutWidth = 660
@@ -115,7 +115,7 @@ final class ConfirmationSheetController: NSWindowController, NSTableViewDataSour
     commandsScroll.translatesAutoresizingMaskIntoConstraints = false
     commandsScroll.heightAnchor.constraint(equalToConstant: 110).isActive = true
     let explanation = Theme.wrappingLabel(
-      "These commands target the connection shown above. DockVac uses the Engine API without force flags.",
+      "These commands target the connection shown above. Docker Cleaner uses the Engine API without force flags.",
       size: 11, color: .secondaryLabelColor)
     explanation.isSelectable = false
     explanation.preferredMaxLayoutWidth = 660

@@ -30,10 +30,10 @@ package enum ManagedStorageCatalog {
                  "Open Arq, then Help > View Cache Statistics (Arq 7.50 or later). Select a backup plan, then Backup Plan > Clear Cache to rebuild its cached database and backup metadata. The next backup downloads metadata from your destination and can cause substantial data transfer. This action does not clear activity logs. The size shown is the whole local cache, not a promise of space recovered by one plan.",
                  "https://www.arqbackup.com/documentation/arq7/English.lproj/clearCache.html", apps: ["com.haystacksoftware.Arq"]),
             area("Arq activity logs", systemApplicationSupport.appendingPathComponent("ArqAgent/logs"),
-                 "These are diagnostic logs, separate from Arq's backup cache. Clear Cache does not clear these logs. Contact support@arqbackup.com for supported pruning guidance; RepoMen has not verified a safe deletion or retention policy. This footprint is not counted as reclaimable space.",
+                 "These are diagnostic logs, separate from Arq's backup cache. Clear Cache does not clear these logs. Contact support@arqbackup.com for supported pruning guidance; Developer Cleanup has not verified a safe deletion or retention policy. This footprint is not counted as reclaimable space.",
                  "https://www.arqbackup.com/", apps: ["com.haystacksoftware.Arq"]),
             area("JetBrains diagnostic logs", home.appendingPathComponent("Library/Logs/JetBrains"),
-                 "In your JetBrains IDE, choose Help > Show Log in Finder to inspect diagnostics. Keep logs needed for troubleshooting and ask JetBrains Support about unexpected growth. RepoMen measures this directory but does not delete diagnostics or your IDE's Local History.",
+                 "In your JetBrains IDE, choose Help > Show Log in Finder to inspect diagnostics. Keep logs needed for troubleshooting and ask JetBrains Support about unexpected growth. Developer Cleanup measures this directory but does not delete diagnostics or your IDE's Local History.",
                  "https://www.jetbrains.com/help/idea/directories-used-by-the-ide-to-store-settings-caches-plugins-and-logs.html#logs-directory",
                  apps: ["com.jetbrains.intellij", "com.jetbrains.intellij.ce"]),
         ]

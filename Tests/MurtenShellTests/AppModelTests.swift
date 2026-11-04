@@ -234,7 +234,7 @@ final class AppModelTests: XCTestCase {
         let harness = Harness()
         XCTAssertTrue(harness.model.interruptionWarnings().isEmpty)
         harness.provider.busy = "A cleanup is still running."
-        XCTAssertEqual(harness.model.interruptionWarnings(), ["DockVac: A cleanup is still running."])
+        XCTAssertEqual(harness.model.interruptionWarnings(), ["Docker Cleaner: A cleanup is still running."])
     }
 
     // MARK: - Views

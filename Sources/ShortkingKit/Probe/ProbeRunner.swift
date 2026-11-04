@@ -26,7 +26,7 @@ public final class ProbeRunner: @unchecked Sendable {
             case .timedOut:
                 return "The probe helper did not finish in time."
             case .malformedOutput(let detail):
-                return "The probe helper produced output Shortking could not read: \(detail)"
+                return "The probe helper produced output Shortcut Detective could not read: \(detail)"
             }
         }
     }

@@ -26,7 +26,7 @@ final class ZenBackupManagerProviderTests: XCTestCase {
     func testRegistersTheTimelineRouteAndAWatcher() throws {
         let provider = makeProvider(try makeZenFolder())
         XCTAssertEqual(provider.moduleID, "zenbackupmanager")
-        XCTAssertEqual(provider.moduleID, ModuleRegistry.all.first { $0.name == "Zen Backup Manager" }?.id)
+        XCTAssertEqual(provider.moduleID, ModuleRegistry.all.first { $0.id == "zenbackupmanager" }?.id)
         XCTAssertEqual(provider.routeActions, ["timeline": ["profile"]])
         XCTAssertEqual(provider.watch?.moduleID, provider.moduleID)
         XCTAssertNotNil(provider.makeSettings())

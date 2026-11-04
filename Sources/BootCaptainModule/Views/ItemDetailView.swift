@@ -109,7 +109,7 @@ struct ItemDetailView: View {
                         .font(.headline)
                         .foregroundStyle(.secondary)
                     // The suite carries no privileged helper (HelperClient).
-                    Text("\(HelperClient.unavailableReason) Moving items in /Library needs BootCaptain's administrator helper.")
+                    Text("\(HelperClient.unavailableReason) Moving items in /Library needs Startup Manager's administrator helper.")
                         .font(.caption).foregroundStyle(.secondary)
                 } else {
                     HStack {
@@ -144,7 +144,7 @@ struct ItemDetailView: View {
                     if working { ProgressView().controlSize(.small) }
                 }
                 Text(helper.isAvailable
-                     ? "BootCaptain records an undo before changing anything. Nothing is deleted."
+                     ? "Startup Manager records an undo before changing anything. Nothing is deleted."
                      : HelperClient.unavailableReason)
                     .font(.caption).foregroundStyle(.secondary)
             case .guidedAction:
@@ -153,7 +153,7 @@ struct ItemDetailView: View {
                 } label: {
                     Label("Open in System Settings", systemImage: "arrow.up.forward.app")
                 }
-                Text("This item is controlled by its owning app or the system; BootCaptain sends you to the right place.")
+                Text("This item is controlled by its owning app or the system; Startup Manager sends you to the right place.")
                     .font(.caption).foregroundStyle(.secondary)
             case .readOnly:
                 Label("Read-only", systemImage: "lock").foregroundStyle(.secondary)

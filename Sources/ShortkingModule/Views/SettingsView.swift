@@ -66,10 +66,10 @@ struct SettingsView: View {
             Section("Attribution") {
                 Toggle("Learn owners from app launch and quit",
                        isOn: $state.settings.differentialLearningEnabled)
-                Text("While Shortking is open, it re-probes whenever an app launches or quits "
+                Text("While Shortcut Detective is open, it re-probes whenever an app launches or quits "
                     + "and records which combinations changed hands. Over time this attributes "
                     + "the WindowServer layer on its own — using only public API, with no "
-                    + "cooperation from any app. It pauses when you leave Shortking, so Murten "
+                    + "cooperation from any app. It pauses when you leave Shortcut Detective, so Murten "
                     + "Utilities does not probe in the background.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -141,7 +141,7 @@ struct SettingsView: View {
             Button("Forget everything", role: .destructive) { state.resetAttribution() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This deletes every launch/quit observation Shortking has accumulated. Owners it "
+            Text("This deletes every launch/quit observation Shortcut Detective has accumulated. Owners it "
                 + "inferred will go back to “unknown” until it relearns them.")
         }
     }

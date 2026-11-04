@@ -38,7 +38,7 @@ public enum AssetFilter: Equatable, Hashable, Sendable {
         if fileName.contains(where: { wildcards.contains($0) }) {
             guard fileName.contains(where: { $0.isLetter || $0.isNumber }) else {
                 throw ObtainintoshError("The pattern \"\(input)\" matches every file. Leave the program blank "
-                    + "to let Obtainintosh choose.")
+                    + "to let Software Update Finder choose.")
             }
             return .pattern(fileName.lowercased())
         }

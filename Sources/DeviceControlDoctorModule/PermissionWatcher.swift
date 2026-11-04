@@ -52,7 +52,7 @@ struct PermissionWatcher: Watcher {
         case .unreadable:
             return .unavailable(moduleID: moduleID, at: started, ObservationFailure(
                 kind: .malformedResponse,
-                message: "The watch list could not be read. Open DeviceControlDoctor for details."))
+                message: "The watch list could not be read. Open App Permission Checkup for details."))
         }
 
         var findings: [Finding] = []
@@ -104,7 +104,7 @@ struct PermissionWatcher: Watcher {
         // every read, so a link added later cannot lead a read into one.
         guard let path = ProtectedLocation.readablePath(app.path, home: home, linkDestination: Self.linkDestination) else {
             return .skipped(.permissionDenied,
-                            "It is in, or linked into, a folder macOS protects, so it is checked only when you open DeviceControlDoctor.")
+                            "It is in, or linked into, a folder macOS protects, so it is checked only when you open App Permission Checkup.")
         }
         let clientIdentifier = app.canReset ? nil : app.bundleID
         guard let current = AppCatalog.app(at: URL(fileURLWithPath: path), clientIdentifier: clientIdentifier) else {

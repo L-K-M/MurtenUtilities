@@ -27,7 +27,7 @@ final class ProgramFormTests: XCTestCase {
         form.receive(hauntwarePrograms, forKey: key)
 
         XCTAssertEqual(form.offeredPrograms, hauntwarePrograms.programs)
-        XCTAssertEqual(form.defaultProgramHint, "Without a choice, Obtainintosh downloads planchette.")
+        XCTAssertEqual(form.defaultProgramHint, "Without a choice, Software Update Finder downloads planchette.")
 
         form.chooseProgram("seance-sync")
         XCTAssertEqual(form.assetFilter, "seance-sync")

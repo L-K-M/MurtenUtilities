@@ -33,11 +33,11 @@ public struct StartupItemsWatcher: Watcher {
         case .notYetReviewed:
             return .unavailable(moduleID: moduleID, at: now(), ObservationFailure(
                 kind: .toolMissing,
-                message: "Open BootCaptain once so it knows which startup items you have already seen."))
+                message: "Open Startup Manager once so it knows which startup items you have already seen."))
         case .unreadable:
             return .unavailable(moduleID: moduleID, at: now(), ObservationFailure(
                 kind: .malformedResponse,
-                message: "The list of reviewed startup items could not be read. Open BootCaptain and mark the list as reviewed."))
+                message: "The list of reviewed startup items could not be read. Open Startup Manager and mark the list as reviewed."))
         case .reviewed(let inventory):
             baseline = inventory
         }

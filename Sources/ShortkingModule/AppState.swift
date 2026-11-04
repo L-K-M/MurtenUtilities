@@ -585,7 +585,7 @@ final class AppState: ObservableObject {
         guard let group = result.groups.first(where: { $0.combo == combo }) else {
             return Verdict(
                 tone: .unknown,
-                headline: "Nothing Shortking can see claims \(combo.displayString)",
+                headline: "Nothing Shortcut Detective can see claims \(combo.displayString)",
                 detail: "No config file, menu bar, preference domain or hotkey registration "
                     + "accounts for it. That points at the frontmost app's own handling, or at a "
                     + "tool that pattern-matches keys in its own code and registers nothing.",
@@ -618,7 +618,7 @@ final class AppState: ObservableObject {
             return Verdict(
                 tone: .unknown,
                 headline: "\(combo.displayString) is claimed, but everything holding it is disabled",
-                detail: "Every claim Shortking found on this combination is switched off, so "
+                detail: "Every claim Shortcut Detective found on this combination is switched off, so "
                     + "pressing it should do nothing at all.",
                 offersInvestigation: true
             )

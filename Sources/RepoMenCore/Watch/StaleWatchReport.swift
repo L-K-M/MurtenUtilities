@@ -103,7 +103,7 @@ package enum StaleWatchReport {
             return ObservationFailure(
                 kind: .permissionDenied, scope: scope,
                 message: "\(folder) is inside \(Format.abbreviatePath(root, home: home)), which macOS "
-                    + "protects with a privacy prompt. Background checks skip it; scan it in RepoMen instead.")
+                    + "protects with a privacy prompt. Background checks skip it; scan it in Developer Cleanup instead.")
         case .missing:
             return ObservationFailure(kind: .toolMissing, scope: scope,
                                       message: "The watched folder \(folder) no longer exists.")

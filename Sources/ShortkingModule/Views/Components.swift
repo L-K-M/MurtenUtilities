@@ -232,7 +232,7 @@ struct ConfidenceMeter: View {
         .help(
             confidence >= 1.0
                 ? "Read directly from a config file, plist or the Accessibility API."
-                : "Inferred. Confidence rises as Shortking observes more evidence."
+                : "Inferred. Confidence rises as Shortcut Detective observes more evidence."
         )
     }
 

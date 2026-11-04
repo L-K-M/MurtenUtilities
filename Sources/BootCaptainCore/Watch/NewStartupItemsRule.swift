@@ -48,12 +48,12 @@ public struct NewStartupItemsRule: SuggestionRule {
         let title = "\(product) installed \(count) new startup item\(count == 1 ? "" : "s")"
 
         var detail = count == 1
-            ? "It is not in the list you last reviewed in BootCaptain"
-            : "They are not in the list you last reviewed in BootCaptain"
+            ? "It is not in the list you last reviewed in Startup Manager"
+            : "They are not in the list you last reviewed in Startup Manager"
         if let labels = finding.text("labels"), !labels.isEmpty {
             detail += ": \(labels)"
         }
-        detail += ". Open BootCaptain to see what \(count == 1 ? "it runs" : "they run"); nothing changes until you choose to."
+        detail += ". Open Startup Manager to see what \(count == 1 ? "it runs" : "they run"); nothing changes until you choose to."
 
         return SuggestionContent(
             title: title, detail: detail,

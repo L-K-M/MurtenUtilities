@@ -48,7 +48,7 @@ public struct LiveUpdateObserver: UpdateObserving {
         if app.sourceType == .forgejo && app.hasStoredAccessToken {
             guard let key = await vault.cachedToken(.forgejo(appID: app.id)) else {
                 throw LookupFailure(.permissionDenied, "Its application key is read from the Keychain only when you "
-                    + "check from Obtainintosh, so it was not checked in the background.")
+                    + "check from Software Update Finder, so it was not checked in the background.")
             }
             credentials.forge = ForgeCredentials(username: app.username, token: key)
         }

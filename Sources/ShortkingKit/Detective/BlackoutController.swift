@@ -25,7 +25,7 @@ public final class BlackoutController {
             case .unsupported:
                 return "Blackout needs SkyLight symbols that are not available on this macOS version."
             case .failedToRead:
-                return "Could not read the current global hotkey mode, so Shortking will not change it."
+                return "Could not read the current global hotkey mode, so Shortcut Detective will not change it."
             case .failedToSet:
                 return "Could not change the global hotkey mode."
             }
@@ -137,7 +137,7 @@ public final class BlackoutController {
         if shortcutWorkedDuringBlackout {
             return "\(combo.displayString) worked with global hotkeys disabled, so a hotkey "
                 + "registered with WindowServer was consuming it. That narrows it to the "
-                + "WindowServer layer — run a live capture, or let Shortking identify the owner "
+                + "WindowServer layer — run a live capture, or let Shortcut Detective identify the owner "
                 + "across app restarts."
         }
         return "\(combo.displayString) still did not work with global hotkeys disabled, so no "

@@ -258,7 +258,7 @@ struct DetailView: View {
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                         .monospacedDigit()
-                        .help("Everything RepoMen has reclaimed for you since install")
+                        .help("Everything Developer Cleanup has reclaimed for you since install")
                 }
                 if let offender = model.biggestOffender,
                    !model.checkedIDs.contains(offender.id) {
@@ -415,7 +415,7 @@ struct DetailView: View {
             if !others.isEmpty {
                 let owners = Set(others.map(SnapshotTool.ownerLabel(forForeignName:)))
                     .sorted().joined(separator: ", ")
-                text += "\n\n\(others.count) snapshot\(others.count == 1 ? "" : "s") by \(owners) \(others.count == 1 ? "is" : "are") also on this disk and can hold the freed blocks too. RepoMen never touches snapshots made by other apps — manage \(others.count == 1 ? "it" : "them") there or in Disk Utility."
+                text += "\n\n\(others.count) snapshot\(others.count == 1 ? "" : "s") by \(owners) \(others.count == 1 ? "is" : "are") also on this disk and can hold the freed blocks too. Developer Cleanup never touches snapshots made by other apps — manage \(others.count == 1 ? "it" : "them") there or in Disk Utility."
             }
         }
         if summary.cancelled {

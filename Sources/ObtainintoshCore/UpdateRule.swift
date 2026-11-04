@@ -18,7 +18,7 @@ public struct UpdateRule: SuggestionRule {
 
         return SuggestionContent(
             title: "\(name) \(latest) is available",
-            detail: "Version \(installed) is installed. Obtainintosh downloads the release and shows it in Finder; "
+            detail: "Version \(installed) is installed. Software Update Finder downloads the release and shows it in Finder; "
                 + "you install it yourself.",
             route: ModuleRoute(moduleID: UpdateFinding.moduleID, action: UpdateFinding.routeAction))
     }

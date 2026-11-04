@@ -62,7 +62,7 @@ struct CleanupSheet: View {
                 .font(.system(size: 26)).foregroundStyle(.orange)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Review Broken Startup Items").font(.title3.bold())
-                Text("Review the evidence and choose each item you want BootCaptain to change.")
+                Text("Review the evidence and choose each item you want Startup Manager to change.")
                     .font(.callout).foregroundStyle(.secondary)
             }
             Spacer()
@@ -83,7 +83,7 @@ struct CleanupSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             Label("System items — needs administrator approval", systemImage: "lock.shield")
                 .font(.headline)
-            Text("These live in /Library and need BootCaptain's administrator helper. \(HelperClient.unavailableReason)")
+            Text("These live in /Library and need Startup Manager's administrator helper. \(HelperClient.unavailableReason)")
                 .font(.caption).foregroundStyle(.secondary)
             ForEach(systemActionable) { row($0).disabled(!helper.isAvailable) }
         }

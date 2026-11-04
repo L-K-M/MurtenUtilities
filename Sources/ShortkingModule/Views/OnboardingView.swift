@@ -103,8 +103,8 @@ struct OnboardingView: View {
     private var intro: some View {
         page(
             symbol: "crown",
-            title: "Shortking",
-            summary: "Shortking answers two questions: what key combinations are claimed on this "
+            title: "Shortcut Detective",
+            summary: "Shortcut Detective answers two questions: what key combinations are claimed on this "
                 + "machine, by whom and at what layer — and, when you press one and the wrong "
                 + "thing happens, who ate it."
         ) {
@@ -115,7 +115,7 @@ struct OnboardingView: View {
                     + "spot no other tool covers.", systemImage: "questionmark.circle")
                 Label("What it cannot do: name the owner of every claim. Apps register hotkeys "
                     + "inside WindowServer with no way to list them, and event-tap tools register "
-                    + "nothing at all. Shortking says “claimed, owner unknown” rather than "
+                    + "nothing at all. Shortcut Detective says “claimed, owner unknown” rather than "
                     + "quietly leaving those out — and then offers to find out.",
                     systemImage: "exclamationmark.circle")
             }
@@ -153,7 +153,7 @@ struct OnboardingView: View {
                 if needsRelaunch {
                     Text("The permission is granted, but this copy of Murten Utilities still can't "
                         + "read menus — macOS decides once per process and caches the answer. Quit "
-                        + "Murten Utilities and open it again; Shortking will come back to this screen.")
+                        + "Murten Utilities and open it again; Shortcut Detective will come back to this screen.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

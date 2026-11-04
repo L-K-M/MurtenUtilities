@@ -324,24 +324,24 @@ public enum MCPBridgeClient {
         do {
             channel = try LocalChannelClient.connect(path: path)
         } catch {
-            return .unavailable("Coreography is not running, or MCP access is off in its Settings")
+            return .unavailable("System Monitor is not running, or MCP access is off in its Settings")
         }
         // The app answers once it has checked the client, which may wait for approval.
         guard let first = try? await channel.readLine(), let status = MCPBridge.status(of: first) else {
             channel.close()
-            return .unavailable("Coreography closed the connection")
+            return .unavailable("System Monitor closed the connection")
         }
         switch status {
         case .ready: break
         case .denied:
             channel.close()
-            return .refused("Coreography did not approve this client; allow it when asked, or check Settings > MCP access")
+            return .refused("System Monitor did not approve this client; allow it when asked, or check Settings > MCP access")
         case .busy:
             channel.close()
-            return .refused("Coreography already serves its maximum number of MCP sessions")
+            return .refused("System Monitor already serves its maximum number of MCP sessions")
         case .disabled:
             channel.close()
-            return .refused("MCP access is off in Coreography's Settings")
+            return .refused("MCP access is off in System Monitor's Settings")
         }
 
         // stdin blocks, so it reads on its own thread; its end closes the session.

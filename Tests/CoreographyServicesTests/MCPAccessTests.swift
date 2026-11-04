@@ -182,7 +182,7 @@ final class MCPAccessTests: XCTestCase {
     @MainActor
     func testTheBridgeClientReportsRefusalsAndPipesASession() async throws {
         let unavailable = await MCPBridgeClient.run(path: socketPath, input: { nil }, output: { _ in })
-        XCTAssertEqual(unavailable, .unavailable("Coreography is not running, or MCP access is off in its Settings"))
+        XCTAssertEqual(unavailable, .unavailable("System Monitor is not running, or MCP access is off in its Settings"))
 
         let access = makeAccess()
         access.setEnabled(true)

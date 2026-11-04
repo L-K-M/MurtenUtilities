@@ -67,7 +67,7 @@ public struct RebuildableSpaceRule: SuggestionRule {
       title: "Docker is holding ~\(Self.roundedGigabytes(bytes)) GB you can rebuild",
       detail: """
         Untagged image leftovers and unused build cache at \(endpoint). Docker makes both \
-        again on the next build, so removing them costs build time, never data. DockVac \
+        again on the next build, so removing them costs build time, never data. Docker Cleaner \
         selects them for review; nothing is removed until you confirm.
         """,
       route: DockVacSuite.reclaimRoute(endpoint: endpoint))

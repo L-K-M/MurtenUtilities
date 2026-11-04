@@ -90,7 +90,7 @@ enum CoreographyNavigation {
 /// Features that need the privileged helper say why they are unavailable:
 /// a short reason on each control, the explanation once in the pane.
 enum HelperAvailability {
-    static let explanation = String(localized: "Needs a signed build: this copy of Murten Utilities is not signed with a Developer ID, so Coreography's privileged helper cannot run. Other users' processes, spindump, raising priority and login items stay unavailable.")
+    static let explanation = String(localized: "Needs a signed build: this copy of Murten Utilities is not signed with a Developer ID, so System Monitor's privileged helper cannot run. Other users' processes, spindump, raising priority and login items stay unavailable.")
 
     static func reason(_ state: HelperInstallState?) -> String? {
         state == .needsSignedBuild ? String(localized: "Needs a signed build") : nil

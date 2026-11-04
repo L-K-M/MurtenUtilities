@@ -41,10 +41,10 @@ public enum ConflictAnalyzer {
                 winner: only,
                 losers: [],
                 explanation: "\(group.combo.displayString) is claimed at the WindowServer layer by "
-                    + "an application Shortking cannot name. Nothing in any config file, menu bar "
+                    + "an application Shortcut Detective cannot name. Nothing in any config file, menu bar "
                     + "or preference domain accounts for it.",
                 suggestion: "Run Detective Mode to identify the owner — live capture takes one "
-                    + "key press, or Shortking can narrow it down across app restarts.",
+                    + "key press, or Shortcut Detective can narrow it down across app restarts.",
                 severity: .low
             )
         }

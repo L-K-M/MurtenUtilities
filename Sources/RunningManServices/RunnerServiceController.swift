@@ -295,7 +295,7 @@ public actor RunnerServiceController {
     }
     private func requireUserService(_ runner: InstalledRunner) throws {
         guard runner.serviceDomain == .user else {
-            throw RunnerServiceError("This runner is managed by a system LaunchDaemon. RunningMan does not start, stop or change system services; manage it with an administrator account.")
+            throw RunnerServiceError("This runner is managed by a system LaunchDaemon. CI Runner Manager does not start, stop or change system services; manage it with an administrator account.")
         }
     }
     private func validateRunner(_ runner: InstalledRunner) throws {
@@ -493,7 +493,7 @@ public actor RunnerServiceController {
     }
     private static func systemServiceDetail(label: String?) -> String {
         let service = label.map { "the system service " + $0 } ?? "a system service"
-        return "This runner is managed by \(service). RunningMan shows its process, logs and jobs, but does not start, stop or change system services, and cannot verify whether it is running a job."
+        return "This runner is managed by \(service). CI Runner Manager shows its process, logs and jobs, but does not start, stop or change system services, and cannot verify whether it is running a job."
     }
 
     private func forgejoStatuses(runners: [InstalledRunner], processes: RunnerProcesses, loaded: [String: Int32], fresh: Bool) async -> [String: RunnerStatus] {
@@ -609,7 +609,7 @@ public actor RunnerServiceController {
 
     private func prepareStartupPolicy(_ enabled: Bool, service: inout ServiceDescriptor) throws -> URL? {
         guard !service.hasUncertainStartupPolicy else {
-            throw RunnerServiceError("This service has complex KeepAlive conditions. RunningMan cannot safely infer or change its login startup policy; its existing policy was preserved.")
+            throw RunnerServiceError("This service has complex KeepAlive conditions. CI Runner Manager cannot safely infer or change its login startup policy; its existing policy was preserved.")
         }
         let previous = service.dictionary["KeepAlive"]
         let usesKeepAlive = (previous as? Bool == true) || ((previous as? [String: Any])?["SuccessfulExit"] is Bool)

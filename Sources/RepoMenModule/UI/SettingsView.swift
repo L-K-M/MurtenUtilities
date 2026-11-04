@@ -46,7 +46,7 @@ private struct GeneralSettingsView: View {
             Divider()
                 .padding(.vertical, 4)
 
-            Toggle("Scan automatically when RepoMen opens", isOn: $preferences.scanAtLaunch)
+            Toggle("Scan automatically when Developer Cleanup opens", isOn: $preferences.scanAtLaunch)
         }
         .padding(20)
     }
@@ -142,7 +142,7 @@ private struct RulesSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Uncheck a kind and RepoMen stops finding or suggesting it.")
+                Text("Uncheck a kind and Developer Cleanup stops finding or suggesting it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 ForEach(ArtifactCategory.allCases) { category in

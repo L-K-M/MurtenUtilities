@@ -36,43 +36,43 @@ public enum ModuleRegistry {
     /// The confirmed roster in home-screen order (see PLAN.md / docs/modules.md).
     public static let all: [SuiteModule] = [
         SuiteModule(
-            id: "dockvac", name: "DockVac",
+            id: "dockvac", name: "Docker Cleaner",
             summary: "See what Docker keeps on disk and reclaim exactly what you choose.",
             systemImage: "shippingbox", status: .available, sourceRepository: "DockVac"),
         SuiteModule(
-            id: "repomen", name: "RepoMen",
+            id: "repomen", name: "Developer Cleanup",
             summary: "Hunt down build artifacts and caches that eat your disk.",
             systemImage: "externaldrive", status: .available, sourceRepository: "RepoMen"),
         SuiteModule(
-            id: "bootcaptain", name: "BootCaptain",
+            id: "bootcaptain", name: "Startup Manager",
             summary: "Inventory startup items and investigate boot failures.",
             systemImage: "power", status: .available, sourceRepository: "BootCaptain"),
         SuiteModule(
-            id: "devicecontroldoctor", name: "DeviceControlDoctor",
+            id: "devicecontroldoctor", name: "App Permission Checkup",
             summary: "Diagnose privacy permissions that look granted but fail.",
             systemImage: "cross.case", status: .available, sourceRepository: "DeviceControlDoctor"),
         SuiteModule(
-            id: "shortking", name: "Shortking",
+            id: "shortking", name: "Shortcut Detective",
             summary: "Find out who owns — or stole — a keyboard shortcut.",
             systemImage: "keyboard", status: .available, sourceRepository: "Shortking"),
         SuiteModule(
-            id: "hallpass", name: "HallPass",
+            id: "hallpass", name: "Local Network Access",
             summary: "Exempt trusted networks from local-network privacy prompts.",
             systemImage: "network", status: .available, sourceRepository: "HallPass"),
         SuiteModule(
-            id: "zenbackupmanager", name: "Zen Backup Manager",
+            id: "zenbackupmanager", name: "Zen Session Recovery",
             summary: "Browse and restore Zen Browser session backups on a timeline.",
             systemImage: "clock.arrow.circlepath", status: .available, sourceRepository: "ZenBackupManager"),
         SuiteModule(
-            id: "obtainintosh", name: "Obtainintosh",
+            id: "obtainintosh", name: "Software Update Finder",
             summary: "Track updates for apps and fonts installed from releases.",
             systemImage: "arrow.down.circle", status: .available, sourceRepository: "Obtainintosh"),
         SuiteModule(
-            id: "runningman", name: "RunningMan",
+            id: "runningman", name: "CI Runner Manager",
             summary: "Run, watch and register self-hosted GitHub and Forgejo runners.",
             systemImage: "figure.run", status: .available, sourceRepository: "RunningMan"),
         SuiteModule(
-            id: "coreography", name: "Coreography",
+            id: "coreography", name: "System Monitor",
             summary: "Watch CPU, memory, disk and network in real time.",
             systemImage: "waveform.path.ecg", status: .available, sourceRepository: "Coreography"),
     ]

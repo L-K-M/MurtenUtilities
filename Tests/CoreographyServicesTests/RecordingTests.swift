@@ -42,7 +42,7 @@ final class RecordingTests: XCTestCase {
 
     func testUnreadableNewerAndInvalidFilesAreRefusedWithAReason() throws {
         XCTAssertThrowsError(try Recording.decode(Data("nope".utf8))) {
-            XCTAssertEqual($0 as? Recording.Failure, .unreadable("not a Coreography recording"))
+            XCTAssertEqual($0 as? Recording.Failure, .unreadable("not a System Monitor recording"))
         }
         XCTAssertThrowsError(try Recording.decode(Data(#"{"schemaVersion":99}"#.utf8))) {
             XCTAssertEqual($0 as? Recording.Failure, .newerSchema(99))
@@ -105,8 +105,8 @@ final class RecordingTests: XCTestCase {
         XCTAssertNil(model.openRecording)
         XCTAssertEqual(model.displayMode, .live)
         let refused = await model.openRecording(Data("x".utf8))
-        XCTAssertEqual(refused, "The recording could not be read: not a Coreography recording")
-        XCTAssertEqual(model.actionMessage, "The recording could not be read: not a Coreography recording")
+        XCTAssertEqual(refused, "The recording could not be read: not a System Monitor recording")
+        XCTAssertEqual(model.actionMessage, "The recording could not be read: not a System Monitor recording")
     }
 
     /// The later of two opens wins, even when the earlier file takes longer to read.

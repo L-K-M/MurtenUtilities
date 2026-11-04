@@ -15,7 +15,7 @@ struct AskPanel: View {
     @Binding var question: String
 
     var body: some View {
-        DisclosureGroup("Ask Coreography") {
+        DisclosureGroup("Ask System Monitor") {
             VStack(alignment: .leading, spacing: 8) {
                 if model.hasProviderKey {
                     HStack {
@@ -32,7 +32,7 @@ struct AskPanel: View {
                     }
                     answer
                 } else {
-                    Text("Add an Anthropic API key in Settings > Coreography to ask questions in plain language.")
+                    Text("Add an Anthropic API key in Settings > System Monitor to ask questions in plain language.")
                     SettingsLink { Text("Open Settings…") }
                 }
                 Text(sharingNotice).font(.caption).foregroundStyle(.secondary)
@@ -158,7 +158,7 @@ struct SettingsView: View {
                      ? "Shortcuts could not be listed; rules still tint their lane."
                      : "A rule runs its Shortcut when it is raised, at most once every 15 minutes.")
                     .font(.caption).foregroundStyle(.secondary)
-                Text("Rules are checked while Coreography samples: while its pane or menu section shows, the HUD is up, or a recording runs. Suggestions and notifications come from Murten Utilities' background check instead.")
+                Text("Rules are checked while System Monitor samples: while its pane or menu section shows, the HUD is up, or a recording runs. Suggestions and notifications come from Murten Utilities' background check instead.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Your alert rules") {
@@ -211,7 +211,7 @@ struct SettingsView: View {
                 Slider(value: $hud.settings.textScale, in: HUDSettings.textScaleRange) { Text("Text size") }
                 Toggle("Dark backing behind text", isOn: $hud.settings.scrim)
                 Toggle("Let clicks pass through", isOn: $hud.settings.clickThrough)
-                Text("Turn click-through off to drag the HUD; it remembers where you put it on each display. With Coreography's pane in front, Control-Command-H shows it and Control-Command-J changes what it shows; the menu section shows it too. Frame rate needs macOS 27.")
+                Text("Turn click-through off to drag the HUD; it remembers where you put it on each display. With System Monitor's pane in front, Control-Command-H shows it and Control-Command-J changes what it shows; the menu section shows it too. Frame rate needs macOS 27.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Data sources") {
@@ -225,7 +225,7 @@ struct SettingsView: View {
                     }
                 }
             }
-            Section("Ask Coreography") {
+            Section("Ask System Monitor") {
                 SecureField("Anthropic API key", text: $key)
                 HStack {
                     Button("Save key") {

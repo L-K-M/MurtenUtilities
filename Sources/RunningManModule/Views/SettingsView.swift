@@ -20,10 +20,10 @@ struct SettingsView: View {
             }
             Section {
                 Toggle("Refresh runner status automatically", isOn: $model.refreshAutomatically)
-                Text("Refreshes local service state and diagnostic logs every 3 seconds (6 in Low Power Mode) while RunningMan’s pane or its part of the menu-bar panel is open, and while a stop-after-job request waits for its runner. Otherwise the suite’s background check looks at runner health every 15 minutes, if you turn it on under Background Checks.")
+                Text("Refreshes local service state and diagnostic logs every 3 seconds (6 in Low Power Mode) while CI Runner Manager’s pane or its part of the menu-bar panel is open, and while a stop-after-job request waits for its runner. Otherwise the suite’s background check looks at runner health every 15 minutes, if you turn it on under Background Checks.")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
                 Toggle("Keep this Mac awake while a job is running", isOn: $model.keepAwakeWhileBusy)
-                Text("Prevents idle sleep during detected jobs while RunningMan refreshes. Closing your MacBook lid can still put it to sleep.")
+                Text("Prevents idle sleep during detected jobs while CI Runner Manager refreshes. Closing your MacBook lid can still put it to sleep.")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
                 Toggle("Play lap sounds", isOn: $model.lapSoundsEnabled)
                 Text("Quiet ticks as steps finish, a whoosh when a job overtakes its usual pace, and a chime at the finish, only while Murten Utilities is in front.")
@@ -41,7 +41,7 @@ struct SettingsView: View {
             } header: { Text("GitHub") }
             Section {
                 Toggle("Read server queues automatically", isOn: $model.remoteMonitoringEnabled)
-                Text("Reads compatible queued and active jobs about once a minute while RunningMan refreshes. GitHub uses your CLI sign-in; Forgejo uses a token stored in Keychain. Coverage depends on server APIs, labels and repository access. The background check never reads queues.")
+                Text("Reads compatible queued and active jobs about once a minute while CI Runner Manager refreshes. GitHub uses your CLI sign-in; Forgejo uses a token stored in Keychain. Coverage depends on server APIs, labels and repository access. The background check never reads queues.")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
                 Button("Connect a Forgejo server…", systemImage: "network") { connectingForgejo = true }
                 ForEach(model.forgejoServers, id: \.absoluteString) { server in
@@ -51,7 +51,7 @@ struct SettingsView: View {
                         Button("Forget connection") { Task { await model.forgetForgejo(server) } }.controlSize(.small)
                     }
                 }
-                Text("Forgetting a connection removes RunningMan’s API token. Registered runners keep their own connection and continue running.")
+                Text("Forgetting a connection removes CI Runner Manager’s API token. Registered runners keep their own connection and continue running.")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
             } header: { Text("Queues & Forgejo") }
             Section {
@@ -78,7 +78,7 @@ struct SettingsView: View {
                         .foregroundStyle(.white, RunningManStyle.accent)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("RunningMan").font(.system(size: 14, weight: .semibold, design: .rounded))
+                        Text("CI Runner Manager").font(.system(size: 14, weight: .semibold, design: .rounded))
                         Text("A little clarity for the runners behind your releases.").font(.system(size: 11)).foregroundStyle(.secondary)
                     }
                     Spacer()
@@ -294,7 +294,7 @@ private struct MenuRunnerRow: View {
             }
             .buttonStyle(.plain)
             .help(snapshot.detail.map { "\(snapshot.status.title). \($0)" } ?? snapshot.status.title)
-            .accessibilityHint("Shows this runner in RunningMan")
+            .accessibilityHint("Shows this runner in CI Runner Manager")
             Menu { RunnerActionsMenu(snapshot: snapshot) } label: {
                 Label("Actions for \(snapshot.runner.name)", systemImage: "ellipsis").labelStyle(.iconOnly)
             }.menuStyle(.borderlessButton).menuIndicator(.hidden).tint(.secondary).fixedSize().help("Runner actions")
@@ -321,7 +321,7 @@ private struct MenuOverflowRow: View {
         }
         .buttonStyle(.plain)
         .modifier(MenuRowHighlight())
-        .accessibilityHint("Shows every runner in RunningMan")
+        .accessibilityHint("Shows every runner in CI Runner Manager")
     }
 }
 

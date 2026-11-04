@@ -54,7 +54,7 @@ public enum ConfigurationError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .invalidPropertyList: "The system settings could not be read as a valid property list."
-        case .invalidKey(let key): "The setting \(key) does not contain an array of strings. HallPass does not change this configuration."
+        case .invalidKey(let key): "The setting \(key) does not contain an array of strings. Local Network Access does not change this configuration."
         case .tooManyNetworks: "Each connection allows at most \(NetworkConfiguration.maximumNetworksPerInterface) network ranges."
         case .unsupportedBackup: "This backup has an unknown format."
         case .duplicateNetwork: "This IP range already exists for the selected connection."

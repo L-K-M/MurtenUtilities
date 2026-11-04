@@ -246,7 +246,7 @@ public actor ForgejoAPIClient: ForgejoAPIRequesting {
         switch code {
         case 300...399:
             let target = redirectTarget(response.value(forHTTPHeaderField: "Location"), relativeTo: response.url).map { " to " + $0 } ?? ""
-            message = "The Forgejo server redirected\(target) (HTTP \(code)). RunningMan follows redirects only within the same HTTPS address. Enter the server’s final HTTPS URL."
+            message = "The Forgejo server redirected\(target) (HTTP \(code)). CI Runner Manager follows redirects only within the same HTTPS address. Enter the server’s final HTTPS URL."
         case 401:
             message = "Forgejo rejected the access token (HTTP 401). It may be mistyped, expired or revoked. Create a new token and connect the server again."
         case 403:

@@ -176,7 +176,7 @@ final class DockVacWatcherTests: XCTestCase {
     let failure = try XCTUnwrap(observation.failures.first)
     XCTAssertEqual(failure.kind, .permissionDenied)
     XCTAssertEqual(failure.scope, FindingScope("ssh://deploy@build-box:2222"))
-    XCTAssertEqual(failure.message, "SSH endpoints are checked when you open DockVac.")
+    XCTAssertEqual(failure.message, "SSH endpoints are checked when you open Docker Cleaner.")
   }
 
   func testASkippedSSHEndpointKeepsItsSuggestionStale() async throws {

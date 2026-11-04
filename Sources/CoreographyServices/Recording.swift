@@ -151,7 +151,7 @@ public enum Recording {
             case .tooLarge: "The file is larger than any recording"
             case .unreadable(let detail): "The recording could not be read: \(detail)"
             case .uncodable(let detail): "The recording could not be written: \(detail)"
-            case .newerSchema(let version): "The recording uses a newer format (\(version)); update Coreography"
+            case .newerSchema(let version): "The recording uses a newer format (\(version)); update System Monitor"
             case .invalidRange: "The recording's time range is invalid"
             case .missingHistory(let reason): reason
             }
@@ -246,7 +246,7 @@ public enum Recording {
         // Read the version first, so a newer file says so instead of failing on a field.
         struct Version: Decodable { let schemaVersion: Int }
         guard let version = try? decoder.decode(Version.self, from: data) else {
-            throw .unreadable("not a Coreography recording")
+            throw .unreadable("not a System Monitor recording")
         }
         guard version.schemaVersion <= schemaVersion else { throw .newerSchema(version.schemaVersion) }
         let document: Document

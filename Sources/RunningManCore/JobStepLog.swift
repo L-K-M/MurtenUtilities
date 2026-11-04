@@ -253,14 +253,14 @@ struct JobOutputCapture {
                     // the steps finished, lines written since the previous read are lost.
                     if hasOutput && !readAfterStepsFinished && !markedUploadedTail {
                         flushPartial()
-                        appendOmission("Output may be missing here: the runner uploaded the rest of this log before RunningMan read it.")
+                        appendOmission("Output may be missing here: the runner uploaded the rest of this log before CI Runner Manager read it.")
                         markedUploadedTail = true
                         changed = true
                     }
                     break
                 }
                 flushPartial()
-                appendOmission("Output may be missing here: the runner uploaded part of this log before RunningMan read it.")
+                appendOmission("Output may be missing here: the runner uploaded part of this log before CI Runner Manager read it.")
                 pageNumber = next.page; offset = 0; changed = true
                 continue
             }

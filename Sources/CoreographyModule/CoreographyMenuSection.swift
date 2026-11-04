@@ -61,7 +61,7 @@ struct CoreographyMenuSection: View {
                     .help(model.displayMode == .live ? "Hold the display" : "Return to live")
                 Button(hud.isShown ? "Hide HUD" : "Show HUD") { hud.toggle() }
                 Spacer()
-                Button("Open Coreography") { openPane() }
+                Button("Open System Monitor") { openPane() }
             }
             .controlSize(.small)
         }

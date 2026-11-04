@@ -12,7 +12,7 @@ struct WatchSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("""
-                RepoMen's background check looks at your scan folders and these watched \
+                Developer Cleanup's background check looks at your scan folders and these watched \
                 folders every 6 hours and suggests a clean-up once artifacts idle past a \
                 folder's threshold reach 5 GB. Turn it on in Settings › Background Checks. \
                 It never removes anything, and it skips folders in Desktop, Documents, \
@@ -49,7 +49,7 @@ struct WatchSettingsView: View {
                 Auto-trash: in folders you arm, stale artifacts go to the Trash (never a \
                 permanent delete) every 6 hours, each re-verified like a manual reclaim, and \
                 the pane's auto-trash log lists them. It runs only while Murten Utilities \
-                stays in the menu bar with RepoMen's background check on. Folders in \
+                stays in the menu bar with Developer Cleanup's background check on. Folders in \
                 Desktop, Documents, Downloads, iCloud Drive or on external volumes cannot be \
                 armed, because macOS would ask for access with no window in front; scan \
                 them in the pane instead.
@@ -81,7 +81,7 @@ struct WatchSettingsView: View {
         guard armed > 0 else { return "No folder is armed for auto-trash." }
         let folders = armed == 1 ? "1 folder" : "\(armed) folders"
         if !autoTrash.isAllowedToRun {
-            return "Armed in \(folders), paused until the menu bar companion and RepoMen's background check are on."
+            return "Armed in \(folders), paused until the menu bar companion and Developer Cleanup's background check are on."
         }
         guard let run = preferences.lastWatchRun else {
             return "Armed in \(folders). The first pass runs shortly, then every 6 hours."
@@ -102,7 +102,7 @@ struct WatchSettingsView: View {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = true
         panel.prompt = "Watch"
-        panel.message = "Choose folders for RepoMen to keep clean automatically"
+        panel.message = "Choose folders for Developer Cleanup to keep clean automatically"
         guard panel.runModal() == .OK else { return }
         for url in panel.urls { watch(url.path) }
     }

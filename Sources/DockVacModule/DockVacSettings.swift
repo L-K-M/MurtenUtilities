@@ -14,8 +14,8 @@ struct DockVacSettings: View {
       Text(
         """
         When Docker runs on a server you reach over SSH, the background check skips it and \
-        DockVac checks it when you open the tool. Turn this on to include the server in the \
-        hourly check. DockVac never asks for a password or passphrase, but an SSH agent \
+        Docker Cleaner checks it when you open the tool. Turn this on to include the server in the \
+        hourly check. Docker Cleaner never asks for a password or passphrase, but an SSH agent \
         that confirms each use of a key, such as 1Password or Secretive, may ask you to \
         approve the connection while you are doing something else.
         """

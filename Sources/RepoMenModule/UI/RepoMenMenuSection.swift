@@ -51,7 +51,7 @@ struct RepoMenMenuSection: View {
 
     private var statusLine: String {
         if autoTrash.isRunning { return "Moving stale artifacts to the Trash…" }
-        if !autoTrash.isAllowedToRun { return "Paused: RepoMen's background check is off." }
+        if !autoTrash.isAllowedToRun { return "Paused: Developer Cleanup's background check is off." }
         guard let run = preferences.lastWatchRun else { return "First pass runs shortly." }
         let age = Format.age(run.date)
         return run.reclaimedCount == 0

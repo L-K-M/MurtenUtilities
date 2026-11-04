@@ -49,9 +49,9 @@ struct JobLogView: View {
             }.padding(13)
             Divider()
             if !log.hasOutput {
-                notice("The runner uploaded this job’s output to GitHub before RunningMan could read it. Open the run on GitHub to see it.")
+                notice("The runner uploaded this job’s output to GitHub before CI Runner Manager could read it. Open the run on GitHub to see it.")
             } else if log.isTruncated {
-                notice("Some output is not shown: earlier lines were trimmed to save memory, or the runner uploaded them before RunningMan read them.")
+                notice("Some output is not shown: earlier lines were trimmed to save memory, or the runner uploaded them before CI Runner Manager read them.")
             }
             ScrollViewReader { proxy in
                 ScrollView {

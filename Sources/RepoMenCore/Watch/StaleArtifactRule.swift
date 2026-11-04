@@ -59,7 +59,7 @@ package struct StaleArtifactRule: SuggestionRule {
             .map { " over \($0) day\($0 == 1 ? "" : "s") ago" } ?? " long ago"
         return SuggestionContent(
             title: "\(Format.bytes(bytes)) of stale build artifacts in \(folder)",
-            detail: "\(artifacts) in \(folder) were last built\(age). Open RepoMen to review them; "
+            detail: "\(artifacts) in \(folder) were last built\(age). Open Developer Cleanup to review them; "
                 + "nothing is checked or removed until you choose.",
             route: RepoMenRoutes.review(folder: finding.scope.rawValue))
     }

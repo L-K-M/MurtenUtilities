@@ -283,7 +283,7 @@ public enum UsageAnalyzer {
       removability = .requires(
         prerequisites: stopped.map { $0.resourceID },
         reason:
-          "Used by stopped \(containerList(stopped)). Remove that container first; DockVac can do both in one cleanup."
+          "Used by stopped \(containerList(stopped)). Remove that container first; Docker Cleaner can do both in one cleanup."
       )
       statusText =
         "Used by \(ByteFormat.count(stopped.count, singular: "stopped container", plural: "stopped containers"))"
@@ -420,7 +420,7 @@ public enum UsageAnalyzer {
     if container.state.isActive {
       removability = .blocked(
         reason:
-          "The container is \(container.state.displayName.lowercased()). DockVac never stops or force-removes containers; stop it in Docker first."
+          "The container is \(container.state.displayName.lowercased()). Docker Cleaner never stops or force-removes containers; stop it in Docker first."
       )
       statusText = container.status.isEmpty ? container.state.displayName : container.status
       tone = .locked
@@ -533,7 +533,7 @@ public enum UsageAnalyzer {
       removability = .requires(
         prerequisites: stopped.map { $0.resourceID },
         reason:
-          "Mounted by stopped \(containerList(stopped)). Remove that container first; DockVac can do both in one cleanup."
+          "Mounted by stopped \(containerList(stopped)). Remove that container first; Docker Cleaner can do both in one cleanup."
       )
       statusText =
         "Mounted by \(ByteFormat.count(stopped.count, singular: "stopped container", plural: "stopped containers"))"
@@ -541,7 +541,7 @@ public enum UsageAnalyzer {
     } else if let references = volume.referenceCount, references > 0 {
       removability = .blocked(
         reason:
-          "Docker reports \(references) reference(s) to this volume from resources DockVac cannot see."
+          "Docker reports \(references) reference(s) to this volume from resources Docker Cleaner cannot see."
       )
       statusText = "In use (\(references) references)"
       tone = .locked

@@ -123,7 +123,7 @@ struct ClaimCard: View {
 
             if claim.status == .probedClaimed {
                 Text("Nothing in any config file, menu bar, or preference domain accounts for this "
-                    + "claim. Shortking knows it exists because registering the combination was "
+                    + "claim. Shortcut Detective knows it exists because registering the combination was "
                     + "refused — but not who holds it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)

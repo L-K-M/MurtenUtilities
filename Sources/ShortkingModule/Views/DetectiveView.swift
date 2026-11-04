@@ -159,7 +159,7 @@ struct DetectiveContent: View {
                             Button("Cancel", role: .cancel) {}
                         } message: {
                             Text("Every hotkey registered with WindowServer stops working until "
-                                + "Shortking restores them, at the latest after "
+                                + "Shortcut Detective restores them, at the latest after "
                                 + "\(Int(BlackoutController.maximumDuration)) seconds. Accessibility "
                                 + "shortcuts stay on. Then press the shortcut that misbehaved.")
                         }
@@ -198,7 +198,7 @@ struct DetectiveContent: View {
             TechniqueCard(
                 title: "Identify by restart",
                 symbol: "arrow.triangle.2.circlepath",
-                summary: "When nothing live works, Shortking narrows the owner down by watching "
+                summary: "When nothing live works, Shortcut Detective narrows the owner down by watching "
                     + "which combinations free up as apps quit. It binary-searches the suspects, "
                     + "so it takes log₂(n) restarts rather than one per app. Suspending a process "
                     + "does not work — WindowServer registrations are held by the connection, not "
@@ -357,7 +357,7 @@ struct IdentificationPlan: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                Text("Shortking also learns this passively: while it is open, every time an app "
+                Text("Shortcut Detective also learns this passively: while it is open, every time an app "
                     + "launches or quits it re-probes and records what changed, so this map fills "
                     + "itself in over ordinary use.")
                     .font(.caption)

@@ -60,7 +60,7 @@ struct AutoTrashLogView: View {
                 .font(.system(size: 28))
                 .foregroundStyle(.tertiary)
             Text(autoTrash.armedFolders.isEmpty
-                 ? "Auto-trash is off. Arm it for a watched folder in Settings › RepoMen › Watch."
+                 ? "Auto-trash is off. Arm it for a watched folder in Settings › Developer Cleanup › Watch."
                  : "Auto-trash has not moved anything yet.")
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -104,7 +104,7 @@ struct AutoTrashLogView: View {
         let folders = armed.count == 1 ? "1 folder" : "\(armed.count) folders"
         if autoTrash.isRunning { return "Auto-trash is running in \(folders)…" }
         if !autoTrash.isAllowedToRun {
-            return "Armed in \(folders), paused: auto-trash runs only while Murten Utilities stays in the menu bar with RepoMen's background check on."
+            return "Armed in \(folders), paused: auto-trash runs only while Murten Utilities stays in the menu bar with Developer Cleanup's background check on."
         }
         guard let run = preferences.lastWatchRun else { return "Armed in \(folders); the first pass runs shortly." }
         return "Armed in \(folders). Last pass \(Format.age(run.date)): \(Format.bytes(run.reclaimedBytes)) moved to the Trash."

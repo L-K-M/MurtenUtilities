@@ -63,7 +63,7 @@ struct ContentView: View {
         .sheet(isPresented: $model.showingNewRunner) { NewRunnerSheet().environment(model).tint(RunningManStyle.accent) }
         .sheet(isPresented: $model.showingForgejoConnection) { ForgejoConnectionSheet().environment(model).tint(RunningManStyle.accent) }
         .onChange(of: model.selectedRunnerID) { _, _ in model.selectionChanged() }
-        .alert("RunningMan", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
+        .alert("CI Runner Manager", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
             Button("OK") { model.errorMessage = nil }
         } message: { Text(model.errorMessage ?? "") }
         .confirmationDialog(model.confirmation?.title ?? "Confirm action", isPresented: Binding(get: { model.confirmation != nil }, set: { if !$0 { model.cancelPendingAction() } }), titleVisibility: .visible) {

@@ -42,7 +42,7 @@ struct HealthView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Incomplete sources")
                 .font(.headline)
-            Text("These sources did not finish, so the inventory below is partial. Shortking shows "
+            Text("These sources did not finish, so the inventory below is partial. Shortcut Detective shows "
                 + "what it has rather than pretending the gap does not exist.")
                 .font(.caption)
                 .foregroundStyle(.secondary)

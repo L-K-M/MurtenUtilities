@@ -47,7 +47,7 @@ struct WorkspaceActions {
             command("Show Ethernet", .ethernet, KeyboardShortcut("2"), enabled: available && interface != .ethernet),
             command(model.isDemo ? "End Preview…" : "Start Preview", .preview,
                     enabled: available && (!model.isLoaded || model.isDemo)),
-            command("HallPass Help", .help, enabled: available),
+            command("Local Network Access Help", .help, enabled: available),
             ModuleCommand("Open Apple Documentation", id: "hallpass.documentation") {
                 _ = NSWorkspace.shared.open(HallPassHelp.appleDocumentation)
             }

@@ -28,7 +28,7 @@ public struct VerificationRule: SuggestionRule {
 
         let name = finding.text(Evidence.appName) ?? "An app"
         let detail = reasons.joined(separator: " ")
-            + " A permission record cannot show whether the app works: check it again and test it in DeviceControlDoctor."
+            + " A permission record cannot show whether the app works: check it again and test it in App Permission Checkup."
         return SuggestionContent(title: "Verify \(name)'s permissions again", detail: detail,
                                  route: DoctorRoute.review(appID: appID))
     }

@@ -25,12 +25,12 @@ protocol PreferencesServicing: Sendable {
 
 actor SystemPreferencesService: PreferencesServicing {
     func load() async throws -> PreferencesSnapshot {
-        let xml = try await authorized(PreferencePlan.readCommand, prompt: "HallPass wants to read the local network exemptions.")
+        let xml = try await authorized(PreferencePlan.readCommand, prompt: "Local Network Access wants to read the local network exemptions.")
         return try PreferencesSnapshot(xml: xml)
     }
 
     func save(_ plan: PreferencePlan) async throws -> PreferencesSnapshot {
-        let xml = try await authorized(plan.shellScript(), prompt: "HallPass wants to save the displayed network exemptions.")
+        let xml = try await authorized(plan.shellScript(), prompt: "Local Network Access wants to save the displayed network exemptions.")
         let result = try PreferencesSnapshot(xml: xml)
         guard result.configuration == plan.desired else { throw PreferencesServiceError.verificationFailed }
         return result

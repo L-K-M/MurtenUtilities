@@ -15,7 +15,7 @@ struct MCPAccessSection: View {
             Text("Clients run coreo mcp --stdio. Each app is asked once; it can then read resource use, app and process names and history, never paths, arguments or process control.")
                 .font(.caption).foregroundStyle(.secondary)
             // The suite does not ship the CLI (it stays in Coreography's repo).
-            Text("Murten Utilities does not include coreo. Use the one inside the Coreography app: Coreography.app/Contents/Helpers/coreo mcp --stdio. Approvals still name the app behind it.")
+            Text("System Monitor in Murten Utilities does not include coreo. Use the one inside the standalone Coreography app: Coreography.app/Contents/Helpers/coreo mcp --stdio. Approvals still name the app behind it.")
                 .font(.caption).foregroundStyle(.secondary)
             if let problem = access.problem {
                 Text(problem).font(.caption).foregroundStyle(.red)
@@ -45,14 +45,14 @@ struct MCPApprovalAlert: ViewModifier {
     func body(content: Content) -> some View {
         let request = access.pendingApproval
         content.alert(
-            request.map { "Allow \($0.identity.displayName) to read Coreography diagnostics?" } ?? "",
+            request.map { "Allow \($0.identity.displayName) to read System Monitor diagnostics?" } ?? "",
             isPresented: Binding(get: { request != nil }, set: { _ in }),
             presenting: request
         ) { request in
             Button("Allow") { access.answer(request.id, allow: true) }
             Button("Don't Allow", role: .cancel) { access.answer(request.id, allow: false) }
         } message: { request in
-            Text("\(request.identity.detail)\n\nIt can read resource use, app and process names and history through MCP. It cannot see paths or arguments, quit processes or change settings. Every program started from \(request.identity.displayName), such as a terminal's commands, shares this approval. Revoke it in Settings > Coreography > MCP access.")
+            Text("\(request.identity.detail)\n\nIt can read resource use, app and process names and history through MCP. It cannot see paths or arguments, quit processes or change settings. Every program started from \(request.identity.displayName), such as a terminal's commands, shares this approval. Revoke it in Settings > System Monitor > MCP access.")
         }
     }
 }
