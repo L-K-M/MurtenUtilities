@@ -83,6 +83,8 @@ final class RepoMenProviderTests: XCTestCase {
         let finished = await eventually { provider.model.phase == .ready }
         XCTAssertTrue(finished)
         XCTAssertEqual(provider.model.items.map(\.path), [project.appendingPathComponent("app/target").path])
+        XCTAssertTrue(provider.model.items.allSatisfy(\.isMeasured),
+                      "ready means every completed measurement is visible")
         XCTAssertTrue(provider.model.checkedIDs.isEmpty, "a suggestion never preselects (docs/modules.md)")
         XCTAssertEqual(provider.model.sidebarSelection, .all)
     }

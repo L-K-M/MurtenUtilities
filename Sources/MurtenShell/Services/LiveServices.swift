@@ -4,12 +4,12 @@ import IOKit.ps
 import MurtenCore
 import Network
 import ServiceManagement
-import UserNotifications
+@preconcurrency import UserNotifications
 
 // MARK: - Assembly
 
 public extension ShellServices {
-    static let bundleIdentifier = "ch.lkmc.MurtenUtilities"
+    nonisolated static let bundleIdentifier = "ch.lkmc.MurtenUtilities"
 
     /// The real services. Suggestion persistence falls back to a temporary
     /// file only when Application Support cannot be located, and says so.
@@ -68,7 +68,7 @@ struct UserDefaultsSettingsStore: SettingsPersisting {
 /// center is unavailable, so every call degrades to `.unsupported`.
 @MainActor
 final class UserNotificationNotifier: NSObject, SuggestionNotifying, UNUserNotificationCenterDelegate {
-    private static let routeKey = "route"
+    private nonisolated static let routeKey = "route"
     var onOpen: ((URL) -> Void)?
 
     private var center: UNUserNotificationCenter? {
@@ -145,11 +145,11 @@ final class SystemWatchEnvironment: WatchEnvironmentSampling, @unchecked Sendabl
     }
 
     private func update(_ cost: WatchEnvironment.NetworkCost) {
-        lock.lock(); networkCost = cost; lock.unlock()
+        lock.withLock { networkCost = cost }
     }
 
     func sample() async -> WatchEnvironment {
-        lock.lock(); let cost = networkCost; lock.unlock()
+        let cost = lock.withLock { networkCost }
         let now = Calendar.current.dateComponents([.hour, .minute], from: Date())
         return WatchEnvironment(
             powerSource: Self.powerSource(),

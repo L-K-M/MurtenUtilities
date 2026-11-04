@@ -78,7 +78,7 @@ final class RestoreServiceTests: XCTestCase {
         try Data("untouched".utf8).write(to: outside)
         try FileManager.default.createSymbolicLink(at: modernTarget, withDestinationURL: outside)
         XCTAssertThrowsError(try service.restore(backup(), to: profile))
-        XCTAssertEqual(try String(contentsOf: outside), "untouched")
+        XCTAssertEqual(try String(contentsOf: outside, encoding: .utf8), "untouched")
     }
 
     func testWriteFailureRollsBackBothFiles() throws {

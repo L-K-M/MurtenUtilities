@@ -116,7 +116,7 @@ final class AppModel: ObservableObject {
         records = []; selectedID = nil; lastSafety = nil
         busy = true; progress = "Reading session backups…"
         let root = safetyRoot
-        scanTask = Task {
+        scanTask = Task { [self] in
             let worker = Task.detached(priority: .userInitiated) {
                 try BackupCatalog.scan(profile: profile, safetyRoot: root) { done, total in
                     Task { @MainActor [weak self] in
