@@ -275,7 +275,7 @@ struct ContentView: View {
                     Button("End Preview") { perform(.preview) }.disabled(!available)
                 }
             } else if model.recoveryBlocked {
-                banner("Draft File Protected", symbol: "exclamationmark.triangle", text: "Check the permissions of the HallPass data folder, then quit and reopen Murten Utilities before you make changes.") {
+                banner("Draft File Protected", symbol: "exclamationmark.triangle", text: "Check the permissions of the Local Network Access data folder (named “HallPass” on disk), then quit and reopen Murten Utilities before you make changes.") {
                     EmptyView()
                 }
             } else if model.requiresReload {

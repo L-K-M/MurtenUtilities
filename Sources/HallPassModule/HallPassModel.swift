@@ -112,7 +112,7 @@ final class HallPassModel {
                 self.error = "The draft could not be restored. The original is kept unchanged in the backups folder as “\(preserved.lastPathComponent)”.\n\n\(failure)"
             } catch {
                 recoveryBlocked = true
-                self.error = "The original draft file is left unchanged. Editing is locked because the file could not be preserved. Check the permissions of the HallPass data folder, then quit and reopen Murten Utilities.\n\n\(error.localizedDescription)"
+                self.error = "The original draft file is left unchanged. Editing is locked because the file could not be preserved. Check the permissions of the Local Network Access data folder (named “HallPass” on disk), then quit and reopen Murten Utilities.\n\n\(error.localizedDescription)"
             }
         }
     }
