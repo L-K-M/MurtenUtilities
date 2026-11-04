@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   App Permission Checkup, Shortcut Detective, Local Network Access, Zen
   Session Recovery, Software Update Finder, CI Runner Manager and System
   Monitor, with their panes, tests and eligible watchers.
+- App Permission Checkup can reset every Device Control and Data Access
+  decision after inventorying all recorded clients, safely quitting affected
+  apps, and verifying they remain closed before each service-wide reset.
 - Ad-hoc builds omit Startup Manager and System Monitor's privileged helpers;
   their helper-backed actions remain disabled until a Developer ID build.
 

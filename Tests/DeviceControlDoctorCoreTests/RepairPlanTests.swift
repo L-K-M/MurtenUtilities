@@ -12,6 +12,16 @@ final class RepairPlanTests: XCTestCase {
         }
         XCTAssertThrowsError(try RepairPlan(bundleIdentifier: "com.example.App", services: []))
     }
+    func testGlobalPlanResetsEveryManagedServiceWithoutAClientIdentifier() {
+        let plan = GlobalRepairPlan()
+
+        XCTAssertEqual(plan.services, [.accessibility, .postEvent, .listenEvent])
+        XCTAssertEqual(plan.arguments, [
+            ["reset", "Accessibility"],
+            ["reset", "PostEvent"],
+            ["reset", "ListenEvent"]
+        ])
+    }
     func testUnknownIsNotTreatedAsDenied() {
         var app = WatchedApp(name: "Example", bundleID: "com.example.App", path: "/Applications/Example.app", version: "1")
         app.expectedServices = [.accessibility]

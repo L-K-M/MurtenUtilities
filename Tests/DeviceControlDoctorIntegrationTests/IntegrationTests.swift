@@ -9,6 +9,7 @@ final class IntegrationTests: XCTestCase {
         XCTAssertEqual(result.exitCode, 0)
         XCTAssertFalse(result.timedOut)
         XCTAssertEqual(result.output.count, 131_072)
+        XCTAssertTrue(result.outputTruncated)
     }
     func testCommandTimeoutTerminatesOnlyItsChild() async {
         let started = Date()

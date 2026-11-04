@@ -31,9 +31,11 @@ public final class DeviceControlDoctorProvider: SuiteModuleProvider {
     /// The pane and the watcher share one process boundary and one watch
     /// list file; tests pass a fake runner and a fixture file.
     init(context: ModuleContext, runner: any ProcessRunning, watchList: URL,
-         home: String = FileManager.default.homeDirectoryForCurrentUser.path) {
+         home: String = FileManager.default.homeDirectoryForCurrentUser.path,
+         lifecycle: (any ApplicationLifecycleManaging)? = nil) {
+        let lifecycle = lifecycle ?? WorkspaceApplicationLifecycle()
         store = DoctorStore(defaults: context.defaults, runner: runner, storageURL: watchList,
-                            watchListChanged: context.requestRecheck)
+                            lifecycle: lifecycle, watchListChanged: context.requestRecheck)
         watch = WatcherRegistration(watcher: PermissionWatcher(watchList: watchList, runner: runner, home: home),
                                     rule: VerificationRule())
     }
