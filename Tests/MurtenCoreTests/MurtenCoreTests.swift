@@ -15,6 +15,28 @@ final class MurtenCoreTests: XCTestCase {
         }
     }
 
+    func testModulesUseDescriptiveDisplayNames() {
+        let names = Dictionary(uniqueKeysWithValues: ModuleRegistry.all.map { ($0.id, $0.name) })
+
+        XCTAssertEqual(names, [
+            "dockvac": "Docker Cleaner",
+            "repomen": "Developer Cleanup",
+            "bootcaptain": "Startup Manager",
+            "devicecontroldoctor": "App Permission Checkup",
+            "shortking": "Shortcut Detective",
+            "hallpass": "Local Network Access",
+            "zenbackupmanager": "Zen Session Recovery",
+            "obtainintosh": "Software Update Finder",
+            "runningman": "CI Runner Manager",
+            "coreography": "System Monitor",
+        ])
+
+        for module in ModuleRegistry.all {
+            XCTAssertNotEqual(module.name, module.sourceRepository,
+                              "\(module.id) exposes its source app name instead of its job")
+        }
+    }
+
     func testModuleIDsAreRouteIdentifiers() throws {
         let allowlist = RouteAllowlist(modules: Set(ModuleRegistry.all.map(\.id)))
         for module in ModuleRegistry.all {

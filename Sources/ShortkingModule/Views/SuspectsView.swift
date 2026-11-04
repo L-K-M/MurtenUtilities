@@ -34,7 +34,7 @@ struct SuspectsView: View {
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text("Shortking cannot read which combinations they consume — event-tap tools "
+            Text("Shortcut Detective cannot read which combinations they consume — event-tap tools "
                 + "pattern-match in their own code and register nothing with the system — so this "
                 + "is a suspect list, not an inventory. Their bindings show up in the inventory "
                 + "only via their config files.")

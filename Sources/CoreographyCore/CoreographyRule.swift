@@ -49,7 +49,7 @@ public struct CoreographyRule: SuggestionRule {
         return SuggestionContent(
             title: "\(name) has kept a CPU core busy for an hour",
             detail: "It averaged \(percent) % of one core over the last \(minutes) minutes. "
-                + "Open Coreography to see what it is doing; nothing is quit unless you choose to.",
+                + "Open System Monitor to see what it is doing; nothing is quit unless you choose to.",
             route: CoreographyWatch.route(CoreographyWatch.Action.process, context: [CoreographyWatch.nameContextKey: name]))
     }
 
@@ -67,7 +67,7 @@ public struct CoreographyRule: SuggestionRule {
         return SuggestionContent(
             title: "Memory is running out",
             detail: "macOS has reported critical memory pressure at two checks in a row, so apps may slow down "
-                + "while it compresses and swaps memory. Open Coreography to see which apps use the most.",
+                + "while it compresses and swaps memory. Open System Monitor to see which apps use the most.",
             route: CoreographyWatch.route(CoreographyWatch.Action.memory))
     }
 
@@ -85,7 +85,7 @@ public struct CoreographyRule: SuggestionRule {
         return SuggestionContent(
             title: "Your Mac is slowing down to stay cool",
             detail: "Thermal pressure was heavy at two checks in a row, so macOS is limiting the processor. "
-                + "Open Coreography to see what keeps it busy and how warm it runs.",
+                + "Open System Monitor to see what keeps it busy and how warm it runs.",
             route: CoreographyWatch.route(CoreographyWatch.Action.thermal))
     }
 
@@ -100,7 +100,7 @@ public struct CoreographyRule: SuggestionRule {
         return SuggestionContent(
             title: "The startup disk is nearly full",
             detail: "Only \(Self.size(available)) of \(Self.size(total)) is free (\(percent) %). "
-                + "macOS needs free space for updates, swap and caches. Open Coreography to see what is writing to disk.",
+                + "macOS needs free space for updates, swap and caches. Open System Monitor to see what is writing to disk.",
             route: CoreographyWatch.route(CoreographyWatch.Action.storage))
     }
 

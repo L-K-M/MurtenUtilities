@@ -119,7 +119,7 @@ final class AppController: NSObject, ReportActions, DockerServiceDelegate {
     if endpoint.lowercased().hasPrefix("\(DockerSSHHost.scheme)://") {
       guard let host = try? DockerSSHHost(endpoint) else {
         notice =
-          "The suggestion names an endpoint DockVac cannot use (\(endpoint)). Nothing was selected."
+          "The suggestion names an endpoint Docker Cleaner cannot use (\(endpoint)). Nothing was selected."
         render()
         return
       }
@@ -139,7 +139,7 @@ final class AppController: NSObject, ReportActions, DockerServiceDelegate {
     guard let connection, connection.endpoint.address == endpoint else {
       let reached = connection?.endpoint.address ?? "no daemon"
       notice =
-        "The suggestion was for Docker at \(endpoint), but DockVac reached \(reached). Nothing was selected."
+        "The suggestion was for Docker at \(endpoint), but Docker Cleaner reached \(reached). Nothing was selected."
       return
     }
     let plan = automaticPlans[.safe] ?? .empty
@@ -599,7 +599,7 @@ final class AppController: NSObject, ReportActions, DockerServiceDelegate {
         icon: Theme.dockVacIcon,
         headline: "Ready to scan Docker",
         message:
-          "DockVac shows what Docker keeps on disk and lets you remove exactly the pieces you choose. Nothing is deleted without your confirmation.",
+          "Docker Cleaner shows what Docker keeps on disk and lets you remove exactly the pieces you choose. Nothing is deleted without your confirmation.",
         details: "",
         action: "Scan Docker")
       pane.show(pane.messageView)

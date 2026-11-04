@@ -35,7 +35,7 @@ public enum DockerEngineError: Error, Hashable, Sendable, LocalizedError {
     case .timedOut(let path):
       return "Docker at \(path) did not answer in time."
     case .malformedResponse(let detail):
-      return "Docker sent a response DockVac could not read: \(detail)"
+      return "Docker sent a response Docker Cleaner could not read: \(detail)"
     case .api(let status, let message):
       return message.isEmpty ? "Docker returned HTTP \(status)." : message
     case .decoding(let error):

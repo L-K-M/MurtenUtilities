@@ -71,7 +71,7 @@ public enum BriefingError: Error, Equatable, Sendable {
         case .server(let status, let detail): "The provider failed (\(status)): \(detail)"
         case .refused: "The model declined to write a briefing."
         case .truncated: "The briefing was cut off before it finished."
-        case .malformedResponse: "The provider returned a reply Coreography could not read."
+        case .malformedResponse: "The provider returned a reply System Monitor could not read."
         case .credentials(let detail): "The Keychain could not provide the key: \(detail)"
         case .unreachable(let detail): "The provider could not be reached: \(detail)"
         }

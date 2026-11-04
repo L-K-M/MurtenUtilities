@@ -55,7 +55,7 @@ struct HelperSection: View {
     private static func summary(_ state: HelperInstallState) -> LocalizedStringKey {
         switch state {
         case .needsSignedBuild: "This build is not signed with a Developer ID, so macOS will not run the helper."
-        case .missingFromApp: "The helper is missing from this copy of Coreography. Reinstall the app."
+        case .missingFromApp: "The helper is missing from this copy of System Monitor. Reinstall Murten Utilities."
         case .notInstalled: "Not installed."
         case .awaitingApproval: "Waiting for your approval in System Settings > General > Login Items."
         case .ready: "Installed and answering."

@@ -371,7 +371,7 @@ private struct AppDetailView: View {
                             .confirmationDialog("Restart \(app.name) without resetting permissions?", isPresented: $showsRestart) {
                                 Button("Restart App") { doctor.restartApp(app) }
                             } message: {
-                                Text("DeviceControlDoctor will request a normal quit and reopen this app. Finish any work first, then use the Test Pad to check whether restarting helped.")
+                                Text("App Permission Checkup will request a normal quit and reopen this app. Finish any work first, then use the Test Pad to check whether restarting helped.")
                             }
                         Spacer()
                         Button("Check Again") { doctor.refresh(appID: app.id) }
@@ -687,7 +687,7 @@ struct TestPadView: View {
                     .focused($padFocused)
                     .scrollContentBackground(.hidden)
                     .padding(10)
-                    .accessibilityLabel("DeviceControlDoctor functional test field")
+                    .accessibilityLabel("App Permission Checkup functional test field")
                 if text.isEmpty {
                     Text("Click here, then invoke the app you’re testing…")
                         .foregroundStyle(.tertiary).padding(16).allowsHitTesting(false)
@@ -747,10 +747,10 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("Monitoring") {
-                Toggle("Check permissions every minute while DeviceControlDoctor is open", isOn: $doctor.monitorEnabled)
-                Text("Checks read authorization records. DeviceControlDoctor never resets permissions, quits another app, or grants access automatically.")
+                Toggle("Check permissions every minute while App Permission Checkup is open", isOn: $doctor.monitorEnabled)
+                Text("Checks read authorization records. App Permission Checkup never resets permissions, quits another app, or grants access automatically.")
                     .font(.caption).foregroundStyle(.secondary)
-                Text("Checks while DeviceControlDoctor is closed are set in the Background Checks tab.")
+                Text("Checks while App Permission Checkup is closed are set in the Background Checks tab.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Privacy and scope") {

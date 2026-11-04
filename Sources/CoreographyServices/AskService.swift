@@ -50,7 +50,7 @@ public enum AskError: Error, Equatable, Sendable {
         case .refused: "The model declined to answer this question."
         case .truncated: "The answer was cut off before it finished; no partial tool call was run."
         case .tooManyRounds: "The model needed too many tool calls; ask a narrower question."
-        case .malformedResponse: "The provider returned a response Coreography could not read."
+        case .malformedResponse: "The provider returned a response System Monitor could not read."
         case .credentials(let detail): "The Keychain could not provide the key: \(detail)"
         }
     }
@@ -85,7 +85,7 @@ public actor AskService {
     private static let maxTokens = 16_000
     private static let effort = "medium"
     static let systemPrompt = """
-        You are Coreography's diagnostic assistant on the user's Mac. Answer only from the diagnostic tools' \
+        You are System Monitor's diagnostic assistant on the user's Mac. Answer only from the diagnostic tools' \
         results, which are measured readings with units, availability and evidence references. Cite the \
         evidence references you rely on. Separate observations from possible causes, and say when the data \
         is insufficient; a busy process or simultaneous spikes alone do not prove why the Mac feels slow. \

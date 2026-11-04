@@ -8,7 +8,7 @@ enum BackupPanels {
         panel.allowedContentTypes = [.json]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        panel.title = "Import HallPass Backup"
+        panel.title = "Import Local Network Access Backup"
         panel.prompt = "Import"
         panel.message = "The backup replaces the draft. You can undo the import."
         panel.beginSheetModal(for: window) { response in

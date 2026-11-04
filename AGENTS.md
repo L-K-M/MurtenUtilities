@@ -4,13 +4,15 @@ Guidance for AI coding agents working in the **MurtenUtilities** repository.
 
 ## What MurtenUtilities Is
 
-Murten Utilities is a macOS utility *suite* — one app that collects the fleet's
-small tools (DockVac, RepoMen, BootCaptain, DeviceControlDoctor, Shortking,
-HallPass, ZenBackupManager, Obtainintosh, RunningMan, Coreography) behind a
-Norton-Utilities-style home screen, plus an opt-in menu-bar companion that
-suggests when a tool would help. The product plan is [PLAN.md](PLAN.md); the
-contracts are [docs/architecture.md](docs/architecture.md); per-module status
-is [docs/modules.md](docs/modules.md). All ten rostered tools are available;
+Murten Utilities is a macOS utility *suite* — one app that collects Docker
+Cleaner, Developer Cleanup, Startup Manager, App Permission Checkup, Shortcut
+Detective, Local Network Access, Zen Session Recovery, Software Update Finder,
+CI Runner Manager and System Monitor behind a Norton-Utilities-style home
+screen. Their source targets keep the legacy app names. An opt-in menu-bar
+companion suggests when a tool would help. The product plan is
+[PLAN.md](PLAN.md); the contracts are
+[docs/architecture.md](docs/architecture.md); per-module status is
+[docs/modules.md](docs/modules.md). All ten rostered tools are available;
 eligible tools also contribute opt-in watchers and suggestion routes.
 
 ## Tech Stack

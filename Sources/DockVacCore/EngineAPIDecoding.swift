@@ -8,7 +8,7 @@ public enum DockerDecodingError: Error, Hashable, Sendable, LocalizedError {
   public var errorDescription: String? {
     switch self {
     case .malformedJSON(let detail):
-      return "Docker returned data DockVac could not read: \(detail)"
+      return "Docker returned data Docker Cleaner could not read: \(detail)"
     case .invalidResource(let detail):
       return "Docker returned an invalid resource: \(detail)"
     }

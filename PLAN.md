@@ -27,7 +27,7 @@ The confirmed roster — and what each tool is for — lives in
 - **Suggestion feed** — on the home screen and in the menu. Every suggestion
   deep-links into the relevant pane with a safe default preselected. Example:
   the watcher sees ~8 GB of untagged image leftovers and unused build cache →
-  "Docker is holding ~8 GB you can re-pull or rebuild. Clean up?" → opens DockVac with
+  "Docker is holding ~8 GB you can re-pull or rebuild. Clean up?" → opens Docker Cleaner with
   exactly that set selected. The module defines what "safe" means
   (docs/modules.md, *What a suggestion may preselect*). Nothing repairs
   without a click.
@@ -50,16 +50,16 @@ The confirmed roster — and what each tool is for — lives in
 
 | Module | From repo | One-line job | Watcher → suggestion |
 | --- | --- | --- | --- |
-| DockVac | `DockVac` (SwiftPM) | Docker disk reclaim | Engine API disk-usage growth → "clean up?" |
-| RepoMen | `RepoMen` (.xcodeproj) | dev caches & build artifacts | cache growth → "12 GB of build products" |
-| BootCaptain | `BootCaptain` (Swift, GitHub-only) | startup items & boot failures | new/changed login items → "review what X added" |
-| DeviceControlDoctor | `DeviceControlDoctor` (SwiftPM) | TCC permission diagnostics | grant-vs-function drift → "re-check X" |
-| Shortking | `Shortking` (Swift, GitHub-only) | shortcut inventory & diagnosis | new conflict → "X stole ⌘⇧Space" |
-| HallPass | `HallPass` (SwiftPM) | local-network CIDR exemptions | mostly on-demand |
-| Zen Backup Manager | `ZenBackupManager` (Swift, GitHub-only) | browser-session backups | backup staleness → "last snapshot 9 days ago" |
-| Obtainintosh | `Obtainintosh` (Tauri source; native Swift port) | release-tracking updater | "3 app updates available" |
-| RunningMan | `RunningMan` (SwiftPM) | self-hosted CI runners | runner offline → "restart?" |
-| Coreography | `Coreography` (SwiftPM+.xcodeproj) | system monitor | sustained pressure → "X has pinned a core for an hour" |
+| Docker Cleaner | `DockVac` (SwiftPM) | Docker disk reclaim | Engine API disk-usage growth → "clean up?" |
+| Developer Cleanup | `RepoMen` (.xcodeproj) | dev caches & build artifacts | cache growth → "12 GB of build products" |
+| Startup Manager | `BootCaptain` (Swift, GitHub-only) | startup items & boot failures | new/changed login items → "review what X added" |
+| App Permission Checkup | `DeviceControlDoctor` (SwiftPM) | TCC permission diagnostics | grant-vs-function drift → "re-check X" |
+| Shortcut Detective | `Shortking` (Swift, GitHub-only) | shortcut inventory & diagnosis | new conflict → "X stole ⌘⇧Space" |
+| Local Network Access | `HallPass` (SwiftPM) | local-network CIDR exemptions | mostly on-demand |
+| Zen Session Recovery | `ZenBackupManager` (Swift, GitHub-only) | browser-session backups | backup staleness → "last snapshot 9 days ago" |
+| Software Update Finder | `Obtainintosh` (Tauri source; native Swift port) | release-tracking updater | "3 app updates available" |
+| CI Runner Manager | `RunningMan` (SwiftPM) | self-hosted CI runners | runner offline → "restart?" |
+| System Monitor | `Coreography` (SwiftPM+.xcodeproj) | system monitor | sustained pressure → "X has pinned a core for an hour" |
 
 Per-module migration notes, satellites, and new-module ideas:
 [docs/modules.md](docs/modules.md).

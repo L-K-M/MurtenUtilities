@@ -45,14 +45,14 @@ struct ShortkingWatcher: Watcher {
         do {
             guard let claims = try inventory.savedInventory() else {
                 return unavailable(at: observedAt, .toolMissing,
-                                   "No shortcut inventory yet. Open Shortking once to take one.")
+                                   "No shortcut inventory yet. Open Shortcut Detective once to take one.")
             }
             saved = claims
         } catch let error as StoreFileReader.ReadError {
             switch error {
             case .newerSchema:
                 return unavailable(at: observedAt, .malformedResponse,
-                                   "The saved shortcut inventory comes from a newer Shortking.")
+                                   "The saved shortcut inventory comes from a newer Shortcut Detective.")
             case .malformed:
                 return unavailable(at: observedAt, .malformedResponse,
                                    "The saved shortcut inventory could not be read.")

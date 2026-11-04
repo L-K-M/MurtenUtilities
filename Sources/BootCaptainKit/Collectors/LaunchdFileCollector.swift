@@ -101,7 +101,7 @@ public struct LaunchdFileCollector: Collector {
                 osBuild: ctx.osBuild,
                 permissions: ctx.hasRoot ? "root" : "user")])
         item.notes = job.unknownKeys.isEmpty ? [] :
-            ["Contains keys BootCaptain does not model: \(job.unknownKeys.joined(separator: ", "))"]
+            ["Contains keys Startup Manager does not model: \(job.unknownKeys.joined(separator: ", "))"]
         if job.associatedBundleIdentifiers.isEmpty == false {
             item.attribution.bundleIdentifier = job.associatedBundleIdentifiers.first
         }

@@ -256,7 +256,7 @@ public actor HistoryStore {
             let version = try Self.userVersion(connection)
             guard version <= Self.schemaVersion else {
                 throw HistoryStoreError.storage(
-                    "History was written by a newer Coreography (schema \(version)); update Coreography to keep recording"
+                    "History was written by a newer System Monitor (schema \(version)); update Murten Utilities to keep recording"
                 )
             }
             try connection.execute("PRAGMA journal_mode=WAL")

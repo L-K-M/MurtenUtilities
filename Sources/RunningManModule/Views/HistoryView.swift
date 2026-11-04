@@ -34,7 +34,7 @@ struct HistoryView: View {
             }.padding(.horizontal, 28).padding(.vertical, 14)
             Divider()
             if jobs.isEmpty {
-                EmptyPanel(symbol: model.jobs.isEmpty ? "clock.arrow.circlepath" : "line.3.horizontal.decrease.circle", title: model.jobs.isEmpty ? "Your next run starts the story" : "No matching jobs", message: model.jobs.isEmpty ? "RunningMan collects job history from installed runners. New work will appear here automatically." : "Try another outcome, runner or search term.")
+                EmptyPanel(symbol: model.jobs.isEmpty ? "clock.arrow.circlepath" : "line.3.horizontal.decrease.circle", title: model.jobs.isEmpty ? "Your next run starts the story" : "No matching jobs", message: model.jobs.isEmpty ? "CI Runner Manager collects job history from installed runners. New work will appear here automatically." : "Try another outcome, runner or search term.")
             } else {
                 ScrollView {
                     // Rows are direct children of the lazy stack, so only visible ones are

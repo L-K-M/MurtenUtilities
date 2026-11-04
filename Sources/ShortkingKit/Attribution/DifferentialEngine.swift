@@ -198,7 +198,7 @@ public final class DifferentialEngine {
             instruction: suspects.isEmpty
                 ? "No running application imports the symbols needed to register a global hotkey, "
                     + "so the owner of \(combo.displayString) is not currently running."
-                : "Quit \(names), then continue. Shortking will re-probe \(combo.displayString) and "
+                : "Quit \(names), then continue. Shortcut Detective will re-probe \(combo.displayString) and "
                     + "narrow the search.",
             remainingRestarts: restarts
         )

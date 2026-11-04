@@ -2121,7 +2121,7 @@ private struct ProcessPane: View {
                         Text(line)
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                            .help("CPU the whole machine used beyond the processes Coreography can read: other users' processes, the kernel, and processes too short-lived to sample. Network is traffic macOS counted but tied to no process.")
+                            .help("CPU the whole machine used beyond the processes System Monitor can read: other users' processes, the kernel, and processes too short-lived to sample. Network is traffic macOS counted but tied to no process.")
                     }
                     if snapshot.enumerationTruncated {
                         Text("Enumeration reached capacity; additional processes may exist.")
@@ -2356,7 +2356,7 @@ private struct ProcessActionConfirmation: ViewModifier {
 private struct SampleReportView: View {
     let model: DashboardModel
     @State private var exportFile: ExportFile?
-    @State private var exportName = "Coreography sample"
+    @State private var exportName = "System Monitor sample"
     @State private var exportError: String?
 
     var body: some View {
@@ -2658,7 +2658,7 @@ private struct InspectorView: View {
                 Text("Load \(loads.map { $0.formatted(.number.precision(.fractionLength(2))) }.joined(separator: " · "))")
             }
         }
-        InspectorSection("Coreography") {
+        InspectorSection("System Monitor") {
             SelfCostLine(model: model)
         }
         Text("Select a process to inspect it.").font(.caption).foregroundStyle(.secondary)
@@ -3126,7 +3126,7 @@ private struct SessionsPane: View {
         .task { await model.refreshSessions() }
         .fileExporter(
             isPresented: Binding(get: { exportFile != nil }, set: { if !$0 { exportFile = nil } }),
-            document: exportFile, contentType: exportType, defaultFilename: "Coreography session"
+            document: exportFile, contentType: exportType, defaultFilename: "System Monitor session"
         ) { result in
             if case .failure(let error) = result { exportError = error.localizedDescription }
         }
@@ -3390,7 +3390,7 @@ private struct RangePanel: View {
                 // A selection inside the stored part has no export document but records fine.
                 Button("Save Recording…") { Task { await saveRecording() } }
                     .disabled(model.selection == nil || savingRecording)
-                    .help("A .coreotrace file that opens back in Coreography for replay")
+                    .help("A .coreotrace file that opens back in System Monitor for replay")
                 Button("Annotate…") { model.annotationPromptShown = true }
                     .help("Name this range; the name marks where it starts and ends on every lane")
                 Button("Clear selection") { model.clearSelection() }
@@ -3446,7 +3446,7 @@ private struct RangePanel: View {
         .monospacedDigit()
         .fileExporter(
             isPresented: Binding(get: { exportFile != nil }, set: { if !$0 { exportFile = nil } }),
-            document: exportFile, contentType: exportType, defaultFilename: "Coreography range"
+            document: exportFile, contentType: exportType, defaultFilename: "System Monitor range"
         ) { result in
             if case .failure(let error) = result { exportError = error.localizedDescription }
         }
@@ -3995,7 +3995,7 @@ private struct SelfCostLine: View {
             Text(label(cost))
                 .monospacedDigit()
                 .foregroundStyle(over(cost) ? Color.orange : Color.secondary)
-                .help("Coreography's own process, from the latest process sample. One wakeup a second is the sampling itself.")
+                .help("System Monitor's own process, from the latest process sample. One wakeup a second is the sampling itself.")
         } else if let processes = model.processSnapshot {
             // A process sample without our own row is a failure to report, not a wait.
             Text("Self-cost: unavailable · \(processes.enumeration.reason ?? String(localized: "own process not observed"))")
@@ -4012,7 +4012,7 @@ private struct SelfCostLine: View {
         let wakeups = WakeupText.rate(cost.wakeupsPerSecond.numericValue)
         let budget = String(localized: "budget \(SelfCost.cpuBudgetPercentOfOneCore.formatted())% · \(MetricText.bytes(SelfCost.footprintBudgetBytes)) · \(SelfCost.wakeupBudgetBeyondSampling.formatted()) wakeups/s beyond sampling")
         let note = over(cost) ? " · " + String(localized: "over budget") : ""
-        return String(localized: "Coreography: \(cpu) · \(memory) · \(wakeups) (\(budget))") + note
+        return String(localized: "System Monitor: \(cpu) · \(memory) · \(wakeups) (\(budget))") + note
     }
 
     private func over(_ cost: SelfCost) -> Bool {

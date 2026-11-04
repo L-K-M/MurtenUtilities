@@ -9,7 +9,7 @@ import SwiftUI
 struct SuiteGrantNote: View {
     var body: some View {
         Label {
-            Text("Murten Utilities holds this permission for Shortking, separately from the "
+            Text("Murten Utilities holds this permission for Shortcut Detective, separately from the "
                 + "standalone Shortking app. Because this build is ad-hoc signed, macOS forgets "
                 + "the grant after every update of Murten Utilities: turn it off and on again in "
                 + "System Settings after updating.")

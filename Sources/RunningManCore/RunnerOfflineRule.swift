@@ -28,11 +28,11 @@ public struct RunnerOfflineRule: SuggestionRule {
         let reason = finding.text(RunnerHealthCheck.Evidence.reason).flatMap(RunnerHealthCheck.Reason.init(rawValue:))
         let cause = reason == .startsAtLogin
             ? "It is set to start at login but is not running."
-            : "It stopped without a request from RunningMan."
+            : "It stopped without a request from CI Runner Manager."
 
         return SuggestionContent(
             title: "\(name) has been offline for \(minutes) min — restart?",
-            detail: cause + " Open RunningMan to check its logs and start it; nothing restarts until you choose Start.",
+            detail: cause + " Open CI Runner Manager to check its logs and start it; nothing restarts until you choose Start.",
             route: Self.route(forRunner: finding.scope.rawValue))
     }
 

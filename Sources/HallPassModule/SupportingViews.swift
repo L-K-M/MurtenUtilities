@@ -54,7 +54,7 @@ struct NetworkInspector: View {
 
                     if rows.contains(where: { $0.status == .invalid }) {
                         Section("Invalid Existing Value") {
-                            Text("HallPass keeps existing values unchanged. Correct or remove invalid entries before applying.")
+                            Text("Local Network Access keeps existing values unchanged. Correct or remove invalid entries before applying.")
                         }
                     }
 
@@ -167,11 +167,11 @@ struct HelpView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("HallPass Help").font(.title2.bold()).padding(24)
+            Text("Local Network Access Help").font(.title2.bold()).padding(24)
             Form {
                 Section("Local Network Exemptions") {
                     Text(HallPassHelp.scope)
-                    Text("HallPass manages neither Wi-Fi network names nor firewall rules or permissions of individual apps. It installs no background service and needs no network connection.")
+                    Text("Local Network Access manages neither Wi-Fi network names nor firewall rules or permissions of individual apps. It installs no background service and needs no network connection.")
                 }
                 Section("Changing the Configuration") {
                     Text("1. Load the configuration (⌘L) and confirm as an administrator.")
@@ -185,7 +185,7 @@ struct HelpView: View {
                 }
                 Section("Backups and Recovery") {
                     Text("The Tool menu holds import, export and the backups folder. Export writes the most recently loaded or saved state. An import replaces only the draft and can be undone.")
-                    Text("Before each apply, a backup is saved in “~/Library/Application Support/HallPass/Backups/”. Changes you have not applied are kept as a draft and restored the next time Murten Utilities opens. Before writing, HallPass checks the original system state again.")
+                    Text("Before each apply, a backup is saved in “~/Library/Application Support/HallPass/Backups/”. Changes you have not applied are kept as a draft and restored the next time Murten Utilities opens. Before writing, Local Network Access checks the original system state again.")
                     Text("“Remove All Exemptions” empties both connections in the draft. After applying and restarting, the regular network permissions apply again.")
                 }
                 Section("More Information") {

@@ -59,7 +59,7 @@ struct HomeView: View {
                 Text("Something not working?")
                     .font(.system(size: 30, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
-                Text("Press the shortcut that misbehaved. Shortking will tell you who has it.")
+                Text("Press the shortcut that misbehaved. Shortcut Detective will tell you who has it.")
                     .font(.title3)
                     .foregroundStyle(.white.opacity(0.85))
             }
@@ -287,7 +287,7 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Nothing is fighting over your shortcuts")
                     .font(.headline)
-                Text("Shortking found no app conflicts and nothing that would make a shortcut "
+                Text("Shortcut Detective found no app conflicts and nothing that would make a shortcut "
                     + "misfire. If one still misbehaves, record it above — the cause may be "
                     + "something that registers nothing and has to be caught in the act.")
                     .font(.callout)

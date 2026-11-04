@@ -16,23 +16,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Home window with the suggestion feed, opt-in menu-bar companion, Settings
   (background checks, per-module notifications, pauses, launch at login,
   update checks off by default), Tool menu and module windows.
-- All ten rostered tools: DockVac, RepoMen, BootCaptain,
-  DeviceControlDoctor, Shortking, HallPass, Zen Backup Manager, Obtainintosh,
-  RunningMan and Coreography, with their panes, tests and eligible watchers.
-- Ad-hoc builds omit BootCaptain and Coreography's privileged helpers; their
-  helper-backed actions remain disabled until a Developer ID build.
+- All ten rostered tools: Docker Cleaner, Developer Cleanup, Startup Manager,
+  App Permission Checkup, Shortcut Detective, Local Network Access, Zen
+  Session Recovery, Software Update Finder, CI Runner Manager and System
+  Monitor, with their panes, tests and eligible watchers.
+- Ad-hoc builds omit Startup Manager and System Monitor's privileged helpers;
+  their helper-backed actions remain disabled until a Developer ID build.
 
 ### Changed
 
 - Deployment floor raised to macOS 26.
+- Modules use descriptive, task-oriented names instead of their source app
+  brands; stable routes, settings and on-disk formats are unchanged.
 - Locked the app's appearance to light (`NSRequiresAquaSystemAppearance`) —
   a documented product decision, not a missing feature; dark mode would be a
   Rigi redesign, not a reskin.
 
 ### Fixed
 
-- RepoMen now applies every completed measurement before marking a scan ready.
-- BootCaptain serializes journal access across concurrent tasks.
+- Developer Cleanup now applies every completed measurement before marking a
+  scan ready.
+- Startup Manager serializes journal access across concurrent tasks.
 
 ## [0.1.0] - 2026-11-01
 

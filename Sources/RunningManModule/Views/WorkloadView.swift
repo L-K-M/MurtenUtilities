@@ -68,7 +68,7 @@ struct WorkloadView: View {
                                footnote: "Local concurrency limit", symbol: "square.stack.3d.up", tint: RunningManStyle.accentText)
                 }
                 VStack(alignment: .leading, spacing: 12) {
-                    SectionHeading(title: "Runner activity", subtitle: "Last 24 hours · sampled while RunningMan is monitoring") { EmptyView() }
+                    SectionHeading(title: "Runner activity", subtitle: "Last 24 hours · sampled while CI Runner Manager is monitoring") { EmptyView() }
                     if model.runners.isEmpty {
                         Surface { EmptyPanel(symbol: "chart.bar", title: "Add a runner to begin", message: "Activity and compatible queues appear for installed runners.") }
                     } else {

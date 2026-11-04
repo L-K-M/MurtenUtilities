@@ -71,6 +71,6 @@ public final class DockVacProvider: SuiteModuleProvider {
   public var interruptionWarning: String? {
     guard controller.isCleaning else { return nil }
     return
-      "A cleanup is still running. Docker finishes the operation in progress either way, but DockVac cannot show you its result."
+      "A cleanup is still running. Docker finishes the operation in progress either way, but Docker Cleaner cannot show you its result."
   }
 }

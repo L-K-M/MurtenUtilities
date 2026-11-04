@@ -1222,7 +1222,7 @@ public final class DashboardModel {
             markers.append(TimelineMarker(time: event.time, label: rule.title, kind: .alert))
             runShortcut(for: rule, at: event.time)
             guard rule.notifies, let notifier, alertCooldown.admit(rule.id, at: event.time) else { continue }
-            Task { await notifier.deliver(ruleID: rule.id, title: rule.title, body: "Open Coreography to see what is using it.") }
+            Task { await notifier.deliver(ruleID: rule.id, title: rule.title, body: "Open System Monitor to see what is using it.") }
         }
         refreshActiveAlerts()
     }
@@ -2430,7 +2430,7 @@ public final class DashboardModel {
         // The message also goes to the window: a toolbar button has nowhere else to show it.
         guard let sessionArchive else {
             sessions.insert(session, at: 0)
-            actionMessage = "Sessions cannot be saved on this Mac; this one lasts until Coreography quits."
+            actionMessage = "Sessions cannot be saved on this Mac; this one lasts until System Monitor quits."
             return actionMessage
         }
         do {
@@ -2457,7 +2457,7 @@ public final class DashboardModel {
         do {
             try await sessionArchive?.save(sessions[index])
         } catch {
-            actionMessage = "The new name could not be saved and lasts until Coreography quits: \(error)"
+            actionMessage = "The new name could not be saved and lasts until System Monitor quits: \(error)"
         }
     }
 

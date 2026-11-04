@@ -148,7 +148,7 @@ struct DockVacWatcher: Watcher {
     if error is SSHBackgroundCheckDisabled {
       return ObservationFailure(
         kind: .permissionDenied, scope: scope,
-        message: "SSH endpoints are checked when you open DockVac.")
+        message: "SSH endpoints are checked when you open Docker Cleaner.")
     }
     let message =
       dockerErrorMessage(error).split(separator: "\n").first.map(String.init)

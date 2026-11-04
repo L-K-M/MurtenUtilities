@@ -15,16 +15,16 @@ PLAN.md, *Deployment floor*). The source repos declare these floors
 
 | Module | Declared floor | Declared in | What needs it |
 | --- | --- | --- | --- |
-| DockVac | 13 | `Package.swift` | fits the suite |
-| RepoMen | 13 | `.xcodeproj` | fits the suite |
-| BootCaptain | 13 | `Package.swift`, `project.yml` | fits the suite |
-| DeviceControlDoctor | 14 | `Package.swift` | fits the suite |
-| Shortking | 14 | `Package.swift` | fits the suite |
-| RunningMan | 14 | `Package.swift` | fits the suite |
-| Zen Backup Manager | 14 | `.xcodeproj` | fits the suite |
-| HallPass | 26 | `Package.swift` | The source deliberately adopts the suite floor; local-network exemption APIs require macOS 15.5. |
-| Coreography | 26 | `Package.swift`, `.xcodeproj` | A product decision in its own plan (`docs/plan.md`, decision 1), not an API gate: the tree has no `#available` checks. Its private NetworkStatistics keys are verified only "as the framework publishes them on macOS 26". |
-| Obtainintosh | Tauri app | `tauri.conf.json` | a port; no Swift floor yet |
+| Docker Cleaner (`DockVac`) | 13 | `Package.swift` | fits the suite |
+| Developer Cleanup (`RepoMen`) | 13 | `.xcodeproj` | fits the suite |
+| Startup Manager (`BootCaptain`) | 13 | `Package.swift`, `project.yml` | fits the suite |
+| App Permission Checkup (`DeviceControlDoctor`) | 14 | `Package.swift` | fits the suite |
+| Shortcut Detective (`Shortking`) | 14 | `Package.swift` | fits the suite |
+| CI Runner Manager (`RunningMan`) | 14 | `Package.swift` | fits the suite |
+| Zen Session Recovery (`Zen Backup Manager`) | 14 | `.xcodeproj` | fits the suite |
+| Local Network Access (`HallPass`) | 26 | `Package.swift` | The source deliberately adopts the suite floor; local-network exemption APIs require macOS 15.5. |
+| System Monitor (`Coreography`) | 26 | `Package.swift`, `.xcodeproj` | A product decision in its own plan (`docs/plan.md`, decision 1), not an API gate: the tree has no `#available` checks. Its private NetworkStatistics keys are verified only "as the framework publishes them on macOS 26". |
+| Software Update Finder (`Obtainintosh`) | Tauri app | `tauri.conf.json` | a port; no Swift floor yet |
 
 Every module's floor is at or below the suite's, so no module needs an
 availability fallback or an OS applicability check, and CI (`macos-26`)
@@ -32,7 +32,7 @@ tests the only supported release.
 
 ## Confirmed roster
 
-### DockVac — effort: cheap — phase 1 (first module)
+### Docker Cleaner (from DockVac) — effort: cheap — phase 1 (first module)
 
 Docker disk-usage treemap with selective reclaim — deliberately not a broad
 `docker system prune`.
@@ -76,7 +76,7 @@ Docker disk-usage treemap with selective reclaim — deliberately not a broad
   menu's checkmarks on Show Everything / Show Reclaimable Only (the bar's
   segmented control shows the filter).
 
-### RepoMen — effort: medium — phase 3 — available
+### Developer Cleanup (from RepoMen) — effort: medium — phase 3 — available
 
 Finds developer caches and build artifacts — `target/`, `node_modules/`,
 DerivedData, Homebrew caches — and reclaims them by age and size.
@@ -127,7 +127,7 @@ DerivedData, Homebrew caches — and reclaims them by age and size.
 - **Coexistence:** both apps can scan and reclaim the same folders; a
   standalone app with auto-clean on keeps trashing on its own schedule.
 
-### BootCaptain — effort: medium — phase 3
+### Startup Manager (from BootCaptain) — effort: medium — phase 3
 
 Inventories launch agents, login items and other startup mechanisms,
 attributes them to installed products, and investigates boot failures.
@@ -174,7 +174,7 @@ attributes them to installed products, and investigates boot failures.
   Spawns live in `BootCaptainKit`, so the module needs Kit as well as Core.
   The app is Developer ID signed, notarized and non-sandboxed.
 
-### DeviceControlDoctor — effort: cheap — phase 2
+### App Permission Checkup (from DeviceControlDoctor) — effort: cheap — phase 2
 
 Diagnoses Device Control / Data Access (TCC) permission records that look
 granted but fail functionally. `DoctorCore` is pure, `ProcessRunning` is the
@@ -217,7 +217,7 @@ user-confirmed per service.
   `tccutil list`, which its AGENTS.md records as verified only on macOS 27.2;
   elsewhere they degrade to unavailable.
 
-### Shortking — effort: medium — phase 3
+### Shortcut Detective (from Shortking) — effort: medium — phase 3
 
 Inventories system and app shortcuts, then uses live capture and diagnostic
 tests to find who owns — or stole — a hotkey. **Available.**
@@ -264,7 +264,7 @@ tests to find who owns — or stole — a hotkey. **Available.**
   separate. `ScanOptions.unprivileged` already scopes a watcher-sized scan,
   but a cold scan spawns hundreds of `nm` processes.
 
-### HallPass — effort: cheap — phase 2
+### Local Network Access (from HallPass) — effort: cheap — phase 2
 
 Manages system-wide CIDR exemptions from the macOS local-network privacy
 restriction. Already fleet-standard: `HallPassCore` is pure; writes go through
@@ -306,7 +306,7 @@ privileged osascript with baseline re-check and rollback.
 - **Preselection:** nothing. The provider declares no route actions, so
   only the bare route opens the pane.
 
-### Zen Backup Manager — effort: medium — phase 3
+### Zen Session Recovery (from Zen Backup Manager) — effort: medium — phase 3
 
 Inspects browser tabs and Spaces on a timeline of session backups; restores
 with a verified safety copy and undo.
@@ -341,7 +341,7 @@ with a verified safety copy and undo.
   backup, so the suggestion must say that. Restore requires quitting Zen, and
   the pane offers to quit it.
 
-### Obtainintosh — effort: port — phase 4
+### Software Update Finder (from Obtainintosh) — effort: port — phase 4
 
 Tracks applications and fonts distributed through GitHub or Forgejo
 releases, compares them with what is installed, downloads a matching asset
@@ -384,7 +384,7 @@ and reveals it in Finder. It does not install or replace anything.
 - **Platforms:** macOS only. Linux users (deb, AppImage, Flatpak) keep the
   Tauri app.
 
-### RunningMan — effort: cheap — phase 2
+### CI Runner Manager (from RunningMan) — effort: cheap — phase 2
 
 Discovers self-hosted GitHub Actions and Forgejo runners in place, starts and
 stops them, sets launch-at-login, registers new ones, follows job logs.
@@ -436,7 +436,7 @@ SwiftPM.
   servers, the pane offers once to import both from the standalone app's
   domain (`ch.lkmc.RunningMan`); the standalone domain is only read.
 
-### Coreography — effort: medium — phase 3 — migrated
+### System Monitor (from Coreography) — effort: medium — phase 3 — migrated
 
 The system monitor: CPU/memory/disk/network lanes, process table, menu-bar
 extra, widgets, Shortcuts actions, a `coreo` CLI. `.xcodeproj` today.

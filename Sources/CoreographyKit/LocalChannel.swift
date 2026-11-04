@@ -32,7 +32,7 @@ public enum LocalChannelError: Error, Equatable, CustomStringConvertible, Sendab
     public var description: String {
         switch self {
         case .closed: "the listener was closed"
-        case .inUse: "another copy of Coreography already listens there"
+        case .inUse: "another copy of System Monitor already listens there"
         }
     }
 }

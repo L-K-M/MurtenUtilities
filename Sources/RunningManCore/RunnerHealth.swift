@@ -141,7 +141,7 @@ public enum RunnerHealthCheck {
 
         for directory in skippedDirectories {
             failures.append(ObservationFailure(kind: .permissionDenied, scope: FindingScope(directory.path),
-                message: "\(directory.lastPathComponent) is in a folder macOS protects, so the background check skips it. Open RunningMan to check it."))
+                message: "\(directory.lastPathComponent) is in a folder macOS protects, so the background check skips it. Open CI Runner Manager to check it."))
         }
 
         // Unreadable runners remain failed scopes even when discovery is exhaustive.

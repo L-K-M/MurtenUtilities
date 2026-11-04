@@ -48,7 +48,7 @@ final class StaleWatchReportTests: XCTestCase {
         XCTAssertEqual(kinds["/Users/test/Documents/GitHub"], .permissionDenied)
         XCTAssertEqual(kinds["/Users/test/gone"], .toolMissing)
         XCTAssertEqual(kinds["/Users/test/locked"], .permissionDenied)
-        XCTAssertTrue(observation.failures.contains { $0.message.contains("scan it in RepoMen") })
+        XCTAssertTrue(observation.failures.contains { $0.message.contains("scan it in Developer Cleanup") })
     }
 
     func testScanFoldersAreSurveyedWithThePanesIdleThreshold() throws {

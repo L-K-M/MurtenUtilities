@@ -36,7 +36,7 @@ struct ConflictsView: View {
                         : "line.3.horizontal.decrease.circle",
                     title: state.result.conflicts.isEmpty ? "No conflicts found" : "No matches",
                     message: state.result.conflicts.isEmpty
-                        ? "Nothing Shortking can see is fighting over a key combination. Note that "
+                        ? "Nothing Shortcut Detective can see is fighting over a key combination. Note that "
                             + "event-tap tools bind in their own code, so their shortcuts are only "
                             + "visible through their config files — check Suspects for processes "
                             + "that could still be intercepting keys."

@@ -161,7 +161,7 @@ import UniformTypeIdentifiers
                 let command = await runner.run(SystemTool.tccutil, ["list", "-s", service.rawValue, "-b", initial.bundleID])
                 result = command.timedOut ? .init(state: .unknown, detail: "The permission query timed out.") : TCCOutputParser.parseQuery(output: command.output, exitCode: command.exitCode)
             } else {
-                result = .init(state: .unavailable, detail: "This Mac does not currently provide permission listing to DeviceControlDoctor.")
+                result = .init(state: .unavailable, detail: "This Mac does not currently provide permission listing to App Permission Checkup.")
             }
             readings.append(.init(service: service, result: result))
         }

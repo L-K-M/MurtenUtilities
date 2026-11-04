@@ -106,7 +106,7 @@ final class CleanupProgressSheetController: NSWindowController, NSTableViewDataS
     if state.isFinished {
       headline.stringValue =
         state.failedCount > 0 ? "Cleanup finished with problems" : "Cleanup finished"
-      summary.stringValue = state.summary + " DockVac will rescan Docker when you close this."
+      summary.stringValue = state.summary + " Docker Cleaner will rescan Docker when you close this."
       stopButton.isHidden = true
       doneButton.isHidden = false
     } else if stopRequested {

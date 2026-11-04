@@ -225,7 +225,7 @@ public enum HealthChecker {
                 title: "SkyLight symbols",
                 status: .warning,
                 message: "SkyLight could not be opened. Live system shortcuts and Blackout are off.",
-                detail: "Shortking falls back to reading com.apple.symbolichotkeys.plist, which is "
+                detail: "Shortcut Detective falls back to reading com.apple.symbolichotkeys.plist, which is "
                     + "usually complete but can miss unwritten defaults and MDM-managed values."
             )
         }
@@ -264,7 +264,7 @@ public enum HealthChecker {
                 title: "Hotkey probing",
                 status: .warning,
                 message: "This macOS build permits duplicate hotkey registration.",
-                detail: "Shortking verifies on every launch that registering an already-taken "
+                detail: "Shortcut Detective verifies on every launch that registering an already-taken "
                     + "combination is refused. On this machine it was not, so probe results cannot "
                     + "distinguish taken from free. The claimed-combination map is hidden rather "
                     + "than shown wrongly; Detective Mode's live capture still works."

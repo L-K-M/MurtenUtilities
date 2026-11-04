@@ -748,7 +748,7 @@ final class AppModel {
             pendingConfirmation = .runner(PendingRunnerAction(action: action, runnerID: runner.id, force: true))
         } else if (runner.status == .busy || runner.status == .unknown) && (action == .stop || action == .disable) {
             confirmation = RunnerConfirmation(title: runner.status == .busy ? "Interrupt the active job?" : "Stop with activity unverified?",
-                message: runner.status == .busy ? "\(runner.runner.name) is building right now. This will stop the runner and interrupt its job. Choose “Stop when idle” to let it finish." : "RunningMan cannot verify whether \(runner.runner.name) has active jobs. Stopping may interrupt work.",
+                message: runner.status == .busy ? "\(runner.runner.name) is building right now. This will stop the runner and interrupt its job. Choose “Stop when idle” to let it finish." : "CI Runner Manager cannot verify whether \(runner.runner.name) has active jobs. Stopping may interrupt work.",
                 buttonTitle: action == .disable ? "Disable and interrupt" : "Stop and interrupt")
             pendingConfirmation = .runner(PendingRunnerAction(action: action, runnerID: runner.id, force: true))
         } else { runAction(action, on: runner) }
@@ -761,10 +761,10 @@ final class AppModel {
         if runner.status == .stopped || runner.status == .disabled { return "\(name) is not running." }
         guard runner.runner.provider == .forgejo else { return nil }
         guard remoteMonitoringEnabled else {
-            return "Turn on server monitoring in Workload so RunningMan can tell when \(name) finishes its job. You can still stop it now after confirming the interruption."
+            return "Turn on server monitoring in Workload so CI Runner Manager can tell when \(name) finishes its job. You can still stop it now after confirming the interruption."
         }
         guard runner.status != .busy, runner.status != .idle else { return nil }
-        return "RunningMan cannot verify whether \(name) is running a job, so it cannot tell when to stop it. Check this server’s connection in Workload, or stop the runner now after confirming the interruption."
+        return "CI Runner Manager cannot verify whether \(name) is running a job, so it cannot tell when to stop it. Check this server’s connection in Workload, or stop the runner now after confirming the interruption."
     }
 
     /// Without server monitoring a Forgejo request could never complete, so it ends with an explanation.
@@ -879,7 +879,7 @@ final class AppModel {
     /// System LaunchDaemons are monitored only; the service controller refuses them too.
     private func requireUserService(_ runner: RunnerSnapshot) -> Bool {
         guard runner.runner.serviceDomain == .system else { return true }
-        errorMessage = "\(runner.runner.name) is managed by a system LaunchDaemon. RunningMan monitors it but does not start, stop or change system services."
+        errorMessage = "\(runner.runner.name) is managed by a system LaunchDaemon. CI Runner Manager monitors it but does not start, stop or change system services."
         return false
     }
 
@@ -1023,7 +1023,7 @@ final class AppModel {
         }
         let panel = NSOpenPanel()
         panel.title = "Add an existing runner"
-        panel.message = "Choose a configured GitHub runner folder, a RunningMan Forgejo installation, or a Forgejo folder referenced by a user login service."
+        panel.message = "Choose a configured GitHub runner folder, a Forgejo runner installation created by CI Runner Manager, or a Forgejo folder referenced by a user login service."
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = true
@@ -1034,7 +1034,7 @@ final class AppModel {
                 let canonical = url.resolvingSymlinksInPath().standardizedFileURL
                 let result = await discovery.discover(additionalDirectories: [canonical])
                 guard result.runners.contains(where: { $0.directory.standardizedFileURL == canonical }) else {
-                    errorMessage = "No configured runner was found in \(canonical.lastPathComponent). Choose a GitHub runner folder, a RunningMan Forgejo installation, or a Forgejo folder used by a login service."
+                    errorMessage = "No configured runner was found in \(canonical.lastPathComponent). Choose a GitHub runner folder, a Forgejo runner installation created by CI Runner Manager, or a Forgejo folder used by a login service."
                     continue
                 }
                 if !importedDirectories.contains(canonical) { importedDirectories.append(canonical) }
@@ -1067,7 +1067,7 @@ final class AppModel {
     }
     func clearHistory() {
         confirmation = RunnerConfirmation(title: "Clear saved job history?",
-            message: "Clears RunningMan’s saved history. Runner diagnostic files are kept; jobs still present in those files may appear again after refreshing.",
+            message: "Clears CI Runner Manager’s saved history. Runner diagnostic files are kept; jobs still present in those files may appear again after refreshing.",
             buttonTitle: "Clear history")
         pendingConfirmation = .clearHistory
     }

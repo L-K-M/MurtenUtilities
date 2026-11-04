@@ -38,7 +38,7 @@ struct OverviewView: View {
                     if model.runners.isEmpty {
                         Surface {
                             VStack(spacing: 14) {
-                                EmptyPanel(symbol: "desktopcomputer.and.arrow.down", title: "Meet your new runner headquarters", message: "RunningMan finds runner installations on this Mac. Import a folder or register your first runner to get started.")
+                                EmptyPanel(symbol: "desktopcomputer.and.arrow.down", title: "Meet your new runner headquarters", message: "CI Runner Manager finds runner installations on this Mac. Import a folder or register your first runner to get started.")
                                 HStack {
                                     Button("Import existing…") { model.importRunner() }
                                     Button("Create a runner", systemImage: "plus") { model.showingNewRunner = true }.buttonStyle(.borderedProminent)

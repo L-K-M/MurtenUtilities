@@ -118,7 +118,7 @@ struct ObtainintoshPane: View {
             ModuleCommand("Import from the Obtainintosh App…", isEnabled: idle && model.standaloneListExists) {
                 Task { await model.importStandaloneList() }
             },
-            ModuleCommand("Obtainintosh Settings…", isEnabled: idle) { sheet = .settings },
+            ModuleCommand("Software Update Finder Settings…", isEnabled: idle) { sheet = .settings },
         ]
     }
 

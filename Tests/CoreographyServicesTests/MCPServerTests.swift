@@ -87,7 +87,7 @@ final class MCPServerTests: XCTestCase {
         let throttled = try await toolCall(server, id: 2, name: "get_data_sources", arguments: "{}")
         XCTAssertEqual(throttled["isError"] as? Bool, true)
         let text = (throttled["content"] as? [[String: Any]])?.first?["text"] as? String
-        XCTAssertEqual(text, "Rate limit: Coreography serves at most 20 tool calls per second across its clients")
+        XCTAssertEqual(text, "Rate limit: System Monitor serves at most 20 tool calls per second across its clients")
     }
 
     // MARK: Fixtures

@@ -296,7 +296,7 @@ private struct EmptyDetail: View {
             VStack(spacing: 8) {
                 Image(systemName: "sailboat.fill")
                     .font(.system(size: 46)).foregroundStyle(.tint)
-                Text("BootCaptain").font(.title.bold())
+                Text("Startup Manager").font(.title.bold())
                 Text("Everything that starts with your Mac, explained.")
                     .foregroundStyle(.secondary)
             }

@@ -43,7 +43,7 @@ struct CleanupView: View {
                     Label("Only that job’s build workspace", systemImage: "lock.shield").font(.system(size: 13, weight: .semibold))
                     Text("Release workflows build in a separate temporary copy, then remove it after upload attempts. Runner settings, diagnostic logs, cleanup reports, development checkouts and shared tool caches are kept outside that workspace.")
                         .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true).padding(.top, 7)
-                    Text("RunningMan reads these reports. It does not delete files or assume that an older release was cleaned up.")
+                    Text("CI Runner Manager reads these reports. It does not delete files or assume that an older release was cleaned up.")
                         .font(.system(size: 10)).foregroundStyle(.secondary).padding(.top, 9)
                 }
                 SectionHeading(title: "Cleanup history", subtitle: "Latest reports retained by each runner") { EmptyView() }

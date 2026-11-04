@@ -137,7 +137,7 @@ public struct ProgramForm: Equatable, Sendable {
     public var defaultProgramHint: String? {
         guard !offeredPrograms.isEmpty, assetFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               let program = releasePrograms?.defaultProgram else { return nil }
-        return "Without a choice, Obtainintosh downloads \(program)."
+        return "Without a choice, Software Update Finder downloads \(program)."
     }
 
     /// Chooses a program; a name still derived from the URL follows it,

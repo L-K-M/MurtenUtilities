@@ -62,7 +62,7 @@ struct EmptyStateView: View {
                     .frame(maxWidth: 440)
             } else {
                 Text("""
-                    RepoMen finds regenerable build artifacts — Rust targets, node_modules, \
+                    Developer Cleanup finds regenerable build artifacts — Rust targets, node_modules, \
                     DerivedData, stale caches — even deep inside your project trees, and \
                     reclaims only what you check. Nothing is pre-selected, everything goes \
                     to the Trash, and Docker is never touched.

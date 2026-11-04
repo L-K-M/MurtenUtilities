@@ -162,7 +162,7 @@ public actor ForgejoRunnerInstaller {
             if let manual { registration = manual }
             else {
                 progress("Registering the Forgejo runner with the selected scope…")
-                let body = try JSONSerialization.data(withJSONObject: ["name": request.name, "description": "Native macOS runner managed by RunningMan", "ephemeral": false])
+                let body = try JSONSerialization.data(withJSONObject: ["name": request.name, "description": "Native macOS runner managed by CI Runner Manager", "ephemeral": false])
                 let response = try await api.request(path: location.path, serverURL: location.serverURL, method: "POST", body: body)
                 registration = try JSONDecoder().decode(ForgejoRegistrationDetails.self, from: response).validated()
             }

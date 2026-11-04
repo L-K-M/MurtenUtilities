@@ -42,7 +42,7 @@ public struct ShortcutConflictRule: SuggestionRule {
     }
 
     static func detail(combo: String, contenderCount: Int, contenders: String) -> String {
-        let action = "Open Shortking to see which one wins and where to change the others."
+        let action = "Open Shortcut Detective to see which one wins and where to change the others."
         switch contenderCount {
         case ...1:
             let owner = contenders.isEmpty ? "One app" : contenders

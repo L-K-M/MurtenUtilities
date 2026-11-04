@@ -108,7 +108,7 @@ enum ProcessActions {
         case .suspend:
             // A suspended window server or collector cannot be resumed from this window.
             if endsSession { refusal = "Suspending it would freeze the screen with no way back." }
-            if process.id.pid == snapshot?.collectorPID { refusal = "Coreography cannot suspend itself." }
+            if process.id.pid == snapshot?.collectorPID { refusal = "System Monitor cannot suspend itself." }
             consequences.append("It stops running until resumed; an app stops responding meanwhile.")
         case .resume:
             consequences.append("It continues where it stopped.")
