@@ -175,6 +175,7 @@ struct HallPassModelTests {
         let model = HallPassModel(defaults: defaults(), backups: BackupStore(root: directory), service: try LoadedPreferences())
         model.restoreSession()
         #expect(model.error != nil)
+        #expect(model.error?.contains("HallPass data folder") == true)
 
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
         await model.load()
