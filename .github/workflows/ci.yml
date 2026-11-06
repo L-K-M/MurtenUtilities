@@ -61,7 +61,9 @@ jobs:
         run: swift build
 
       - name: Test
-        run: swift test
+        # Keep each frontend invocation visible and separate after repeated
+        # Xcode 26 compiler crashes without a source diagnostic.
+        run: swift test --verbose -Xswiftc -disable-batch-mode
 
       # Same invocation release.yml uses, so the release path is exercised on
       # every change rather than first failing under a tag.
