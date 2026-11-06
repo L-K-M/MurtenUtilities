@@ -98,10 +98,8 @@ struct ModuleTile: View {
         Button(action: open) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .top) {
-                    Image(systemName: module.systemImage)
-                        .font(.title2)
-                        .frame(width: 32, height: 32)
-                        .accessibilityHidden(true)
+                    ToolIcon(module: module)
+                        .frame(width: 72, height: 72)
                     Spacer()
                     badge
                 }
@@ -113,7 +111,7 @@ struct ModuleTile: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(10)
-            .frame(maxWidth: .infinity, minHeight: 104, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 152, alignment: .topLeading)
             .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 6))
             .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.quaternary))
             .contentShape(RoundedRectangle(cornerRadius: 6))

@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The ten tool icons now use colourful flowing stick figures, with larger
+  artwork in the home tiles and matching illustrations in suggestions and
+  background-check settings.
 - Deployment floor raised to macOS 26.
 - Modules use descriptive, task-oriented names instead of their source app
   brands; stable routes, settings and on-disk formats are unchanged.

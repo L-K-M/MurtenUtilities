@@ -39,10 +39,15 @@ struct SuggestionRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: model.module(suggestion.moduleID)?.systemImage ?? "lightbulb")
-                .font(.title3)
-                .frame(width: 24)
-                .accessibilityHidden(true)
+            Group {
+                if let module = model.module(suggestion.moduleID) {
+                    ToolIcon(module: module)
+                } else {
+                    Image(systemName: "lightbulb")
+                }
+            }
+            .frame(width: 32, height: 32)
+            .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(suggestion.title)

@@ -123,7 +123,12 @@ private struct WatcherRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Label(module.name, systemImage: module.systemImage)
+                Label {
+                    Text(module.name)
+                } icon: {
+                    ToolIcon(module: module)
+                        .frame(width: 28, height: 28)
+                }
                 Spacer()
                 Toggle("Check", isOn: enabled)
                 Toggle("Notify", isOn: notify)
