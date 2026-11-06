@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Prevented a startup freeze or crash when the menu-bar companion is off.
 - Developer Cleanup now applies every completed measurement before marking a
   scan ready.
 - Startup Manager serializes journal access across concurrent tasks.

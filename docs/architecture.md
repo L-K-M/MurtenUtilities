@@ -176,6 +176,10 @@ Do not promise OS-enforced per-module permissions in the single-process shell.
 - Resident mode defaults off. It inserts the menu extra and allows
   background checks; launch at login and notifications are separate
   settings. Removing the item from the menu bar turns resident mode off.
+- The menu extra's insertion binding ignores unchanged writebacks before
+  mutating observed settings. SwiftUI can write its current insertion state
+  during startup; a `didSet` equality guard is too late to prevent scene
+  invalidation and repeated menu construction.
 - Launch at login is an explicit Settings toggle →
   `SMAppService.mainApp.register()` / `.unregister()`.
 - Watchers pause on battery, in Low Power Mode, during quiet hours and, for
