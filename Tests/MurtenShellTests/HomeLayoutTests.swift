@@ -19,30 +19,73 @@ final class HomeLayoutTests: XCTestCase {
         XCTAssertFalse(layout.scrollerHidden, "A smaller window must keep the tools reachable")
     }
 
-    private func measureHome(height: CGFloat) async throws
-        -> (documentHeight: CGFloat, viewportHeight: CGFloat, scrollerHidden: Bool) {
-        let harness = Harness(withWatcher: false)
-        // Erase the internal view type before retaining the host across await.
-        let host = NSHostingView<AnyView>(rootView: AnyView(HomeView(model: harness.model)))
-        host.frame = NSRect(x: 0, y: 0, width: 1040, height: height)
-        let window = NSWindow(contentRect: host.frame, styleMask: [.titled, .resizable],
-                              backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false
-        defer { window.close() }
-        window.contentView = host
-        host.layoutSubtreeIfNeeded()
-        let scroll = try XCTUnwrap(descendants(of: host).compactMap { $0 as? NSScrollView }.first)
-        let document = try XCTUnwrap(scroll.documentView)
-        let loaded = await eventually {
+    private func measureHome(height: CGFloat) async throws -> Measurement {
+        let probe = try LayoutProbe(height: height)
+        defer { probe.close() }
+        let loaded = await eventually { probe.isReady() }
+        XCTAssertTrue(loaded, "The full tool grid must be laid out before measuring it")
+        return try probe.measurement()
+    }
+
+    private struct Measurement {
+        let documentHeight: CGFloat
+        let viewportHeight: CGFloat
+        let scrollerHidden: Bool
+    }
+
+    /// Keep native view state in synchronous methods, outside the async frame.
+    @MainActor
+    private final class LayoutProbe {
+        private let harness: Harness
+        private let host: NSView
+        private let window: NSWindow
+        private let scroll: NSScrollView
+        private let document: NSView
+
+        init(height: CGFloat) throws {
+            let harness = Harness(withWatcher: false)
+            let host: NSView = NSHostingView(rootView: HomeView(model: harness.model))
+            host.frame = NSRect(x: 0, y: 0, width: 1040, height: height)
+            let window = NSWindow(contentRect: host.frame, styleMask: [.titled, .resizable],
+                                  backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentView = host
+            host.layoutSubtreeIfNeeded()
+
+            let scroll: NSScrollView
+            let document: NSView
+            do {
+                scroll = try XCTUnwrap(Self.descendants(of: host).compactMap { $0 as? NSScrollView }.first)
+                document = try XCTUnwrap(scroll.documentView)
+            } catch {
+                window.close()
+                throw error
+            }
+            self.harness = harness
+            self.host = host
+            self.window = window
+            self.scroll = scroll
+            self.document = document
+        }
+
+        func isReady() -> Bool {
             host.layoutSubtreeIfNeeded()
             return document.frame.height > 500
         }
-        XCTAssertTrue(loaded, "The full tool grid must be laid out before measuring it")
-        return (document.frame.height, scroll.contentView.bounds.height,
-                try XCTUnwrap(scroll.verticalScroller).isHidden)
-    }
 
-    private func descendants(of view: NSView) -> [NSView] {
-        view.subviews.flatMap { [$0] + descendants(of: $0) }
+        func measurement() throws -> Measurement {
+            let scroller = try XCTUnwrap(scroll.verticalScroller)
+            return Measurement(documentHeight: document.frame.height,
+                               viewportHeight: scroll.contentView.bounds.height,
+                               scrollerHidden: scroller.isHidden)
+        }
+
+        func close() {
+            window.close()
+        }
+
+        private static func descendants(of view: NSView) -> [NSView] {
+            view.subviews.flatMap { [$0] + descendants(of: $0) }
+        }
     }
 }
