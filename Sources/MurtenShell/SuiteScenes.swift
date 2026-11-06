@@ -49,11 +49,17 @@ public struct SuiteScenes: Scene {
         .menuBarExtraStyle(.window)
     }
 
-    private var residentBinding: Binding<Bool> {
+    var residentBinding: Binding<Bool> {
         Binding(get: { model.settings.residentMode == .on },
                 // Removing the item from the menu bar (⌘-drag out) turns the
                 // companion off, so the setting never lies.
-                set: { model.settings.residentMode = $0 ? .on : .off })
+                set: { isInserted in
+                    let mode: SuiteSettings.ResidentMode = isInserted ? .on : .off
+                    // Observation invalidates before settings.didSet can reject
+                    // an unchanged writeback, causing a scene rebuild loop.
+                    guard model.settings.residentMode != mode else { return }
+                    model.settings.residentMode = mode
+                })
     }
 }
 
