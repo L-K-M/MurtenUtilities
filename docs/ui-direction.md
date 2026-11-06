@@ -36,7 +36,7 @@ Norton's menu window, mapped to components that exist today:
 | Norton element | Implementation |
 | --- | --- |
 | Window with the classic silhouette | `ClassicWindow` (pre–Big Sur corner shape) or a standard SwiftUI window until the chrome pass |
-| Tool rows: icon + name + one-liner | Home-view tiles today → row list later (icons 32–48 px, name in small headline, summary in caption) |
+| Tool rows: icon + name + one-liner | Home-view tiles today → row list later (currently 72-point illustrations, name in small headline, summary in caption) |
 | Engraved status footer | `StatusBarView` (already bridged) |
 | Inset list wells | `ClassicInsetBox` around scroll content |
 | Toolbar/segmented chrome | `ClassicBarView`, `ClassicSegmentedControl`, `ClassicToolbarButton` |
@@ -48,15 +48,20 @@ not a notification center bolted on.
 
 ## Icons
 
-- Placeholders today are SF Symbols; they read as modern-macOS, not classic.
-- The real grammar: friendly, slightly tactile tool icons — the four muted
-  squares in the provisional app icon (`media-sources/icon.py`) gesture at
-  the palette (steel blue, olive gold, terracotta, sage — colors that sit
-  comfortably on platinum).
-- Keep per-tool icon identity from the standalone apps where it's good
-  (RepoMen's, Coreography's artwork) rather than redesigning the set at once.
-- Pict is the fleet's icon store — use it for management/export when real
-  icons are drawn.
+- The suite's ten tools use flowing, faceless stick figures doing each
+  tool's job. Solid circular heads, tapered limbs and ribbon-shaped torsos
+  share one visual language, inspired by 1990s illustrations.
+- Clean flat colour: lake teal, cobalt, sunflower yellow, coral and a little
+  lime. No stippling, black outlines, offset colour patches, gradients or
+  shadows. Keep open space between limbs and one clear principal prop.
+- `MurtenShell/Artwork/` owns the native vector drawings; `ToolIcon` scales
+  them for the home grid, suggestions and tool labels. Shared figure poses
+  keep proportions and stroke character consistent across tools.
+- The home tiles give the artwork 72 points. Text remains the accessible
+  identity; the illustrations are decorative. Compact native Settings tabs
+  retain SF Symbols, which also remain the fallback for future modules.
+- The app's Dock icon and the modules' own application artwork retain their
+  separate identities.
 
 ## Modern manners (what NOT to copy from 1997)
 

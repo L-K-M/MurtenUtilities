@@ -15,7 +15,7 @@ public struct SuiteModule: Identifiable, Equatable, Sendable {
     public let name: String
     /// One line, as on the home screen — the Norton-style label.
     public let summary: String
-    /// SF Symbol shown until the module gets its real icon (see docs/ui-direction.md).
+    /// Fallback for compact native tabs and tools without suite artwork.
     public let systemImage: String
     public let status: Status
     /// The repository the implementation migrates from, when one exists.
