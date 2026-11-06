@@ -60,7 +60,7 @@ cp "$PROJECT_ROOT/Resources/Info.plist" "$APP_PATH/Contents/Info.plist"
 printf 'APPL????' > "$APP_PATH/Contents/PkgInfo"
 
 # Regenerate the iconset from the committed master so the shipped icon always
-# matches media-sources/icon.py → assets/MurtenUtilities-icon.png.
+# matches scripts/generate-app-icon.sh → assets/MurtenUtilities-icon.png.
 swift "$PROJECT_ROOT/scripts/make-icon.swift" "$PROJECT_ROOT/assets/MurtenUtilities-icon.png" "$BUILD_DIR/MurtenUtilities.iconset"
 /usr/bin/iconutil -c icns "$BUILD_DIR/MurtenUtilities.iconset" -o "$APP_PATH/Contents/Resources/AppIcon.icns"
 

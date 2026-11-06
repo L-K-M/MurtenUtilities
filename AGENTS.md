@@ -51,7 +51,8 @@ swift test             # full test suite
 `lkm-build` / `lkm-release` engines (the `release-tool` repo); the build engine
 delegates assembly to `scripts/build-app.sh` via the `swiftpm` kind — which
 also regenerates the icon via `scripts/make-icon.swift` from the committed
-master (`media-sources/icon.py` → `assets/MurtenUtilities-icon.png`). Releases
+master (`scripts/generate-app-icon.sh` compiles `media-sources/icon.swift`
+with the shared artwork into `assets/MurtenUtilities-icon.png`). Releases
 are cut by tagging: `scripts/release.sh X.Y.Z --push` — see `CICD.md`.
 
 ## Conventions

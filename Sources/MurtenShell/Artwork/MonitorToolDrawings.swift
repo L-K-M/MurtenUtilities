@@ -2,11 +2,11 @@ import SwiftUI
 
 extension ToolDrawing {
     func runnerManager() {
-        ellipse(Self.blue, x: 42, y: 9, width: 21, height: 21)
+        ellipse(Self.blue, x: 43, y: 8, width: 19, height: 19)
         fill(Self.coral) { p in
-            p.move(to: CGPoint(x: 51, y: 34))
-            p.addQuadCurve(to: CGPoint(x: 29, y: 66), control: CGPoint(x: 34, y: 40))
-            p.addQuadCurve(to: CGPoint(x: 45, y: 57), control: CGPoint(x: 43, y: 63))
+            p.move(to: CGPoint(x: 52, y: 31))
+            p.addQuadCurve(to: CGPoint(x: 27, y: 70), control: CGPoint(x: 34, y: 40))
+            p.addQuadCurve(to: CGPoint(x: 46, y: 59), control: CGPoint(x: 43, y: 68))
             p.closeSubpath()
         }
         fill(Self.blue) { p in

@@ -54,6 +54,9 @@ jobs:
         with:
           xcode-version: '26.0'   # pin so a runner-image bump can't change the toolchain
 
+      - name: Verify iconset transparency and sizes
+        run: swift scripts/test-iconset.swift
+
       - name: Build
         run: swift build
 

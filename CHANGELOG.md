@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The app icon now shares the clean colour figure-and-toolbox artwork.
 - The ten tool icons now use colourful flowing stick figures, with larger
   artwork in the home tiles and matching illustrations in suggestions and
   background-check settings.
@@ -40,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Opened up the tool figures' cramped torso proportions and made artwork
+  fitting uniform in non-square frames. App-icon resampling retains alpha.
 - Prevented a startup freeze or crash when the menu-bar companion is off.
 - Developer Cleanup now applies every completed measurement before marking a
   scan ready.

@@ -55,7 +55,7 @@ for size in sizes {
             bitsPerComponent: 8,
             bytesPerRow: 0,
             space: CGColorSpace(name: CGColorSpace.sRGB)!,
-            bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
         ) else {
             FileHandle.standardError.write("Error: cannot create graphics context for \(pixels)×\(pixels)\n".data(using: .utf8)!)
             exit(1)

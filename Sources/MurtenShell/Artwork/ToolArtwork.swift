@@ -14,7 +14,18 @@ enum ToolArtwork: String, CaseIterable {
     case runnerManager = "runningman"
     case systemMonitor = "coreography"
 
-    func draw(in context: GraphicsContext) {
+    func draw(in context: GraphicsContext, fitting size: CGSize) {
+        guard size.width > 0, size.height > 0 else { return }
+        let side = ToolDrawing.canvasSide
+        let scale = min(size.width, size.height) / side
+        var fitted = context
+        fitted.translateBy(x: (size.width - side * scale) / 2,
+                           y: (size.height - side * scale) / 2)
+        fitted.scaleBy(x: scale, y: scale)
+        drawArtwork(in: fitted)
+    }
+
+    private func drawArtwork(in context: GraphicsContext) {
         let drawing = ToolDrawing(context: context)
         switch self {
         case .dockerCleaner: drawing.dockerCleaner()

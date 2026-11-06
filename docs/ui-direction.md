@@ -36,7 +36,7 @@ Norton's menu window, mapped to components that exist today:
 | Norton element | Implementation |
 | --- | --- |
 | Window with the classic silhouette | `ClassicWindow` (pre–Big Sur corner shape) or a standard SwiftUI window until the chrome pass |
-| Tool rows: icon + name + one-liner | Home-view tiles today → row list later (currently 72-point illustrations, name in small headline, summary in caption) |
+| Tool rows: icon + name + one-liner | Home-view tiles today → row list later (currently 88-point illustrations, name in small headline, summary in caption) |
 | Engraved status footer | `StatusBarView` (already bridged) |
 | Inset list wells | `ClassicInsetBox` around scroll content |
 | Toolbar/segmented chrome | `ClassicBarView`, `ClassicSegmentedControl`, `ClassicToolbarButton` |
@@ -54,14 +54,20 @@ not a notification center bolted on.
 - Clean flat colour: lake teal, cobalt, sunflower yellow, coral and a little
   lime. No stippling, black outlines, offset colour patches, gradients or
   shadows. Keep open space between limbs and one clear principal prop.
-- `MurtenShell/Artwork/` owns the native vector drawings; `ToolIcon` scales
+- `MurtenShell/Artwork/` owns the native vector drawings; `ToolIcon` uniformly fits
   them for the home grid, suggestions and tool labels. Shared figure poses
   keep proportions and stroke character consistent across tools.
-- The home tiles give the artwork 72 points. Text remains the accessible
+- The home tiles give the artwork 88 points. Text remains the accessible
   identity; the illustrations are decorative. Compact native Settings tabs
   retain SF Symbols, which also remain the fallback for future modules.
-- The app's Dock icon and the modules' own application artwork retain their
-  separate identities.
+- The app's Dock icon uses a figure with a general-purpose toolbox. Its
+  1024-point master shares the production drawing helpers: regenerate it with
+  `./scripts/generate-app-icon.sh`. `make-icon.swift` preserves transparency
+  when making every iconset size; `swift scripts/test-iconset.swift` verifies
+  sizes, transparent corners and opaque interiors.
+- Keep torso shapes open beneath the circular heads. Render checks cover
+  torso/head proportions and round heads in square, wide and tall frames.
+  The modules' own application artwork retains its separate identity.
 
 ## Modern manners (what NOT to copy from 1997)
 
