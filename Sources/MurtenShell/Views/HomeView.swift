@@ -18,7 +18,8 @@ struct HomeView: View {
                     SuggestionFeed(model: model)
                     tools
                 }
-                .padding(20)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
             }
             .background(InsetWell())
             .padding(10)

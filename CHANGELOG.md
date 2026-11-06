@@ -43,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Opened up the tool figures' cramped torso proportions and made artwork
   fitting uniform in non-square frames. App-icon resampling retains alpha.
+- Widened the System Monitor illustration's screen and kept the ten-tool
+  home grid within the default window without a scrollbar.
 - Prevented a startup freeze or crash when the menu-bar companion is off.
 - Developer Cleanup now applies every completed measurement before marking a
   scan ready.

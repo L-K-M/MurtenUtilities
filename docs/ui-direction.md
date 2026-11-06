@@ -60,6 +60,9 @@ not a notification center bolted on.
 - The home tiles give the artwork 88 points. Text remains the accessible
   identity; the illustrations are decorative. Compact native Settings tabs
   retain SF Symbols, which also remain the fallback for future modules.
+- The default 1040-by-720 home window fits all ten tools without a scrollbar.
+  Keep enough vertical space for the grid; smaller windows and longer feeds
+  can still scroll. Check the complete home layout when changing tile sizes.
 - The app's Dock icon uses a figure with a general-purpose toolbox. Its
   1024-point master shares the production drawing helpers: regenerate it with
   `./scripts/generate-app-icon.sh`. `make-icon.swift` preserves transparency
@@ -67,6 +70,7 @@ not a notification center bolted on.
   sizes, transparent corners and opaque interiors.
 - Keep torso shapes open beneath the circular heads. Render checks cover
   torso/head proportions and round heads in square, wide and tall frames.
+  The System Monitor illustration has a landscape screen and casing.
   The modules' own application artwork retains its separate identity.
 
 ## Modern manners (what NOT to copy from 1997)

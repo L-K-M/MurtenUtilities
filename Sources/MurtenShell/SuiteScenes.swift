@@ -20,7 +20,7 @@ public struct SuiteScenes: Scene {
         Window("Murten Utilities", id: Self.homeWindowID) {
             RootView(model: model)
         }
-        .defaultSize(width: 1040, height: 760)
+        .defaultSize(width: 1040, height: 720)
         .commands {
             ToolCommands()
             // One home window; "New Window" would only duplicate it.
