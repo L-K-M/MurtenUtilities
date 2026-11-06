@@ -22,7 +22,8 @@ final class HomeLayoutTests: XCTestCase {
     private func measureHome(height: CGFloat) async throws
         -> (documentHeight: CGFloat, viewportHeight: CGFloat, scrollerHidden: Bool) {
         let harness = Harness(withWatcher: false)
-        let host = NSHostingView(rootView: HomeView(model: harness.model))
+        // Erase the internal view type before retaining the host across await.
+        let host = NSHostingView<AnyView>(rootView: AnyView(HomeView(model: harness.model)))
         host.frame = NSRect(x: 0, y: 0, width: 1040, height: height)
         let window = NSWindow(contentRect: host.frame, styleMask: [.titled, .resizable],
                               backing: .buffered, defer: false)

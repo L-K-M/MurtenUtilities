@@ -61,27 +61,7 @@ jobs:
         run: swift build
 
       - name: Test
-        # Capture the failed frontend's exact invocation while diagnosing the
-        # Xcode 26 compiler crash; preserve its exit status so CI still fails.
-        run: |
-          export MU_REAL_SWIFT_FRONTEND="$(xcrun --find swift-frontend)"
-          MU_FRONTEND_PROBE="$RUNNER_TEMP/murten-frontend-probe"
-          cat > "$MU_FRONTEND_PROBE" <<'FRONTEND_PROBE'
-          #!/bin/bash
-          "$MU_REAL_SWIFT_FRONTEND" "$@"
-          frontend_status=$?
-          if [ "$frontend_status" -ne 0 ]; then
-            {
-              printf 'FRONTEND_FAILED status=%s\n' "$frontend_status"
-              printf '%q ' "$MU_REAL_SWIFT_FRONTEND" "$@"
-              printf '\n'
-            } >&2
-          fi
-          exit "$frontend_status"
-          FRONTEND_PROBE
-          chmod +x "$MU_FRONTEND_PROBE"
-          swift test --verbose -Xswiftc -disable-batch-mode \
-            -Xswiftc -driver-use-frontend-path -Xswiftc "$MU_FRONTEND_PROBE"
+        run: swift test
 
       # Same invocation release.yml uses, so the release path is exercised on
       # every change rather than first failing under a tag.
