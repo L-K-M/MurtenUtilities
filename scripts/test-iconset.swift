@@ -64,6 +64,7 @@ private func verify() throws {
                 throw VerificationFailure("\(name): expected \(pixels)×\(pixels), got \(image.width)×\(image.height)")
             }
             let decoded = try context(size: pixels)
+            defer { withExtendedLifetime(decoded) {} }
             decoded.draw(image, in: CGRect(x: 0, y: 0, width: pixels, height: pixels))
             guard let rgba = decoded.data?.assumingMemoryBound(to: UInt8.self) else {
                 throw VerificationFailure("\(name): cannot read decoded RGBA pixels")
