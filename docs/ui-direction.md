@@ -55,8 +55,11 @@ not a notification center bolted on.
   lime. No stippling, black outlines, offset colour patches, gradients or
   shadows. Keep open space between limbs and one clear principal prop.
 - `MurtenShell/Artwork/` owns the native vector drawings; `ToolIcon` uniformly fits
-  them for the home grid, suggestions and tool labels. Shared figure poses
-  keep proportions and stroke character consistent across tools.
+  them for the home grid, suggestions and tool labels. Share inks and drawing
+  primitives while giving every tool its own action, pose and composition.
+  The human should interact with the principal prop so the gesture helps
+  explain the tool. Keep clear gaps between limbs and check optical balance
+  across the whole set at the home grid's 88-point size.
 - The home tiles give the artwork 88 points. Text remains the accessible
   identity; the illustrations are decorative. Compact native Settings tabs
   retain SF Symbols, which also remain the fallback for future modules.
@@ -72,6 +75,19 @@ not a notification center bolted on.
   torso/head proportions and round heads in square, wide and tall frames.
   The System Monitor illustration has a landscape screen and casing.
   The modules' own application artwork retains its separate identity.
+
+| Tool | Action and silhouette |
+| --- | --- |
+| Docker Cleaner | Crouching at the right, pulling a container clear of its stack |
+| Developer Cleanup | Bent over a long broom, sweeping files toward the left |
+| Startup Manager | Leaning back with both hands on a large power lever |
+| App Permission Checkup | Kneeling beside a closed lock to inspect its keyhole |
+| Shortcut Detective | Lying across a keyboard with a magnifier over one key |
+| Local Network Access | Two helpers joining a cable beneath the network nodes |
+| Zen Session Recovery | Seated cross-legged, cradling a window under a restore arc |
+| Software Update Finder | Working from a ladder to lower a download into its tray |
+| CI Runner Manager | Sprinting above the linked build stages |
+| System Monitor | Seated at a desk, watching a large landscape display |
 
 ## Modern manners (what NOT to copy from 1997)
 

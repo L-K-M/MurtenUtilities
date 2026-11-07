@@ -9,24 +9,14 @@ final class SystemMonitorIconTests: XCTestCase {
     func testMonitorViewportIsLandscape() throws {
         let bitmap = try render()
 
-        // Identify teal opaque pixels only in the right half (x >= 60) to exclude
-        // the standing figure's teal shirt, which occupies the left side.
+        // Teal is reserved for the display; the seated operator uses other inks.
         let viewport = try XCTUnwrap(
-            tealBoundingBox(in: bitmap, minimumX: 60),
-            "No teal pixels found in the right half of the rendered icon"
+            tealBoundingBox(in: bitmap),
+            "No teal display found in the rendered icon"
         )
 
-        // The teal viewport must be wholly inside the image bounds.
-        XCTAssertGreaterThanOrEqual(viewport.minX, 0, "Viewport extends beyond left edge")
-        XCTAssertGreaterThanOrEqual(viewport.minY, 0, "Viewport extends beyond top edge")
-        XCTAssertLessThanOrEqual(viewport.maxX, CGFloat(bitmap.pixelsWide),
-                                 "Viewport extends beyond right edge")
-        XCTAssertLessThanOrEqual(viewport.maxY, CGFloat(bitmap.pixelsHigh),
-                                 "Viewport extends beyond bottom edge")
-
-        // The viewport must have meaningful dimensions.
-        XCTAssertGreaterThanOrEqual(viewport.width, 1, "Viewport width is too small")
-        XCTAssertGreaterThanOrEqual(viewport.height, 1, "Viewport height is too small")
+        XCTAssertGreaterThan(viewport.width, 30, "Viewport must remain a substantial display")
+        XCTAssertGreaterThan(viewport.height, 15, "Viewport must remain a substantial display")
 
         // Acceptance criterion: the monitor display is landscape, not portrait.
         // Independently established ratio bounds: width / height in [1.5, 1.8].
@@ -52,13 +42,13 @@ final class SystemMonitorIconTests: XCTestCase {
         return NSBitmapImageRep(cgImage: cgImage)
     }
 
-    /// Returns the bounding box of all teal opaque pixels where x >= minimumX.
+    /// Returns the bounding box of the teal opaque display pixels.
     /// Teal is defined as low red, moderate+ green and blue, with high alpha —
     /// matching the ToolDrawing.teal color (0, 0.55, 0.57).
-    private func tealBoundingBox(in bitmap: NSBitmapImageRep, minimumX: Int) -> CGRect? {
+    private func tealBoundingBox(in bitmap: NSBitmapImageRep) -> CGRect? {
         var bounds: CGRect?
         for y in 0..<bitmap.pixelsHigh {
-            for x in minimumX..<bitmap.pixelsWide {
+            for x in 0..<bitmap.pixelsWide {
                 guard let color = bitmap.colorAt(x: x, y: y),
                       isTeal(color) else { continue }
                 let pixel = CGRect(x: x, y: y, width: 1, height: 1)

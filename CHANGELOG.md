@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Distinct actions and compositions for all ten tool illustrations: container
+  extraction, sweeping, a startup lever, keyhole inspection, a lounging
+  keyboard detective, cable joining, seated recovery, a download ladder,
+  sprinting CI stages and a seated monitor operator.
 - The app icon now shares the clean colour figure-and-toolbox artwork.
 - The ten tool icons now use colourful flowing stick figures, with larger
   artwork in the home tiles and matching illustrations in suggestions and

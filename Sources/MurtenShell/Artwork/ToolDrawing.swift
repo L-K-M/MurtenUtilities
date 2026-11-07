@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Flat colour and tapered filled paths, with open space between limbs.
-/// Shared poses keep head proportions and stroke character consistent.
+/// Shared inks and primitives keep distinct actions in one illustration family.
 struct ToolDrawing {
     let context: GraphicsContext
 
