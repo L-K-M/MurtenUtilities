@@ -2,7 +2,6 @@ import SwiftUI
 
 extension ToolDrawing {
     func runnerManager() {
-        // A full sprint above three linked build stages.
         stroke(Self.blue, width: 3) { p in
             p.move(to: CGPoint(x: 27, y: 106)); p.addLine(to: CGPoint(x: 102, y: 106))
         }
@@ -14,44 +13,34 @@ extension ToolDrawing {
             p.addLine(to: CGPoint(x: 117, y: 102))
         }
 
-        ellipse(Self.blue, x: 87, y: 9, width: 19, height: 19)
+        // Shoulder–elbow–wrist and hip–knee–ankle chains keep the sprint readable.
+        stroke(Self.blue, width: 6) { p in
+            p.move(to: CGPoint(x: 82, y: 36))
+            p.addLine(to: CGPoint(x: 65, y: 27))
+            p.addLine(to: CGPoint(x: 52, y: 40))
+            p.move(to: CGPoint(x: 87, y: 36))
+            p.addLine(to: CGPoint(x: 102, y: 49))
+            p.addLine(to: CGPoint(x: 115, y: 37))
+        }
+        stroke(Self.blue, width: 7.5) { p in
+            p.move(to: CGPoint(x: 64, y: 64))
+            p.addLine(to: CGPoint(x: 43, y: 78))
+            p.addLine(to: CGPoint(x: 21, y: 63))
+            p.addLine(to: CGPoint(x: 12, y: 67))
+            p.move(to: CGPoint(x: 67, y: 63))
+            p.addLine(to: CGPoint(x: 87, y: 63))
+            p.addLine(to: CGPoint(x: 79, y: 85))
+            p.addLine(to: CGPoint(x: 91, y: 88))
+        }
         fill(Self.coral) { p in
             p.move(to: CGPoint(x: 94, y: 32))
             p.addCurve(to: CGPoint(x: 58, y: 61), control1: CGPoint(x: 78, y: 31), control2: CGPoint(x: 63, y: 43))
-            p.addQuadCurve(to: CGPoint(x: 80, y: 55), control: CGPoint(x: 70, y: 64))
-            p.addQuadCurve(to: CGPoint(x: 94, y: 32), control: CGPoint(x: 86, y: 43))
+            p.addQuadCurve(to: CGPoint(x: 70, y: 66), control: CGPoint(x: 62, y: 65))
+            p.addQuadCurve(to: CGPoint(x: 85, y: 49), control: CGPoint(x: 79, y: 58))
+            p.addQuadCurve(to: CGPoint(x: 94, y: 32), control: CGPoint(x: 89, y: 40))
             p.closeSubpath()
         }
-        fill(Self.blue) { p in
-            p.move(to: CGPoint(x: 77, y: 35))
-            p.addCurve(to: CGPoint(x: 51, y: 30), control1: CGPoint(x: 62, y: 44), control2: CGPoint(x: 59, y: 26))
-            p.addQuadCurve(to: CGPoint(x: 33, y: 46), control: CGPoint(x: 42, y: 31))
-            p.addQuadCurve(to: CGPoint(x: 52, y: 37), control: CGPoint(x: 45, y: 42))
-            p.addCurve(to: CGPoint(x: 77, y: 35), control1: CGPoint(x: 62, y: 52), control2: CGPoint(x: 69, y: 46))
-            p.closeSubpath()
-
-            p.move(to: CGPoint(x: 93, y: 37))
-            p.addQuadCurve(to: CGPoint(x: 111, y: 48), control: CGPoint(x: 101, y: 58))
-            p.addQuadCurve(to: CGPoint(x: 120, y: 29), control: CGPoint(x: 119, y: 39))
-            p.addQuadCurve(to: CGPoint(x: 109, y: 40), control: CGPoint(x: 111, y: 32))
-            p.addQuadCurve(to: CGPoint(x: 93, y: 37), control: CGPoint(x: 101, y: 44))
-            p.closeSubpath()
-
-            p.move(to: CGPoint(x: 61, y: 62))
-            p.addQuadCurve(to: CGPoint(x: 43, y: 75), control: CGPoint(x: 58, y: 71))
-            p.addLine(to: CGPoint(x: 18, y: 58))
-            p.addQuadCurve(to: CGPoint(x: 7, y: 61), control: CGPoint(x: 10, y: 53))
-            p.addLine(to: CGPoint(x: 39, y: 85))
-            p.addQuadCurve(to: CGPoint(x: 68, y: 66), control: CGPoint(x: 52, y: 91))
-            p.closeSubpath()
-
-            p.move(to: CGPoint(x: 78, y: 59))
-            p.addQuadCurve(to: CGPoint(x: 91, y: 73), control: CGPoint(x: 83, y: 63))
-            p.addQuadCurve(to: CGPoint(x: 117, y: 85), control: CGPoint(x: 109, y: 74))
-            p.addQuadCurve(to: CGPoint(x: 91, y: 84), control: CGPoint(x: 111, y: 89))
-            p.addQuadCurve(to: CGPoint(x: 67, y: 65), control: CGPoint(x: 73, y: 81))
-            p.closeSubpath()
-        }
+        ellipse(Self.blue, x: 87, y: 9, width: 19, height: 19)
     }
 
     func systemMonitor() {
@@ -65,8 +54,8 @@ extension ToolDrawing {
             p.addLine(to: CGPoint(x: 55, y: 45)); p.addLine(to: CGPoint(x: 71, y: 45))
         }
         polygon(Self.yellow, CGPoint(x: 40, y: 77), CGPoint(x: 51, y: 77),
-                CGPoint(x: 55, y: 88), CGPoint(x: 65, y: 93),
-                CGPoint(x: 27, y: 93), CGPoint(x: 37, y: 88))
+                CGPoint(x: 55, y: 88), CGPoint(x: 65, y: 96),
+                CGPoint(x: 27, y: 96), CGPoint(x: 37, y: 88))
         stroke(Self.blue, width: 4) { p in
             p.move(to: CGPoint(x: 7, y: 98)); p.addLine(to: CGPoint(x: 88, y: 98))
             p.move(to: CGPoint(x: 13, y: 100)); p.addLine(to: CGPoint(x: 13, y: 118))

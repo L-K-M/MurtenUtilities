@@ -49,7 +49,8 @@ not a notification center bolted on.
 ## Icons
 
 - The suite's ten tools use flowing, faceless stick figures doing each
-  tool's job. Solid circular heads, tapered limbs and ribbon-shaped torsos
+  tool's job. Solid circular heads, rounded articulated limbs and
+  ribbon-shaped torsos
   share one visual language, inspired by 1990s illustrations.
 - Clean flat colour: lake teal, cobalt, sunflower yellow, coral and a little
   lime. No stippling, black outlines, offset colour patches, gradients or
@@ -60,6 +61,13 @@ not a notification center bolted on.
   The human should interact with the principal prop so the gesture helps
   explain the tool. Keep clear gaps between limbs and check optical balance
   across the whole set at the home grid's 88-point size.
+- Keep shoulders and hips connected, with readable elbows and knees and
+  consistent thickness within each pair of limbs. A limb should not pinch
+  to a single point or widen into a fin at its joint.
+- Check physical contact in both enlarged renders and actual 88-point tiles:
+  shoes rest on the floor or ladder rung, a supporting elbow meets its prop,
+  and equipment rests on its stand or desk. Pose quality needs this visual
+  check in addition to the automated rendering and layout regressions.
 - The home tiles give the artwork 88 points. Text remains the accessible
   identity; the illustrations are decorative. Compact native Settings tabs
   retain SF Symbols, which also remain the fallback for future modules.
