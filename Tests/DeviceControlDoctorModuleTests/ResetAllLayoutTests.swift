@@ -18,9 +18,9 @@ final class ResetAllLayoutTests: XCTestCase {
         try await waitForInspection(lifecycle)
 
         let size = probe.fittingSize()
-        XCTAssertLessThanOrEqual(size.height, 600,
-                                 "the process list must scroll instead of increasing the sheet height")
-        XCTAssertLessThanOrEqual(size.width, 640)
+        XCTAssertLessThanOrEqual(size.height, 620,
+                                 "the process table must scroll instead of increasing the sheet height")
+        XCTAssertLessThanOrEqual(size.width, 860)
         try probe.scrollReviewToBottom()
         XCTAssertEqual(probe.fittingSize(), size, "scrolling must not resize the confirmation")
         XCTAssertFalse(runner.ranReset, "opening and reviewing the sheet must never reset permissions")
@@ -38,8 +38,8 @@ final class ResetAllLayoutTests: XCTestCase {
 
         try await waitForInspection(lifecycle)
 
-        XCTAssertLessThanOrEqual(probe.fittingSize().height, 600)
-        XCTAssertLessThanOrEqual(probe.fittingSize().width, 640)
+        XCTAssertLessThanOrEqual(probe.fittingSize().height, 620)
+        XCTAssertLessThanOrEqual(probe.fittingSize().width, 860)
         XCTAssertFalse(runner.ranReset)
         XCTAssertEqual(lifecycle.terminationRequests, 0)
     }
@@ -59,8 +59,8 @@ final class ResetAllLayoutTests: XCTestCase {
         }
 
         XCTAssertNotNil(store.notice)
-        XCTAssertLessThanOrEqual(probe.fittingSize().height, 600)
-        XCTAssertLessThanOrEqual(probe.fittingSize().width, 640)
+        XCTAssertLessThanOrEqual(probe.fittingSize().height, 620)
+        XCTAssertLessThanOrEqual(probe.fittingSize().width, 860)
         XCTAssertFalse(runner.ranReset)
         XCTAssertEqual(lifecycle.inspections, 0)
         XCTAssertEqual(lifecycle.terminationRequests, 0)
@@ -117,7 +117,7 @@ final class ResetAllLayoutTests: XCTestCase {
         private let host: NSView
         private let window: NSWindow
 
-        init<Content: View>(root: Content, size: NSSize = NSSize(width: 640, height: 600)) {
+        init<Content: View>(root: Content, size: NSSize = NSSize(width: 860, height: 620)) {
             let host = NSHostingView(rootView: root)
             host.frame = NSRect(origin: .zero, size: size)
             let window = NSWindow(contentRect: host.frame, styleMask: [.titled, .resizable],

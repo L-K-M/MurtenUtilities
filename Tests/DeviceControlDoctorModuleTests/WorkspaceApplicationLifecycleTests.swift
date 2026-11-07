@@ -386,6 +386,45 @@ final class WorkspaceApplicationLifecycleTests: XCTestCase {
         XCTAssertEqual(Set(running.map(\.processIdentifier)), [711, 712, 713])
     }
 
+    func testReusedPIDDoesNotInheritAnOldHelpersAttribution() async throws {
+        let app = ProcessIdentity(processIdentifier: 98_790, executablePath: "/fixture/app",
+                                  signingIdentifier: "com.example.App")
+        let helper = ProcessIdentity(processIdentifier: 98_791, executablePath: "/fixture/shared-helper",
+                                     signingIdentifier: "com.example.Helper", responsibility: .process(98_790),
+                                     startTime: .init(seconds: 100, microseconds: 0))
+        let replacement = ProcessIdentity(processIdentifier: 98_791, executablePath: helper.executablePath,
+                                          signingIdentifier: helper.signingIdentifier,
+                                          startTime: .init(seconds: 200, microseconds: 0))
+        let lifecycle = WorkspaceApplicationLifecycle(inventory: SequencedInventory(snapshots: [[app, helper], [replacement]]))
+        let initiallyAffected = try await lifecycle.runningProcesses(matching: ["com.example.App"])
+        XCTAssertEqual(Set(initiallyAffected.map(\.id)), [app.processIdentifier, helper.processIdentifier])
+
+        let afterPIDReuse = try await lifecycle.runningProcesses(matching: ["com.example.App"])
+
+        XCTAssertTrue(afterPIDReuse.isEmpty,
+                      "an unrelated replacement must not inherit the cached attribution or appear as a Force Quit target")
+    }
+
+    func testForceQuitIsOfferedOnlyForVerifiedOwnProcesses() async throws {
+        let birth = ProcessStartTime(seconds: 100, microseconds: 0)
+        let own = ProcessIdentity(processIdentifier: 98_780, executablePath: "/fixture/own",
+                                  signingIdentifier: "com.example.App", startTime: birth)
+        let foreign = ProcessIdentity(processIdentifier: 98_781, executablePath: "/fixture/foreign",
+                                      signingIdentifier: "com.example.App", userIdentifier: geteuid() + 1,
+                                      startTime: birth)
+        let unknown = ProcessIdentity(processIdentifier: 98_782, executablePath: "/fixture/unknown",
+                                      signingIdentifier: "com.example.App")
+        let current = ProcessIdentity(processIdentifier: ProcessInfo.processInfo.processIdentifier,
+                                      executablePath: "/fixture/current", signingIdentifier: "com.example.App",
+                                      startTime: birth)
+        let lifecycle = WorkspaceApplicationLifecycle(inventory: InventoryFixture(processes: [own, foreign, unknown, current]))
+
+        let running = try await lifecycle.runningProcesses(matching: ["com.example.App"])
+
+        XCTAssertEqual(running.filter(\.canForceTerminate).map(\.id), [own.processIdentifier])
+        XCTAssertEqual(running.first { $0.id == own.processIdentifier }?.startTime, birth)
+    }
+
     func testLiveInventoryContainsTheTestProcess() async throws {
         let processes = try await liveSnapshot()
         XCTAssertTrue(processes.contains { $0.processIdentifier == ProcessInfo.processInfo.processIdentifier })

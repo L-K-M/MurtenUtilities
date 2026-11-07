@@ -1,11 +1,24 @@
 import DoctorCore
 import Foundation
 
-/// Performs the deliberately broad reset only after every recorded client is
-/// known and its matching processes have stayed closed. The watcher never
-/// reaches this type; only the Reset All confirmation does.
+/// Performs the broad reset with a verified client scope. Requiring closed
+/// apps is the default; only the explicit risk acknowledgement bypasses that
+/// requirement. The watcher never reaches this repair coordinator.
 @MainActor
 struct ResetAllPermissions {
+    enum RunningAppsPolicy: Sendable {
+        case requireClosed
+        case allowRunning
+    }
+
+    enum Progress {
+        case clients(Set<String>)
+        case processes([AffectedProcess])
+        case quitRequested([AffectedProcess])
+        case resetting(PermissionService)
+        case verifying(PermissionService)
+    }
+
     struct Preparation: Equatable, Sendable {
         let clients: Set<String>
         let runningProcesses: [AffectedProcess]
@@ -52,35 +65,40 @@ struct ResetAllPermissions {
         self.timing = timing
     }
 
-    func inspect() async throws -> Preparation {
+    func inspect(including knownClients: Set<String> = []) async throws -> Preparation {
         do {
             try await requireClientListing()
             let scope = try await readScope()
-            let running = try await lifecycle.runningProcesses(matching: scope.clients)
-            return Preparation(clients: scope.clients, runningProcesses: running)
+            let clients = scope.clients.union(knownClients)
+            let running = try await lifecycle.runningProcesses(matching: clients)
+            return Preparation(clients: clients, runningProcesses: running)
         } catch let error where !(error is CancellationError) {
             throw ResetAllError.stopped(error, .nothingReset)
         }
     }
 
-    func apply() async -> Result {
+    func apply(policy: RunningAppsPolicy = .requireClosed,
+               including previouslyKnownClients: Set<String> = [],
+               progress: @MainActor (Progress) -> Void = { _ in }) async -> Result {
         var outcomes: [Outcome] = []
         do {
             try Task.checkCancellation()
             try await requireClientListing()
             var scope = try await readScope()
-            var knownClients = scope.clients
-            guard !knownClients.isEmpty else {
+            var knownClients = scope.clients.union(previouslyKnownClients)
+            progress(.clients(knownClients))
+            guard !scope.clients.isEmpty else {
                 return Result(outcomes: [], failure: "There are no Device Control and Data Access settings to reset.")
             }
 
-            try await quiesce(knownClients)
+            try await prepareProcesses(knownClients, policy: policy, progress: progress)
 
             // Re-read after quitting. An app may have created or removed a
             // record while responding to the quit request.
             scope = try await readScope()
             knownClients.formUnion(scope.clients)
-            try await quiesce(knownClients)
+            progress(.clients(knownClients))
+            try await prepareProcesses(knownClients, policy: policy, progress: progress)
 
             let plan = GlobalRepairPlan()
             for (service, arguments) in zip(plan.services, plan.arguments) {
@@ -91,8 +109,11 @@ struct ResetAllPermissions {
                 // relaunch and disappear from later safety checks.
                 let currentScope = try await readScope()
                 knownClients.formUnion(currentScope.clients)
-                try await verifyStableAndClosed(service: service, knownClients: &knownClients)
+                progress(.clients(knownClients))
+                try await verifyStableScope(service: service, knownClients: &knownClients,
+                                            policy: policy, progress: progress)
 
+                progress(.resetting(service))
                 let command = await runner.run(SystemTool.tccutil, arguments)
                 let failure: String?
                 if command.outputTruncated {
@@ -120,6 +141,7 @@ struct ResetAllPermissions {
                     service: service,
                     failure: "The reset command completed, but its result could not be verified."
                 ))
+                progress(.verifying(service))
                 let remaining = try await readClients(for: service)
                 guard remaining.isEmpty else {
                     knownClients.formUnion(remaining)
@@ -185,20 +207,25 @@ struct ResetAllPermissions {
     /// If the service scope changes while processes are being inspected, try
     /// again with the expanded cumulative client set instead of mutating from
     /// a stale snapshot.
-    private func verifyStableAndClosed(service: PermissionService,
-                                       knownClients: inout Set<String>) async throws {
+    private func verifyStableScope(service: PermissionService, knownClients: inout Set<String>,
+                                   policy: RunningAppsPolicy,
+                                   progress: @MainActor (Progress) -> Void) async throws {
         for _ in 0..<3 {
             try Task.checkCancellation()
             let before = try await readClients(for: service)
             knownClients.formUnion(before)
+            progress(.clients(knownClients))
             let running = try await lifecycle.runningProcesses(matching: knownClients)
-            guard running.isEmpty else {
+            progress(.processes(running))
+            guard policy == .allowRunning || running.isEmpty else {
                 throw ResetAllError.appsStillRunning(running)
             }
             let after = try await readClients(for: service)
             knownClients.formUnion(after)
+            progress(.clients(knownClients))
             let runningAfter = try await lifecycle.runningProcesses(matching: knownClients)
-            guard runningAfter.isEmpty else {
+            progress(.processes(runningAfter))
+            guard policy == .allowRunning || runningAfter.isEmpty else {
                 throw ResetAllError.appsStillRunning(runningAfter)
             }
             if before == after { return }
@@ -206,13 +233,23 @@ struct ResetAllPermissions {
         throw ResetAllError.clientListUnstable(service)
     }
 
-    private func quiesce(_ clients: Set<String>) async throws {
+    private func prepareProcesses(_ clients: Set<String>, policy: RunningAppsPolicy,
+                                  progress: @MainActor (Progress) -> Void) async throws {
+        try Task.checkCancellation()
+        if policy == .allowRunning {
+            // Acknowledgement waives only quiescence, never inventory or scope
+            // verification. It does not silently quit or force-kill anything.
+            progress(.processes(try await lifecycle.runningProcesses(matching: clients)))
+            return
+        }
+
         var stableSamples = 0
         var lastRunning: [AffectedProcess] = []
 
         for _ in 0..<timing.maximumPolls {
             try Task.checkCancellation()
             let running = try await lifecycle.runningProcesses(matching: clients)
+            progress(.processes(running))
             if running.isEmpty {
                 stableSamples += 1
                 if stableSamples >= timing.stableSamples { return }
@@ -220,9 +257,11 @@ struct ResetAllPermissions {
                 stableSamples = 0
                 lastRunning = running
                 lifecycle.requestTermination(of: running)
+                progress(.quitRequested(running.filter(\.canRequestTermination)))
             }
             try await Task.sleep(nanoseconds: timing.pollNanoseconds)
         }
+        if stableSamples > 0 || lastRunning.isEmpty { throw ResetAllError.appsNotStable }
         throw ResetAllError.appsStillRunning(lastRunning)
     }
 }
@@ -246,6 +285,7 @@ private enum ResetAllError: LocalizedError {
     case clientListMalformed(PermissionService, String)
     case clientListUnstable(PermissionService)
     case appsStillRunning([AffectedProcess])
+    case appsNotStable
     case stopped(any Error, Progress)
 
     var errorDescription: String? {
@@ -268,8 +308,11 @@ private enum ResetAllError: LocalizedError {
         case .clientListUnstable(let service):
             return "The \(service.title) client list kept changing during the safety check."
         case .appsStillRunning(let processes):
-            let names = processes.isEmpty ? "An affected app" : processes.map(\.name).joined(separator: ", ")
-            return "\(names) \(processes.count == 1 ? "is" : "are") still running. Quit every affected app and try again."
+            let count = processes.count
+            let subject = count == 1 ? "1 affected process is" : "\(count) affected processes are"
+            return "\(subject) still running. Review their status below, quit them, and retry. Force Quit is never automatic."
+        case .appsNotStable:
+            return "Affected processes have not stayed closed long enough. Review their status and retry."
         case .stopped(let error, let progress):
             return "\(error.localizedDescription) \(progress.consequence)"
         }

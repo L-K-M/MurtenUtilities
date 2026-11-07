@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- App Permission Checkup's Reset All shows live process states with names,
+  PIDs and executable paths, retains exited rows, and supports in-place
+  retries. Per-process Force Quit requires a data-loss confirmation and a
+  fresh identity check. An unchecked, session-only risk acknowledgement
+  permits resetting with apps still running without bypassing inventory,
+  client-scope or reset-result verification.
+
 - Corrected uneven or pinched limbs in Startup Manager, Local Network Access
   and CI Runner Manager. System Monitor's seated figure now faces left, with
   feet pointing left toward the display. Software Update Finder removes the
