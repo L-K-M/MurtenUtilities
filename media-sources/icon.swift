@@ -19,7 +19,7 @@ struct AppIconGenerator {
             let plate = CGRect(x: side / 16, y: side / 16,
                                width: side * 7 / 8, height: side * 7 / 8)
             context.fill(Path(roundedRect: plate, cornerRadius: side * 0.185),
-                         with: .color(Color(red: 0.985, green: 0.982, blue: 0.965)))
+                         with: .color(ToolDrawing.yellow))
             context.translateBy(x: side * 0.10, y: side * 0.10)
             let scale = side * 0.80 / ToolDrawing.canvasSide
             context.scaleBy(x: scale, y: scale)
