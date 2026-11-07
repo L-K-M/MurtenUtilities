@@ -49,7 +49,8 @@ not a notification center bolted on.
 ## Icons
 
 - The suite's ten tools use flowing, faceless stick figures doing each
-  tool's job. Solid circular heads, tapered limbs and ribbon-shaped torsos
+  tool's job. Solid circular heads, rounded articulated limbs and
+  ribbon-shaped torsos
   share one visual language, inspired by 1990s illustrations.
 - Clean flat colour: lake teal, cobalt, sunflower yellow, coral and a little
   lime. No stippling, black outlines, offset colour patches, gradients or
@@ -60,6 +61,17 @@ not a notification center bolted on.
   The human should interact with the principal prop so the gesture helps
   explain the tool. Keep clear gaps between limbs and check optical balance
   across the whole set at the home grid's 88-point size.
+- Keep shoulders and hips connected, with readable elbows and knees and
+  consistent thickness within each pair of limbs. A limb should not pinch
+  to a single point or widen into a fin at its joint.
+- Check physical contact in both enlarged renders and actual 88-point tiles:
+  shoes rest on the floor, a supporting elbow meets its prop, and equipment
+  rests on its stand or desk. Pose quality needs this visual check in both
+  native 88-point and enlarged renders, as issues visible at one size may
+  not appear at the other.
+- Seated and standing figures should have feet that follow the body's facing
+  direction. A figure facing left should have feet pointing left; mismatched
+  foot direction breaks the pose's readability.
 - The home tiles give the artwork 88 points. Text remains the accessible
   identity; the illustrations are decorative. Compact native Settings tabs
   retain SF Symbols, which also remain the fallback for future modules.
@@ -79,16 +91,16 @@ not a notification center bolted on.
 
 | Tool | Action and silhouette |
 | --- | --- |
-| Docker Cleaner | Crouching at the right, pulling a container clear of its stack |
-| Developer Cleanup | Bent over a long broom, sweeping files toward the left |
+| Docker Cleaner | Deep squat on a common floor, clearing containers |
+| Developer Cleanup | Bent over a long broom with equal-width connected legs and left-facing shoes, sweeping files toward the left |
 | Startup Manager | Leaning back with both hands on a large power lever |
-| App Permission Checkup | Kneeling beside a closed lock to inspect its keyhole |
+| App Permission Checkup | Simple supported kneeling pose, one hand on a magnifier, the other on the knee |
 | Shortcut Detective | Lying across a keyboard with a magnifier over one key |
 | Local Network Access | Two helpers joining a cable beneath the network nodes |
 | Zen Session Recovery | Seated cross-legged, cradling a window under a restore arc |
-| Software Update Finder | Working from a ladder to lower a download into its tray |
+| Software Update Finder | Standing securely on the floor, lowering a yellow download into a blue tray |
 | CI Runner Manager | Sprinting above the linked build stages |
-| System Monitor | Seated at a desk, watching a large landscape display |
+| System Monitor | Seated at a desk facing left, feet pointing left toward the display |
 
 ## Modern manners (what NOT to copy from 1997)
 

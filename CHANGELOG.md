@@ -28,10 +28,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Distinct actions and compositions for all ten tool illustrations: container
-  extraction, sweeping, a startup lever, keyhole inspection, a lounging
-  keyboard detective, cable joining, seated recovery, a download ladder,
-  sprinting CI stages and a seated monitor operator.
+- Corrected uneven or pinched limbs in Startup Manager, Local Network Access
+  and CI Runner Manager. System Monitor's seated figure now faces left, with
+  feet pointing left toward the display. Software Update Finder removes the
+  ladder entirely, standing securely on the floor while lowering a yellow
+  download into a blue tray. App Permission Checkup uses a simple supported
+  kneeling pose with one hand on a magnifier and the other on the knee.
+  Developer Cleanup retains the upper body and broom but now has equal-width
+  connected legs and left-facing shoes. Docker Cleaner adopts a simple deep
+  squat with a clear common floor shared with the containers. Separated the
+  network cable from the helper's calf. Closed contact gaps at the
+  recovery figure's shoulders, the detective's elbow and the monitor stand.
+- Distinct actions and compositions for all ten tool illustrations: a deep
+  squat clearing containers, sweeping with connected legs, a startup lever,
+  kneeling keyhole inspection, a lounging keyboard detective, cable joining,
+  seated recovery, lowering a download into a tray, sprinting CI stages and
+  a left-facing seated monitor operator.
 - The app icon is a colourful retro Mac workshop, with a perched helper
   and a large wrench on a sunflower-yellow plate.
 - The ten tool icons now use colourful flowing stick figures, with larger
