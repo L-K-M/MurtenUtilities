@@ -217,9 +217,15 @@ service-wide Reset All for recovery when individual repairs are insufficient.
   relaunch, incomplete inventory, changing scope, command failure or
   unverifiable postcondition stops the remaining resets. Apps are not
   reopened automatically.
-  Responsibility checks include other login sessions. Denied lookups,
-  missing owners and cyclic ownership chains block the reset. Hosts that
-  cannot expose a complete process inventory cannot use this operation.
+  Responsibility checks include other login sessions. Without root, macOS
+  denies responsibility lookups for every process another user owns
+  (launchd, WindowServer and the other system daemons), so those are
+  attributed by their own identity and their live parent chain up to
+  launchd. A launchd job that works for an app, such as an XPC service, is
+  then matched only by its own identity; its app is matched while it runs.
+  Any other denied lookup, a missing owner or parent, and cyclic chains
+  block the reset. Hosts that cannot expose a complete process inventory
+  cannot use this operation.
   Where `tccutil list` is unavailable, Reset All is disabled and changes
   nothing.
 - **State:** the watch list stays at
