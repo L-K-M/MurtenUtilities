@@ -53,10 +53,14 @@ struct ResetAllPermissions {
     }
 
     func inspect() async throws -> Preparation {
-        try await requireClientListing()
-        let scope = try await readScope()
-        let running = try await lifecycle.runningProcesses(matching: scope.clients)
-        return Preparation(clients: scope.clients, runningProcesses: running)
+        do {
+            try await requireClientListing()
+            let scope = try await readScope()
+            let running = try await lifecycle.runningProcesses(matching: scope.clients)
+            return Preparation(clients: scope.clients, runningProcesses: running)
+        } catch let error where !(error is CancellationError) {
+            throw ResetAllError.stopped(error, .nothingReset)
+        }
     }
 
     func apply() async -> Result {
@@ -128,7 +132,10 @@ struct ResetAllPermissions {
         } catch is CancellationError {
             return Result(outcomes: outcomes, failure: "Reset All was cancelled. Completed service resets cannot be undone.")
         } catch {
-            return Result(outcomes: outcomes, failure: error.localizedDescription)
+            // An outcome is recorded only once its reset command has run.
+            let progress: ResetAllError.Progress = outcomes.isEmpty ? .nothingReset : .resetsAttempted
+            return Result(outcomes: outcomes,
+                          failure: ResetAllError.stopped(error, progress).localizedDescription)
         }
 
         let failures = outcomes.compactMap { outcome in
@@ -221,16 +228,30 @@ struct ResetAllPermissions {
 }
 
 private enum ResetAllError: LocalizedError {
+    /// What a stopped run had already changed, for its closing sentence.
+    enum Progress {
+        case nothingReset
+        case resetsAttempted
+
+        var consequence: String {
+            switch self {
+            case .nothingReset: return "No permissions were reset."
+            case .resetsAttempted: return "No further permissions were reset."
+            }
+        }
+    }
+
     case clientListUnavailable
     case clientListFailed(PermissionService, CommandResult)
     case clientListMalformed(PermissionService, String)
     case clientListUnstable(PermissionService)
     case appsStillRunning([AffectedProcess])
+    case stopped(any Error, Progress)
 
     var errorDescription: String? {
         switch self {
         case .clientListUnavailable:
-            return "This Mac cannot provide the complete Device Control and Data Access client list. Reset All is disabled because affected apps cannot be verified. No permissions were reset."
+            return "This Mac cannot provide the complete Device Control and Data Access client list. Reset All is disabled because affected apps cannot be verified."
         case .clientListFailed(let service, let command):
             let detail: String
             if command.outputTruncated {
@@ -240,14 +261,17 @@ private enum ResetAllError: LocalizedError {
             } else {
                 detail = String(command.output.prefix(300))
             }
-            return "The \(service.title) client list could not be read. No further permissions were reset. \(detail)"
+            let summary = "The \(service.title) client list could not be read."
+            return detail.isEmpty ? summary : "\(summary) \(detail)"
         case .clientListMalformed(let service, let line):
-            return "The \(service.title) client list contained an unrecognized record (\(String(line.prefix(160)))). No further permissions were reset."
+            return "The \(service.title) client list contained an unrecognized record (\(String(line.prefix(160))))."
         case .clientListUnstable(let service):
-            return "The \(service.title) client list kept changing during the safety check. No further permissions were reset."
+            return "The \(service.title) client list kept changing during the safety check."
         case .appsStillRunning(let processes):
             let names = processes.isEmpty ? "An affected app" : processes.map(\.name).joined(separator: ", ")
-            return "\(names) \(processes.count == 1 ? "is" : "are") still running. Quit every affected app and try again. No further permissions were reset."
+            return "\(names) \(processes.count == 1 ? "is" : "are") still running. Quit every affected app and try again."
+        case .stopped(let error, let progress):
+            return "\(error.localizedDescription) \(progress.consequence)"
         }
     }
 }

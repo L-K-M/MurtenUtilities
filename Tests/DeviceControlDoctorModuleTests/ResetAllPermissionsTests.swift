@@ -193,6 +193,43 @@ final class ResetAllPermissionsTests: XCTestCase {
         XCTAssertEqual(preparation.runningProcesses, [process])
     }
 
+    func testInspectionFailureSaysNothingWasReset() async {
+        let runner = configuredRunner()
+        let lifecycle = FakeApplicationLifecycle(running: [], runner: runner)
+        lifecycle.error = FakeApplicationLifecycle.Failure.inventory
+
+        do {
+            _ = try await makeReset(runner: runner, lifecycle: lifecycle).inspect()
+            XCTFail("an inventory failure must disable Reset All")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.hasSuffix("No permissions were reset."),
+                          error.localizedDescription)
+        }
+        XCTAssertTrue(resetCalls(runner).isEmpty)
+    }
+
+    func testFailureBeforeTheFirstResetSaysNothingWasReset() async {
+        let runner = configuredRunner()
+        let lifecycle = FakeApplicationLifecycle(running: [], runner: runner)
+        lifecycle.error = FakeApplicationLifecycle.Failure.inventory
+
+        let result = await makeReset(runner: runner, lifecycle: lifecycle).apply()
+
+        XCTAssertTrue(result.outcomes.isEmpty)
+        XCTAssertTrue(result.failure?.hasSuffix("No permissions were reset.") == true, result.failure ?? "")
+    }
+
+    func testFailureAfterAResetSaysNoFurtherPermissionsWereReset() async {
+        let runner = configuredRunner()
+        let lifecycle = FakeApplicationLifecycle(running: [], runner: runner)
+        lifecycle.failsAfterFirstReset = true
+
+        let result = await makeReset(runner: runner, lifecycle: lifecycle).apply()
+
+        XCTAssertEqual(resetCalls(runner), [[SystemTool.tccutil, "reset", "Accessibility"]])
+        XCTAssertTrue(result.failure?.hasSuffix("No further permissions were reset.") == true, result.failure ?? "")
+    }
+
     private func configuredRunner(clearsAfterReset: Bool = true) -> FakeProcessRunner {
         let runner = FakeProcessRunner()
         if clearsAfterReset { runner.clearListedServiceAfterReset() }
@@ -221,7 +258,14 @@ final class ResetAllPermissionsTests: XCTestCase {
 
 @MainActor
 private final class FakeApplicationLifecycle: ApplicationLifecycleManaging {
+    enum Failure: LocalizedError {
+        case inventory
+        var errorDescription: String? { "The running-process list could not be read." }
+    }
+
     var running: [AffectedProcess]
+    var error: Failure?
+    var failsAfterFirstReset = false
     var snapshots: [[AffectedProcess]] = []
     var refusesTermination = false
     var terminationRequests: [[AffectedProcess]] = []
@@ -236,6 +280,8 @@ private final class FakeApplicationLifecycle: ApplicationLifecycleManaging {
 
     func runningProcesses(matching clients: Set<String>) async throws -> [AffectedProcess] {
         matchedClients.append(clients)
+        if let error { throw error }
+        if failsAfterFirstReset, runner.ranReset { throw Failure.inventory }
         if !snapshots.isEmpty { return snapshots.removeFirst() }
         return running
     }
