@@ -59,7 +59,7 @@ extension ToolDrawing {
         stroke(Self.blue, width: 4) { p in
             p.move(to: CGPoint(x: 7, y: 98)); p.addLine(to: CGPoint(x: 88, y: 98))
             p.move(to: CGPoint(x: 13, y: 100)); p.addLine(to: CGPoint(x: 13, y: 118))
-            p.move(to: CGPoint(x: 82, y: 100)); p.addLine(to: CGPoint(x: 82, y: 118))
+            p.move(to: CGPoint(x: 76, y: 100)); p.addLine(to: CGPoint(x: 76, y: 118))
         }
         stroke(Self.coral, width: 3) { p in
             p.move(to: CGPoint(x: 121, y: 80)); p.addLine(to: CGPoint(x: 121, y: 99))
@@ -85,15 +85,12 @@ extension ToolDrawing {
             p.addQuadCurve(to: CGPoint(x: 101, y: 75), control: CGPoint(x: 96, y: 72))
             p.closeSubpath()
         }
-        fill(Self.blue) { p in
+        // The visible shoe points left, in the operator's viewing direction.
+        stroke(Self.blue, width: 6) { p in
             p.move(to: CGPoint(x: 108, y: 95))
-            p.addQuadCurve(to: CGPoint(x: 96, y: 104), control: CGPoint(x: 104, y: 104))
-            p.addLine(to: CGPoint(x: 94, y: 115))
-            p.addLine(to: CGPoint(x: 106, y: 120))
-            p.addQuadCurve(to: CGPoint(x: 87, y: 118), control: CGPoint(x: 89, y: 123))
-            p.addLine(to: CGPoint(x: 87, y: 101))
-            p.addQuadCurve(to: CGPoint(x: 108, y: 95), control: CGPoint(x: 91, y: 93))
-            p.closeSubpath()
+            p.addLine(to: CGPoint(x: 95, y: 100))
+            p.addLine(to: CGPoint(x: 95, y: 117))
+            p.addLine(to: CGPoint(x: 87, y: 117))
         }
     }
 }

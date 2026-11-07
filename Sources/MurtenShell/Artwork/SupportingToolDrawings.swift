@@ -102,47 +102,42 @@ extension ToolDrawing {
     }
 
     func softwareUpdates() {
-        // Both shoes stand on the middle rung; the free hand holds the rail.
-        stroke(Self.blue, width: 3.5) { p in
-            p.move(to: CGPoint(x: 86, y: 67)); p.addLine(to: CGPoint(x: 76, y: 120))
-            p.move(to: CGPoint(x: 110, y: 67)); p.addLine(to: CGPoint(x: 120, y: 120))
-            p.move(to: CGPoint(x: 84, y: 80)); p.addLine(to: CGPoint(x: 112, y: 80))
-            p.move(to: CGPoint(x: 80, y: 100)); p.addLine(to: CGPoint(x: 116, y: 100))
-            p.move(to: CGPoint(x: 77, y: 116)); p.addLine(to: CGPoint(x: 119, y: 116))
-        }
+        // A grounded stance supports the parcel as it is lowered into the tray.
         stroke(Self.blue, width: 5) { p in
-            p.move(to: CGPoint(x: 13, y: 96)); p.addLine(to: CGPoint(x: 17, y: 113))
-            p.addLine(to: CGPoint(x: 64, y: 113)); p.addLine(to: CGPoint(x: 68, y: 96))
+            p.move(to: CGPoint(x: 12, y: 96))
+            p.addLine(to: CGPoint(x: 16, y: 116))
+            p.addLine(to: CGPoint(x: 65, y: 116))
+            p.addLine(to: CGPoint(x: 69, y: 96))
         }
         stroke(Self.coral, width: 6.5) { p in
-            p.move(to: CGPoint(x: 97, y: 69))
-            p.addLine(to: CGPoint(x: 91, y: 83))
-            p.addLine(to: CGPoint(x: 91, y: 97))
-            p.addLine(to: CGPoint(x: 99, y: 97))
-            p.move(to: CGPoint(x: 101, y: 69))
-            p.addLine(to: CGPoint(x: 109, y: 83))
-            p.addLine(to: CGPoint(x: 107, y: 97))
-            p.addLine(to: CGPoint(x: 114, y: 97))
+            p.move(to: CGPoint(x: 87, y: 80))
+            p.addLine(to: CGPoint(x: 80, y: 96))
+            p.addLine(to: CGPoint(x: 80, y: 115))
+            p.addLine(to: CGPoint(x: 73, y: 115))
+            p.move(to: CGPoint(x: 92, y: 80))
+            p.addLine(to: CGPoint(x: 104, y: 96))
+            p.addLine(to: CGPoint(x: 110, y: 115))
+            p.addLine(to: CGPoint(x: 101, y: 115))
         }
         fill(Self.teal) { p in
-            p.move(to: CGPoint(x: 90, y: 39))
-            p.addCurve(to: CGPoint(x: 95, y: 75), control1: CGPoint(x: 79, y: 43), control2: CGPoint(x: 79, y: 56))
-            p.addQuadCurve(to: CGPoint(x: 104, y: 69), control: CGPoint(x: 101, y: 76))
-            p.addCurve(to: CGPoint(x: 90, y: 39), control1: CGPoint(x: 103, y: 56), control2: CGPoint(x: 100, y: 47))
+            p.move(to: CGPoint(x: 84, y: 48))
+            p.addCurve(to: CGPoint(x: 82, y: 82), control1: CGPoint(x: 75, y: 57), control2: CGPoint(x: 77, y: 70))
+            p.addQuadCurve(to: CGPoint(x: 96, y: 81), control: CGPoint(x: 89, y: 88))
+            p.addCurve(to: CGPoint(x: 89, y: 48), control1: CGPoint(x: 96, y: 64), control2: CGPoint(x: 95, y: 54))
             p.closeSubpath()
         }
-        ellipse(Self.coral, x: 85, y: 15, width: 19, height: 19)
-        box(Self.yellow, x: 22, y: 49, width: 36, height: 34, radius: 4)
-        polygon(.white, CGPoint(x: 36, y: 55), CGPoint(x: 44, y: 55),
-                CGPoint(x: 44, y: 67), CGPoint(x: 50, y: 67), CGPoint(x: 40, y: 77),
-                CGPoint(x: 30, y: 67), CGPoint(x: 36, y: 67))
-        stroke(Self.coral, width: 5) { p in
-            p.move(to: CGPoint(x: 88, y: 46))
-            p.addLine(to: CGPoint(x: 74, y: 54))
-            p.addLine(to: CGPoint(x: 57, y: 61))
-            p.move(to: CGPoint(x: 99, y: 46))
-            p.addLine(to: CGPoint(x: 113, y: 57))
-            p.addLine(to: CGPoint(x: 110, y: 69))
+        ellipse(Self.coral, x: 77, y: 24, width: 19, height: 19)
+        box(Self.yellow, x: 26, y: 49, width: 35, height: 34, radius: 4)
+        polygon(.white, CGPoint(x: 39, y: 55), CGPoint(x: 47, y: 55),
+                CGPoint(x: 47, y: 67), CGPoint(x: 53, y: 67), CGPoint(x: 43, y: 77),
+                CGPoint(x: 33, y: 67), CGPoint(x: 39, y: 67))
+        stroke(Self.coral, width: 4.5) { p in
+            p.move(to: CGPoint(x: 82, y: 54))
+            p.addLine(to: CGPoint(x: 72, y: 65))
+            p.addLine(to: CGPoint(x: 60, y: 64))
+            p.move(to: CGPoint(x: 89, y: 57))
+            p.addLine(to: CGPoint(x: 78, y: 78))
+            p.addLine(to: CGPoint(x: 59, y: 78))
         }
     }
 }

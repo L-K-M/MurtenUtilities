@@ -2,7 +2,6 @@ import SwiftUI
 
 extension ToolDrawing {
     func permissionCheckup() {
-        // The lock stays closed while the kneeling inspector checks its keyhole.
         stroke(Self.blue, width: 6) { p in
             p.move(to: CGPoint(x: 22, y: 55))
             p.addLine(to: CGPoint(x: 22, y: 38))
@@ -14,40 +13,33 @@ extension ToolDrawing {
         polygon(.white, CGPoint(x: 35, y: 77), CGPoint(x: 39, y: 77),
                 CGPoint(x: 43, y: 89), CGPoint(x: 31, y: 89))
 
-        ellipse(Self.blue, x: 82, y: 43, width: 19, height: 19)
+        // One foot braces in front; the other leg kneels behind the inspector.
+        stroke(Self.blue, width: 6.5) { p in
+            p.move(to: CGPoint(x: 97, y: 91))
+            p.addLine(to: CGPoint(x: 80, y: 92))
+            p.addLine(to: CGPoint(x: 79, y: 112))
+            p.addLine(to: CGPoint(x: 68, y: 112))
+            p.move(to: CGPoint(x: 100, y: 91))
+            p.addLine(to: CGPoint(x: 103, y: 112))
+            p.addLine(to: CGPoint(x: 120, y: 112))
+        }
+        stroke(Self.blue, width: 4.5) { p in
+            p.move(to: CGPoint(x: 89, y: 71))
+            p.addLine(to: CGPoint(x: 80, y: 87))
+            p.addLine(to: CGPoint(x: 61, y: 94))
+            p.move(to: CGPoint(x: 95, y: 74))
+            p.addLine(to: CGPoint(x: 99, y: 84))
+            p.addLine(to: CGPoint(x: 84, y: 92))
+        }
         fill(Self.teal) { p in
-            p.move(to: CGPoint(x: 96, y: 65))
-            p.addCurve(to: CGPoint(x: 79, y: 91), control1: CGPoint(x: 80, y: 67), control2: CGPoint(x: 74, y: 81))
-            p.addQuadCurve(to: CGPoint(x: 98, y: 91), control: CGPoint(x: 91, y: 97))
-            p.addQuadCurve(to: CGPoint(x: 96, y: 65), control: CGPoint(x: 102, y: 79))
+            p.move(to: CGPoint(x: 89, y: 69))
+            p.addCurve(to: CGPoint(x: 99, y: 94), control1: CGPoint(x: 87, y: 80), control2: CGPoint(x: 93, y: 90))
+            p.addQuadCurve(to: CGPoint(x: 106, y: 89), control: CGPoint(x: 108, y: 96))
+            p.addCurve(to: CGPoint(x: 96, y: 70), control1: CGPoint(x: 102, y: 80), control2: CGPoint(x: 101, y: 73))
+            p.addQuadCurve(to: CGPoint(x: 89, y: 69), control: CGPoint(x: 92, y: 68))
             p.closeSubpath()
         }
-        fill(Self.blue) { p in
-            // One knee is down; the other foot braces beside the lock.
-            p.move(to: CGPoint(x: 86, y: 91))
-            p.addQuadCurve(to: CGPoint(x: 77, y: 107), control: CGPoint(x: 81, y: 99))
-            p.addQuadCurve(to: CGPoint(x: 64, y: 113), control: CGPoint(x: 67, y: 107))
-            p.addLine(to: CGPoint(x: 84, y: 113))
-            p.addQuadCurve(to: CGPoint(x: 94, y: 94), control: CGPoint(x: 83, y: 102))
-            p.closeSubpath()
-            p.move(to: CGPoint(x: 97, y: 89))
-            p.addQuadCurve(to: CGPoint(x: 115, y: 101), control: CGPoint(x: 114, y: 90))
-            p.addLine(to: CGPoint(x: 111, y: 108))
-            p.addQuadCurve(to: CGPoint(x: 120, y: 113), control: CGPoint(x: 119, y: 107))
-            p.addLine(to: CGPoint(x: 102, y: 113))
-            p.addQuadCurve(to: CGPoint(x: 105, y: 103), control: CGPoint(x: 101, y: 108))
-            p.addQuadCurve(to: CGPoint(x: 97, y: 89), control: CGPoint(x: 95, y: 98))
-            p.closeSubpath()
-            p.move(to: CGPoint(x: 87, y: 68))
-            p.addCurve(to: CGPoint(x: 64, y: 95), control1: CGPoint(x: 85, y: 88), control2: CGPoint(x: 72, y: 89))
-            p.addQuadCurve(to: CGPoint(x: 61, y: 92), control: CGPoint(x: 60, y: 98))
-            p.addCurve(to: CGPoint(x: 87, y: 68), control1: CGPoint(x: 74, y: 82), control2: CGPoint(x: 79, y: 84))
-            p.closeSubpath()
-        }
-        stroke(Self.teal, width: 4) { p in
-            p.move(to: CGPoint(x: 83, y: 70))
-            p.addQuadCurve(to: CGPoint(x: 57, y: 77), control: CGPoint(x: 70, y: 66))
-        }
+        ellipse(Self.blue, x: 83, y: 44, width: 19, height: 19)
         stroke(Self.coral, width: 5) { p in
             p.addEllipse(in: CGRect(x: 26, y: 66, width: 22, height: 22))
             p.move(to: CGPoint(x: 45, y: 85))
@@ -142,11 +134,11 @@ extension ToolDrawing {
             p.move(to: CGPoint(x: 96, y: 90))
             p.addLine(to: CGPoint(x: 90, y: 103))
             p.addLine(to: CGPoint(x: 90, y: 114))
-            p.addLine(to: CGPoint(x: 99, y: 114))
+            p.addLine(to: CGPoint(x: 82, y: 114))
             p.move(to: CGPoint(x: 102, y: 90))
             p.addLine(to: CGPoint(x: 108, y: 103))
             p.addLine(to: CGPoint(x: 115, y: 114))
-            p.addLine(to: CGPoint(x: 120, y: 114))
+            p.addLine(to: CGPoint(x: 106, y: 114))
         }
         ellipse(Self.teal, x: 15, y: 40, width: 17, height: 17)
         fill(Self.coral) { p in
