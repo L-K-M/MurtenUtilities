@@ -195,10 +195,11 @@ recovery when individual repairs are insufficient.
   (watched apps, apps needing review, Refresh, Test Pad). Launch at login
   is the suite's. Reset All lives in the always-visible All apps section at
   the bottom of the pane sidebar, separate from the per-app repair sheet; it
-  needs no watch-list selection and has no skip-quit or reopen option. Its
-  confirmation is a fixed-size sheet with a scrollable review body and
-  persistent heading and Cancel/confirmation controls, so hundreds of
-  client/process rows cannot push the controls off-screen.
+  needs no watch-list selection, never reopens affected apps, and waives the
+  closed-app requirement only through an explicit session-only checkbox in
+  its confirmation. Its fixed-size confirmation keeps the heading, failure
+  summary and Cancel/reset controls visible around a scrolling process table;
+  recorded client IDs can be reviewed in a bounded popover.
 - **Watcher:** every 30 minutes (120 s timeout, local), per watched app:
   `tccutil list` for its expected permissions and `codesign` against the
   identity the pane saved. One finding per app (scope: its watch-list id)
@@ -213,17 +214,33 @@ recovery when individual repairs are insufficient.
 - **Preselection:** the route selects the named app in the watch list and
   nothing else. The repair sheet opens only on the user's click, with the
   app's expected permissions checked, as in the standalone app.
-- **Reset All safety:** before clearing Accessibility, event-generation and
-  input-monitoring decisions for every client, the module requires complete,
+- **Reset All safety:** before clearing Accessibility, PostEvent and
+  ListenEvent decisions for every client, the module requires complete,
   strictly parsed `tccutil list` output. It inventories every process through
   libproc and Security.framework signing identifiers (the kernel's
   identifier for the running code when another user's executable is
-  unreadable, as with Xcode's Instruments helpers), requests a normal quit
-  for affected apps, and requires a stable all-closed interval. The complete
-  cumulative client set is checked again around every service reset; a
-  relaunch, incomplete inventory, changing scope, command failure or
-  unverifiable postcondition stops the remaining resets. Apps are not
+  unreadable, as with Xcode's Instruments helpers). The confirmation shows a
+  live per-process table with each process's name, PID and state; exited rows
+  stay listed and processes that ignore a quit request remain visible. By
+  default Reset All requests a normal quit for affected apps and requires a
+  stable all-closed interval. A session-only checkbox, off by default, lets
+  the user acknowledge the risk and reset while apps are still running. The
+  override skips only the closed-app requirement and the normal auto-quit; it
+  never skips the complete client and inventory reads, the scope-stability
+  checks, the reset-command checks or the empty-postcondition verification. A
+  running app can keep stale permissions or recreate its records, so the user
+  is told to save work and restart those apps. Retries happen in place,
+  without reopening the sheet. The complete cumulative client set is checked
+  again around every service reset; a relaunch blocks the default mode.
+  In either mode, incomplete inventory, changing scope, command failure or
+  an unverifiable postcondition stops the remaining resets. Apps are not
   reopened automatically.
+  Per-process Force Quit is offered only behind an explicit click and only
+  after confirming the unsaved-data warning. It is unprivileged, acts only on
+  the user's own processes, freshly re-verifies each PID, path and start
+  time, and never targets the suite itself or PID 0/1. No force kill is
+  automatic and no root helper is used. Quit and Force Quit are repair-only
+  actions behind explicit clicks, never watcher actions.
   Responsibility checks include other login sessions. Without root, macOS
   denies responsibility lookups for every process another user owns
   (launchd, WindowServer and the other system daemons), so those are

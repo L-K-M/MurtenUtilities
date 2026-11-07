@@ -32,6 +32,7 @@ import UniformTypeIdentifiers
     private let defaults: UserDefaults
     private let runner: any ProcessRunning
     private let resetAll: ResetAllPermissions
+    private let lifecycle: any ApplicationLifecycleManaging
     /// Tells the suite to re-run the watcher after a change the user made,
     /// so a suggestion that change settled resolves soon.
     private let watchListChanged: @MainActor () -> Void
@@ -46,11 +47,13 @@ import UniformTypeIdentifiers
     init(defaults: UserDefaults, runner: any ProcessRunning = ProcessRunner(),
          storageURL: URL = WatchListFile.defaultURL,
          lifecycle: (any ApplicationLifecycleManaging)? = nil,
+         resetTiming: ResetAllPermissions.Timing = .live,
          watchListChanged: @escaping @MainActor () -> Void = {}) {
         self.defaults = defaults
         self.runner = runner
-        self.resetAll = ResetAllPermissions(runner: runner,
-            lifecycle: lifecycle ?? WorkspaceApplicationLifecycle())
+        let lifecycle = lifecycle ?? WorkspaceApplicationLifecycle()
+        self.lifecycle = lifecycle
+        self.resetAll = ResetAllPermissions(runner: runner, lifecycle: lifecycle, timing: resetTiming)
         self.storageURL = storageURL
         self.watchListChanged = watchListChanged
         if defaults.object(forKey: Self.monitorEnabledKey) != nil {
@@ -359,29 +362,51 @@ import UniformTypeIdentifiers
 
     /// Reads the complete service-wide client scope for the Reset All sheet.
     /// When the OS cannot provide that scope, the broad repair stays disabled.
-    func inspectResetAll() async -> ResetAllPermissions.Preparation? {
-        guard !isChecking, !isRepairing else { return nil }
+    func inspectResetAll(including knownClients: Set<String> = []) async throws -> ResetAllPermissions.Preparation {
+        guard !isChecking, !isRepairing else { throw ProcessTerminationError.busy }
         do {
-            return try await resetAll.inspect()
+            return try await resetAll.inspect(including: knownClients)
         } catch {
-            notice = error.localizedDescription
-            return nil
+            // Closing the sheet cancels its read-only poll. Do not turn the
+            // cancelled subprocess result into a notice in the main pane.
+            try Task.checkCancellation()
+            if !(error is CancellationError) { notice = error.localizedDescription }
+            throw error
         }
     }
 
-    /// Called only by the Reset All confirmation. The coordinator owns the
-    /// quit-and-verify invariant and never runs from monitoring.
-    func resetAllPermissions() async -> Bool {
-        guard !isChecking, !isRepairing else { return false }
+    func quitResetAllProcess(_ process: AffectedProcess) throws {
+        guard !isChecking, !isRepairing else { throw ProcessTerminationError.busy }
+        guard process.canRequestTermination else { throw ProcessTerminationError.unavailable }
+        lifecycle.requestTermination(of: [process])
+    }
+
+    func forceQuitResetAllProcess(_ process: AffectedProcess) throws {
+        guard !isChecking, !isRepairing else { throw ProcessTerminationError.busy }
+        try lifecycle.forceTerminate(process)
+    }
+
+    /// Called only by the Reset All confirmation. The acknowledged override
+    /// waives quiescence, not scope, inventory, or command-result checks.
+    func resetAllPermissions(policy: ResetAllPermissions.RunningAppsPolicy = .requireClosed,
+                             including knownClients: Set<String> = [],
+                             progress: @MainActor (ResetAllPermissions.Progress) -> Void = { _ in }) async -> Bool {
+        guard !isChecking, !isRepairing else {
+            notice = ProcessTerminationError.busy.localizedDescription
+            return false
+        }
         isRepairing = true
-        let result = await resetAll.apply()
+        let result = await resetAll.apply(policy: policy, including: knownClients, progress: progress)
 
         let attempted = result.outcomes.map(\.service.title)
         let succeeded = result.outcomes.filter { $0.failure == nil }.map(\.service.title)
         if !attempted.isEmpty {
             for index in apps.indices { apps[index].functionalTest = nil }
+            let policyDetail = policy == .requireClosed
+                ? "All affected apps were required to be closed first."
+                : "You acknowledged the risk of resetting while affected apps were running."
             events.insert(.init(appName: "All apps", message:
-                "Reset All attempted \(attempted.joined(separator: ", ")). All affected apps were required to be closed first."), at: 0)
+                "Reset All attempted \(attempted.joined(separator: ", ")). \(policyDetail)"), at: 0)
             events = Array(events.prefix(200))
             save()
             watchListChanged()
@@ -394,7 +419,9 @@ import UniformTypeIdentifiers
         }
 
         if result.succeeded {
-            notice = "Reset all Device Control and Data Access settings. Re-enable each app in System Settings before opening it again."
+            notice = policy == .requireClosed
+                ? "Reset all Device Control and Data Access settings. Re-enable each app in System Settings before opening it again."
+                : "Reset all Device Control and Data Access settings with the running-app override. Restart affected apps and approve access again in System Settings."
         } else {
             let completed = succeeded.isEmpty ? "" : "\n\nCompleted before stopping: \(succeeded.joined(separator: ", "))."
             notice = (result.failure ?? "Reset All did not complete.") + completed

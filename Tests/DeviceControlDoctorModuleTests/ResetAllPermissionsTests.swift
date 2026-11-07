@@ -33,7 +33,7 @@ final class ResetAllPermissionsTests: XCTestCase {
         let result = await makeReset(runner: runner, lifecycle: lifecycle).apply()
 
         XCTAssertFalse(result.succeeded)
-        XCTAssertTrue(result.failure?.contains("Stubborn") == true)
+        XCTAssertTrue(result.failure?.contains("1 affected process is still running") == true)
         XCTAssertTrue(resetCalls(runner).isEmpty, "no permission may be cleared while an affected app remains open")
     }
 
@@ -48,7 +48,7 @@ final class ResetAllPermissionsTests: XCTestCase {
         let result = await makeReset(runner: runner, lifecycle: lifecycle).apply()
 
         XCTAssertFalse(result.succeeded)
-        XCTAssertTrue(result.failure?.contains("Relaunched") == true)
+        XCTAssertTrue(result.failure?.contains("1 affected process is still running") == true)
         XCTAssertEqual(resetCalls(runner), [[SystemTool.tccutil, "reset", "Accessibility"]])
         XCTAssertTrue(lifecycle.matchedClients.last?.contains("com.example.First") == true,
                       "clients whose earlier record was reset must stay in every later safety check")
@@ -68,7 +68,7 @@ final class ResetAllPermissionsTests: XCTestCase {
         let result = await makeReset(runner: runner, lifecycle: lifecycle).apply()
 
         XCTAssertFalse(result.succeeded)
-        XCTAssertTrue(result.failure?.contains("Relaunched") == true)
+        XCTAssertTrue(result.failure?.contains("1 affected process is still running") == true)
         XCTAssertTrue(resetCalls(runner).isEmpty)
     }
 
@@ -228,6 +228,135 @@ final class ResetAllPermissionsTests: XCTestCase {
 
         XCTAssertEqual(resetCalls(runner), [[SystemTool.tccutil, "reset", "Accessibility"]])
         XCTAssertTrue(result.failure?.hasSuffix("No further permissions were reset.") == true, result.failure ?? "")
+    }
+
+    func testAcknowledgedOverrideResetsWithoutQuittingRunningProcesses() async {
+        let runner = configuredRunner()
+        let process = AffectedProcess(processIdentifier: 101, name: "Stubborn helper",
+                                      executablePath: "/fixture/helper", canRequestTermination: false)
+        let lifecycle = FakeApplicationLifecycle(running: [process], runner: runner)
+        lifecycle.refusesTermination = true
+
+        let result = await makeReset(runner: runner, lifecycle: lifecycle).apply(policy: .allowRunning)
+
+        XCTAssertTrue(result.succeeded, result.failure ?? "")
+        XCTAssertEqual(resetCalls(runner).count, 3)
+        XCTAssertTrue(lifecycle.terminationRequests.isEmpty,
+                      "override resets without automatically quitting or force-quitting apps")
+        XCTAssertFalse(lifecycle.matchedClients.isEmpty, "override must still inspect processes")
+    }
+
+    func testQuittingProgressShowsProcessesThatRemainAfterTheQuitRequest() async {
+        let runner = configuredRunner()
+        let process = AffectedProcess(processIdentifier: 101, name: "Stubborn helper",
+                                      executablePath: "/fixture/helper", canRequestTermination: true)
+        let lifecycle = FakeApplicationLifecycle(running: [process], runner: runner)
+        lifecycle.refusesTermination = true
+        var observed: [[AffectedProcess]] = []
+        var requested: [[AffectedProcess]] = []
+
+        let result = await makeReset(runner: runner, lifecycle: lifecycle).apply { update in
+            switch update {
+            case .processes(let processes): observed.append(processes)
+            case .quitRequested(let processes): requested.append(processes)
+            default: break
+            }
+        }
+
+        XCTAssertFalse(result.succeeded)
+        XCTAssertEqual(observed.last, [process], "the UI needs the current blocker, not just a failure string")
+        XCTAssertEqual(requested.first, [process])
+        XCTAssertTrue(resetCalls(runner).isEmpty)
+    }
+
+    func testOverrideCannotBypassFailedInventoryOrUnverifiableReset() async {
+        let runner = configuredRunner()
+        let lifecycle = FakeApplicationLifecycle(running: [], runner: runner)
+        lifecycle.error = .inventory
+        let denied = await makeReset(runner: runner, lifecycle: lifecycle).apply(policy: .allowRunning)
+        XCTAssertFalse(denied.succeeded)
+        XCTAssertTrue(resetCalls(runner).isEmpty)
+
+        let unchangedRunner = configuredRunner(clearsAfterReset: false)
+        let unchanged = await makeReset(runner: unchangedRunner,
+                                       lifecycle: FakeApplicationLifecycle(running: [], runner: unchangedRunner))
+            .apply(policy: .allowRunning)
+        XCTAssertFalse(unchanged.succeeded)
+        XCTAssertEqual(resetCalls(unchangedRunner).count, 1)
+        XCTAssertTrue(unchanged.failure?.contains("not empty after reset") == true)
+    }
+
+    func testOverrideStillRejectsUnavailableOrIncompleteClientLists() async {
+        let failures = [
+            CommandResult(output: "unrecognized record", exitCode: 0),
+            CommandResult(output: "", exitCode: -1, timedOut: true),
+            CommandResult(output: "com.example.App", exitCode: 0, outputTruncated: true),
+            CommandResult(output: "not permitted", exitCode: 1)
+        ]
+        for command in failures {
+            let runner = configuredRunner()
+            runner.respond(to: [SystemTool.tccutil, "list", "-s", "Accessibility"], with: command)
+            let lifecycle = FakeApplicationLifecycle(running: [], runner: runner)
+            let result = await makeReset(runner: runner, lifecycle: lifecycle).apply(policy: .allowRunning)
+            XCTAssertFalse(result.succeeded)
+            XCTAssertTrue(resetCalls(runner).isEmpty)
+            XCTAssertTrue(lifecycle.terminationRequests.isEmpty)
+        }
+        let runner = configuredRunner()
+        runner.withholdListing()
+        let unavailable = await makeReset(runner: runner,
+                                         lifecycle: FakeApplicationLifecycle(running: [], runner: runner))
+            .apply(policy: .allowRunning)
+        XCTAssertFalse(unavailable.succeeded)
+        XCTAssertTrue(resetCalls(runner).isEmpty)
+    }
+
+    func testOverrideStillStopsWhenInventoryFailsAfterOneServiceReset() async {
+        let runner = configuredRunner()
+        let lifecycle = FakeApplicationLifecycle(running: [], runner: runner)
+        lifecycle.failsAfterFirstReset = true
+
+        let result = await makeReset(runner: runner, lifecycle: lifecycle).apply(policy: .allowRunning)
+
+        XCTAssertFalse(result.succeeded)
+        XCTAssertEqual(resetCalls(runner).count, 1)
+        XCTAssertTrue(result.failure?.hasSuffix("No further permissions were reset.") == true)
+    }
+
+    func testRecentlyExitedProcessesAreNotReportedAsStillRunning() async {
+        let runner = configuredRunner()
+        let lifecycle = FakeApplicationLifecycle(running: [], runner: runner)
+        let reset = ResetAllPermissions(runner: runner, lifecycle: lifecycle,
+                                       timing: .init(pollNanoseconds: 0, stableSamples: 3, maximumPolls: 2))
+
+        let result = await reset.apply()
+
+        XCTAssertTrue(result.failure?.contains("not stayed closed long enough") == true)
+        XCTAssertFalse(result.failure?.contains("still running") == true)
+        XCTAssertTrue(resetCalls(runner).isEmpty)
+    }
+
+    func testInspectionIncludesClientsWhoseRecordsWereAlreadyReset() async throws {
+        let runner = configuredRunner()
+        let lifecycle = FakeApplicationLifecycle(running: [], runner: runner)
+
+        let preparation = try await makeReset(runner: runner, lifecycle: lifecycle)
+            .inspect(including: ["com.example.AlreadyReset"])
+
+        XCTAssertTrue(preparation.clients.contains("com.example.AlreadyReset"))
+        XCTAssertTrue(lifecycle.matchedClients.last?.contains("com.example.AlreadyReset") == true)
+    }
+
+    func testRetryKeepsEarlierClientsInEveryProcessCheck() async {
+        let runner = configuredRunner()
+        let lifecycle = FakeApplicationLifecycle(running: [], runner: runner)
+
+        let result = await makeReset(runner: runner, lifecycle: lifecycle)
+            .apply(including: ["com.example.AlreadyReset"])
+
+        XCTAssertTrue(result.succeeded, result.failure ?? "")
+        XCTAssertFalse(lifecycle.matchedClients.isEmpty)
+        XCTAssertTrue(lifecycle.matchedClients.allSatisfy { $0.contains("com.example.AlreadyReset") })
     }
 
     private func configuredRunner(clearsAfterReset: Bool = true) -> FakeProcessRunner {

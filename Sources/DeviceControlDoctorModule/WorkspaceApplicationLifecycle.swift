@@ -24,12 +24,13 @@ struct ProcessIdentity: Equatable, Sendable {
     let responsibility: ProcessResponsibility
     let signingIdentityAvailable: Bool
     let userIdentifier: uid_t
+    let startTime: ProcessStartTime?
 
     init(processIdentifier: Int32, executablePath: String, signingIdentifier: String?,
          enclosingAppIdentifier: String? = nil,
          responsibility: ProcessResponsibility? = nil,
          signingIdentityAvailable: Bool = true,
-         userIdentifier: uid_t = getuid()) {
+         userIdentifier: uid_t = getuid(), startTime: ProcessStartTime? = nil) {
         self.processIdentifier = processIdentifier
         self.executablePath = executablePath
         self.signingIdentifier = signingIdentifier
@@ -37,6 +38,7 @@ struct ProcessIdentity: Equatable, Sendable {
         self.responsibility = responsibility ?? .process(processIdentifier)
         self.signingIdentityAvailable = signingIdentityAvailable
         self.userIdentifier = userIdentifier
+        self.startTime = startTime
     }
 }
 
@@ -108,7 +110,8 @@ struct SystemProcessInventory: ProcessInventoryReading {
                     enclosingAppIdentifier: enclosingAppIdentifier(for: executablePath),
                     responsibility: responsibility,
                     signingIdentityAvailable: signingIdentity.available,
-                    userIdentifier: ownership.userIdentifier
+                    userIdentifier: ownership.userIdentifier,
+                    startTime: ownership.startTime
                 )
             }
             let latest = Set(try allProcessIdentifiers())
@@ -170,6 +173,7 @@ struct SystemProcessInventory: ProcessInventoryReading {
     private struct Ownership {
         let userIdentifier: uid_t
         let parentProcessIdentifier: Int32
+        let startTime: ProcessStartTime
     }
 
     /// `KERN_PROC_PID` answers for every process, including other users'.
@@ -191,7 +195,9 @@ struct SystemProcessInventory: ProcessInventoryReading {
             processIdentifier: processIdentifier
         ) else { return nil }
         return Ownership(userIdentifier: userIdentifier,
-                         parentProcessIdentifier: information.kp_eproc.e_ppid)
+                         parentProcessIdentifier: information.kp_eproc.e_ppid,
+                         startTime: ProcessStartTime(seconds: Int64(information.kp_proc.p_starttime.tv_sec),
+                                                     microseconds: Int64(information.kp_proc.p_starttime.tv_usec)))
     }
 
     static func interpretUserIdentifierQuery(status: Int32, returnedSize: Int,
@@ -335,12 +341,15 @@ final class WorkspaceApplicationLifecycle: ApplicationLifecycleManaging {
     }
 
     private let inventory: any ProcessInventoryReading
+    private let forceTerminator: any ProcessForceTerminating
     /// Once a helper has been attributed to an affected app, keep recognizing
     /// the same live PID/path even after its responsible main app exits.
     private var implicatedProcesses = Set<ProcessKey>()
 
-    init(inventory: any ProcessInventoryReading = SystemProcessInventory()) {
+    init(inventory: any ProcessInventoryReading = SystemProcessInventory(),
+         forceTerminator: (any ProcessForceTerminating)? = nil) {
         self.inventory = inventory
+        self.forceTerminator = forceTerminator ?? SystemProcessForceTerminator()
     }
 
     func runningProcesses(matching clients: Set<String>) async throws -> [AffectedProcess] {
@@ -406,6 +415,11 @@ final class WorkspaceApplicationLifecycle: ApplicationLifecycleManaging {
                 name: running?.localizedName ?? URL(fileURLWithPath: executablePath).lastPathComponent,
                 executablePath: executablePath,
                 canRequestTermination: running != nil
+                    && process.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+                startTime: process.startTime,
+                canForceTerminate: process.startTime != nil
+                    && process.userIdentifier == geteuid()
+                    && process.processIdentifier > 1
                     && process.processIdentifier != ProcessInfo.processInfo.processIdentifier
             )
         }
@@ -418,8 +432,17 @@ final class WorkspaceApplicationLifecycle: ApplicationLifecycleManaging {
                   let application = NSRunningApplication(processIdentifier: process.processIdentifier),
                   let currentPath = application.executableURL?.path,
                   Self.normalizedPath(currentPath) == process.executablePath else { continue }
+            if let startTime = process.startTime {
+                guard let current = try? SystemProcessForceTerminator.readIdentity(process.processIdentifier),
+                      current.startTime == startTime,
+                      current.executablePath == process.executablePath else { continue }
+            }
             _ = application.terminate()
         }
+    }
+
+    func forceTerminate(_ process: AffectedProcess) throws {
+        try forceTerminator.forceTerminate(process)
     }
 
     private static func normalizedPath(_ path: String) -> String {
