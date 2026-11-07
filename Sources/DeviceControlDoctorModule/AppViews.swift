@@ -14,6 +14,7 @@ struct MainView: View {
     @EnvironmentObject private var doctor: DoctorStore
     @Environment(\.openWindow) private var openWindow
     @State private var showsAddApps = false
+    @State private var showsResetAll = false
     /// The suggestion or tile click that opened the pane.
     let route: ModuleRoute?
 
@@ -83,6 +84,17 @@ struct MainView: View {
                 }
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                Divider()
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("All apps").font(.headline)
+                    Text("Clear Accessibility, event-generation, and input-monitoring decisions for every app, not just your watch list.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button("Reset All Permissions…", role: .destructive) { showsResetAll = true }
+                        .disabled(doctor.isChecking || doctor.isRepairing)
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 340)
         } detail: {
@@ -131,6 +143,7 @@ struct MainView: View {
             }
         }
         .sheet(isPresented: $showsAddApps) { AddAppsView() }
+        .sheet(isPresented: $showsResetAll) { ResetAllView() }
         .tint(DoctorStyle.accent)
         .frame(minWidth: 980, minHeight: 650)
         // The standalone app's File-menu commands, in the suite's Tool menu.
@@ -744,7 +757,6 @@ struct TestPadView: View {
 
 struct SettingsView: View {
     @EnvironmentObject private var doctor: DoctorStore
-    @State private var showsResetAll = false
 
     var body: some View {
         Form {
@@ -755,14 +767,6 @@ struct SettingsView: View {
                 Text("Checks while App Permission Checkup is closed are set in the Background Checks tab.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            Section("Device Control and Data Access") {
-                Text("Reset every app’s Accessibility, event-generation, and input-monitoring decisions when repairing individual apps is not enough.")
-                    .font(.callout)
-                Text("This is service-wide. Every affected app must be closed before any setting is cleared, and each app must be approved again afterward.")
-                    .font(.caption).foregroundStyle(.secondary)
-                Button("Reset All…", role: .destructive) { showsResetAll = true }
-                    .disabled(doctor.isChecking || doctor.isRepairing)
-            }
             Section("Privacy and scope") {
                 Text("The watch list, app identities, permission results, and your test observations are stored locally. Reports are exported only when you choose Export Report.")
                     .font(.callout)
@@ -772,11 +776,10 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .tint(DoctorStyle.accent)
-        .sheet(isPresented: $showsResetAll) { ResetAllView() }
     }
 }
 
-private struct ResetAllView: View {
+struct ResetAllView: View {
     @EnvironmentObject private var doctor: DoctorStore
     @Environment(\.dismiss) private var dismiss
     @State private var preparation: ResetAllPermissions.Preparation?
@@ -795,19 +798,43 @@ private struct ResetAllView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: completed ? "checkmark.circle" : "exclamationmark.triangle")
-                    .font(.system(size: 29, weight: .light))
-                    .foregroundStyle(completed ? DoctorStyle.accent : DoctorStyle.warning)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(completed ? "Reset completed" : "Reset all access decisions")
-                        .font(.title2.weight(.semibold))
-                    Text("Device Control and Data Access")
-                        .font(.headline)
-                }
+        VStack(alignment: .leading, spacing: 0) {
+            heading
+                .padding(26)
+            Divider()
+            ScrollView {
+                review
+                    .padding(26)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
+            Divider()
+            actions
+                .padding(20)
+        }
+        // Lists and errors scroll; the title and destructive confirmation stay
+        // reachable even when hundreds of processes are affected.
+        .frame(width: 640, height: 600)
+        .interactiveDismissDisabled(doctor.isRepairing)
+        .tint(DoctorStyle.accent)
+        .task { await inspect() }
+    }
 
+    private var heading: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: completed ? "checkmark.circle" : "exclamationmark.triangle")
+                .font(.system(size: 29, weight: .light))
+                .foregroundStyle(completed ? DoctorStyle.accent : DoctorStyle.warning)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(completed ? "Reset completed" : "Reset all access decisions")
+                    .font(.title2.weight(.semibold))
+                Text("Device Control and Data Access")
+                    .font(.headline)
+            }
+        }
+    }
+
+    private var review: some View {
+        VStack(alignment: .leading, spacing: 18) {
             if completed {
                 Text("All three permission services were reset. Affected apps were not reopened automatically. Approve each app again in System Settings before opening it.")
                     .font(.callout)
@@ -832,14 +859,19 @@ private struct ResetAllView: View {
                         .disabled(isLoading || doctor.isChecking || doctor.isRepairing)
                 }
             }
+        }
+    }
 
-            Divider()
-            HStack {
-                if doctor.isRepairing {
+    private var actions: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if doctor.isRepairing {
+                HStack {
                     ProgressView().controlSize(.small)
                     Text("Quitting affected apps and verifying they stay closed…")
                         .font(.caption).foregroundStyle(.secondary)
                 }
+            }
+            HStack {
                 Spacer()
                 Button(completed ? "Done" : "Cancel") { dismiss() }
                     .keyboardShortcut(.cancelAction)
@@ -854,11 +886,6 @@ private struct ResetAllView: View {
                 }
             }
         }
-        .padding(26)
-        .frame(width: 610)
-        .interactiveDismissDisabled(doctor.isRepairing)
-        .tint(DoctorStyle.accent)
-        .task { await inspect() }
     }
 
     @ViewBuilder

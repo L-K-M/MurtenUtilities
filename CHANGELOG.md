@@ -55,6 +55,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Locked the app's appearance to light (`NSRequiresAquaSystemAppearance`) —
   a documented product decision, not a missing feature; dark mode would be a
   Rigi redesign, not a reskin.
+- App Permission Checkup's Reset All moved out of its Settings panel into an
+  always-visible All apps section at the bottom of the pane sidebar, separate
+  from per-app repair and available without a watch-list selection; its
+  confirmation is a fixed-size sheet with a scrollable review body and
+  persistent heading and Cancel/confirmation controls.
 
 ### Fixed
 
