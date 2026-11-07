@@ -30,8 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Corrected uneven or pinched limbs in Startup Manager, Local Network Access
   and CI Runner Manager. Software Update Finder now has a balanced ladder
-  stance with both feet on a rung and one hand on the rail. Closed contact
-  gaps at the recovery figure's shoulders, the detective's elbow and the
+  stance with both feet on a rung and one hand on the rail. Separated the
+  network cable from the helper's calf. Closed contact gaps at the
+  recovery figure's shoulders, the detective's elbow and the
   monitor stand.
 - Distinct actions and compositions for all ten tool illustrations: container
   extraction, sweeping, a startup lever, keyhole inspection, a lounging

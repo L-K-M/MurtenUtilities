@@ -176,7 +176,7 @@ extension ToolDrawing {
         }
         stroke(Self.teal, width: 3) { p in
             p.move(to: CGPoint(x: 54, y: 82))
-            p.addCurve(to: CGPoint(x: 39, y: 103), control1: CGPoint(x: 47, y: 88), control2: CGPoint(x: 53, y: 101))
+            p.addCurve(to: CGPoint(x: 48, y: 103), control1: CGPoint(x: 47, y: 88), control2: CGPoint(x: 53, y: 101))
             p.move(to: CGPoint(x: 74, y: 82))
             p.addCurve(to: CGPoint(x: 84, y: 105), control1: CGPoint(x: 90, y: 86), control2: CGPoint(x: 76, y: 99))
         }
