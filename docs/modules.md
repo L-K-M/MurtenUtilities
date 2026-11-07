@@ -179,8 +179,9 @@ attributes them to installed products, and investigates boot failures.
 Diagnoses Device Control / Data Access (TCC) permission records that look
 granted but fail functionally. `DoctorCore` is pure, `ProcessRunning` is the
 only subprocess boundary, `tccutil`/`codesign` run via fixed paths, repair is
-user-confirmed per service. Settings also offers an explicitly confirmed,
-service-wide Reset All for recovery when individual repairs are insufficient.
+user-confirmed per service. The pane sidebar's always-visible All apps
+section also offers an explicitly confirmed, service-wide Reset All for
+recovery when individual repairs are insufficient.
 
 - **Status:** available. `DoctorCore` (in `Sources/DeviceControlDoctorCore`)
   and `DeviceControlDoctorModule`; the source's tests run as
@@ -192,8 +193,12 @@ service-wide Reset All for recovery when individual repairs are insufficient.
   (`test-pad`); the File-menu commands are Tool-menu commands with the same
   shortcuts (⌘O, ⌘R, ⇧⌘E); the menu-bar extra is a companion section
   (watched apps, apps needing review, Refresh, Test Pad). Launch at login
-  is the suite's. Reset All lives in Settings, separate from the per-app
-  repair sheet; it has no skip-quit or reopen option.
+  is the suite's. Reset All lives in the always-visible All apps section at
+  the bottom of the pane sidebar, separate from the per-app repair sheet; it
+  needs no watch-list selection and has no skip-quit or reopen option. Its
+  confirmation is a fixed-size sheet with a scrollable review body and
+  persistent heading and Cancel/confirmation controls, so hundreds of
+  client/process rows cannot push the controls off-screen.
 - **Watcher:** every 30 minutes (120 s timeout, local), per watched app:
   `tccutil list` for its expected permissions and `codesign` against the
   identity the pane saved. One finding per app (scope: its watch-list id)
