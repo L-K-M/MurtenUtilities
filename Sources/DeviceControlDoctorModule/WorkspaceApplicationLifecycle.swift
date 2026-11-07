@@ -57,6 +57,20 @@ struct SystemProcessInventory: ProcessInventoryReading {
         return unsafeBitCast(symbol, to: ResponsibleFunction.self)
     }()
 
+    private typealias CodeSigningOperation = @convention(c) (pid_t, UInt32, UnsafeMutableRawPointer?, Int) -> Int32
+    private static let codeSigningOperation: CodeSigningOperation? = {
+        guard let handle = dlopen(nil, RTLD_NOW),
+              let symbol = dlsym(handle, "csops") else {
+            return nil
+        }
+        return unsafeBitCast(symbol, to: CodeSigningOperation.self)
+    }()
+    /// `CS_OPS_IDENTITY` in xnu's <sys/codesign.h>, which the SDK omits.
+    private static let codeSigningIdentityOperation: UInt32 = 11
+    /// The blob `CS_OPS_IDENTITY` returns: a 4-byte magic and a 4-byte
+    /// big-endian total length, then the NUL-terminated identifier.
+    private static let kernelIdentityHeaderSize = 8
+
     func snapshot() async throws -> [ProcessIdentity] {
         try await Task.detached(priority: .userInitiated) {
             try Self.readSnapshot()
@@ -231,6 +245,44 @@ struct SystemProcessInventory: ProcessInventoryReading {
 
     private static func signingIdentity(for processIdentifier: Int32,
                                         executablePath: String) -> (identifier: String?, available: Bool) {
+        let fromSignature = codeSignatureIdentity(for: processIdentifier, executablePath: executablePath)
+        if fromSignature.available { return fromSignature }
+
+        // Security.framework reads the executable, which another user's
+        // process may keep unreadable: roleaccountd stages root XPC
+        // services (Xcode's Instruments helpers) in a root-only directory.
+        // The kernel still knows the identifier the running code was
+        // signed with, and reports it without privilege.
+        if let identifier = kernelSigningIdentifier(for: processIdentifier) {
+            return (identifier, true)
+        }
+        return fromSignature
+    }
+
+    private static func kernelSigningIdentifier(for processIdentifier: Int32) -> String? {
+        guard let codeSigningOperation else { return nil }
+        var blob = [UInt8](repeating: 0, count: 1_024)
+        let status = blob.withUnsafeMutableBytes {
+            codeSigningOperation(processIdentifier, codeSigningIdentityOperation,
+                                 $0.baseAddress, $0.count)
+        }
+        return interpretKernelIdentity(status: status, blob: blob)
+    }
+
+    /// Any malformed, truncated or empty answer yields nil, which keeps the
+    /// process's identity unavailable so Reset All fails closed.
+    static func interpretKernelIdentity(status: Int32, blob: [UInt8]) -> String? {
+        let headerSize = kernelIdentityHeaderSize
+        guard status == 0, blob.count > headerSize else { return nil }
+        let declaredLength = blob[4..<headerSize].reduce(0) { $0 << 8 | Int($1) }
+        guard declaredLength > headerSize, declaredLength <= blob.count else { return nil }
+        let identifier = blob[headerSize..<declaredLength].prefix { $0 != 0 }
+        guard !identifier.isEmpty else { return nil }
+        return String(bytes: identifier, encoding: .utf8)
+    }
+
+    private static func codeSignatureIdentity(for processIdentifier: Int32,
+                                              executablePath: String) -> (identifier: String?, available: Bool) {
         var dynamicCode: SecCode?
         let attributes = [kSecGuestAttributePid as String: processIdentifier] as CFDictionary
         if SecCodeCopyGuestWithAttributes(nil, attributes, [], &dynamicCode) == errSecSuccess,
@@ -323,11 +375,17 @@ final class WorkspaceApplicationLifecycle: ApplicationLifecycleManaging {
                     throw LifecycleError.responsibilityCycle(process.processIdentifier)
                 }
                 guard let owner = byProcessIdentifier[link.processIdentifier] else {
+                    // macOS reparents an orphan to launchd, so a parent that
+                    // exited mid-snapshot ends the chain exactly as the next
+                    // snapshot would; failing here would only abort a reset.
+                    if case .parent = link { break }
                     // An already-attributed helper must stay affected after
                     // its main app exits. Otherwise the missing owner leaves
-                    // the process's relationship to affected apps unknown.
+                    // the process's relationship to affected apps unknown;
+                    // unlike a parent, a stale responsible PID persists.
                     if implicatedProcesses.contains(keyFor(process)) { break }
-                    throw link.missingError(for: process.processIdentifier)
+                    throw LifecycleError.responsibleProcessMissing(process.processIdentifier,
+                                                                   link.processIdentifier)
                 }
                 attributedIdentifiers.formUnion([
                     owner.signingIdentifier,
@@ -379,15 +437,6 @@ final class WorkspaceApplicationLifecycle: ApplicationLifecycleManaging {
                 return processIdentifier
             }
         }
-
-        func missingError(for processIdentifier: Int32) -> LifecycleError {
-            switch self {
-            case .responsible(let responsible):
-                return .responsibleProcessMissing(processIdentifier, responsible)
-            case .parent(let parent):
-                return .parentProcessMissing(processIdentifier, parent)
-            }
-        }
     }
 
     private static let launchdProcessIdentifier: Int32 = 1
@@ -433,7 +482,6 @@ enum LifecycleError: LocalizedError {
     case responsibilityReadFailed(Int32, Int32)
     case responsibilityCycle(Int32)
     case responsibleProcessMissing(Int32, Int32)
-    case parentProcessMissing(Int32, Int32)
 
     var errorDescription: String? {
         switch self {
@@ -457,8 +505,6 @@ enum LifecycleError: LocalizedError {
             return "Process \(processIdentifier)'s responsibility chain contains a cycle."
         case .responsibleProcessMissing(let processIdentifier, let responsibleProcessIdentifier):
             return "Process \(processIdentifier)'s responsible app (process \(responsibleProcessIdentifier)) is no longer available to inspect."
-        case .parentProcessMissing(let processIdentifier, let parentProcessIdentifier):
-            return "Process \(processIdentifier)'s parent (process \(parentProcessIdentifier)) is no longer available to inspect."
         }
     }
 }

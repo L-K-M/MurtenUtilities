@@ -124,6 +124,31 @@ final class WorkspaceApplicationLifecycleTests: XCTestCase {
         ))
     }
 
+    func testKernelIdentityIsReadFromTheCodeSigningBlob() {
+        let identifier = Array("com.apple.dt.instruments.dtarbiter.xpc".utf8)
+        let length = 8 + identifier.count + 1
+        let blob: [UInt8] = [0xFA, 0xDE, 0x71, 0x71,
+                             0, 0, UInt8(length >> 8), UInt8(length & 0xFF)]
+            + identifier + [0] + [UInt8](repeating: 0xEE, count: 16)
+
+        XCTAssertEqual(SystemProcessInventory.interpretKernelIdentity(status: 0, blob: blob),
+                       "com.apple.dt.instruments.dtarbiter.xpc")
+    }
+
+    func testMalformedKernelIdentityLeavesTheIdentityUnavailable() {
+        let header: [UInt8] = [0xFA, 0xDE, 0x71, 0x71]
+        let cases: [(status: Int32, blob: [UInt8])] = [
+            (-1, header + [0, 0, 0, 12] + Array("abc".utf8) + [0]),          // csops failed
+            (0, header + [0, 0, 0, 64] + Array("abc".utf8) + [0]),           // truncated
+            (0, header + [0, 0, 0, 9] + [0]),                                 // empty identifier
+            (0, header + [0, 0, 0, 4]),                                       // length below header
+            (0, header + [0, 0, 0, 11] + [0xC3, 0x28] + [0]),                 // invalid UTF-8
+        ]
+        for (status, blob) in cases {
+            XCTAssertNil(SystemProcessInventory.interpretKernelIdentity(status: status, blob: blob))
+        }
+    }
+
     func testUnreadableSystemDaemonStartedByLaunchdIsNotAffected() async throws {
         let launchd = ProcessIdentity(processIdentifier: 1,
                                       executablePath: "/sbin/launchd",
@@ -178,7 +203,7 @@ final class WorkspaceApplicationLifecycleTests: XCTestCase {
         let afterQuit = try await lifecycle.runningProcesses(matching: ["com.example.Main"])
 
         XCTAssertEqual(Set(beforeQuit.map(\.processIdentifier)), [722, 723])
-        XCTAssertEqual(afterQuit.map(\.processIdentifier), [723],
+        XCTAssertEqual(Set(afterQuit.map(\.processIdentifier)), [723],
                        "a privileged child inherits the app's responsibility, even once reparented")
     }
 
@@ -202,7 +227,7 @@ final class WorkspaceApplicationLifecycleTests: XCTestCase {
         XCTAssertEqual(Set(running.map(\.processIdentifier)), [724, 725, 726])
     }
 
-    func testUnreadableProcessWithMissingParentFailsClosed() async {
+    func testUnreadableProcessWhoseParentExitedMidSnapshotDoesNotBlock() async throws {
         let orphan = ProcessIdentity(processIdentifier: 727,
                                      executablePath: "/usr/local/libexec/orphan",
                                      signingIdentifier: "com.example.Orphan",
@@ -210,12 +235,23 @@ final class WorkspaceApplicationLifecycleTests: XCTestCase {
                                      userIdentifier: 0)
         let lifecycle = WorkspaceApplicationLifecycle(inventory: InventoryFixture(processes: [orphan]))
 
-        do {
-            _ = try await lifecycle.runningProcesses(matching: ["com.example.Main"])
-            XCTFail("an unreadable process whose parent cannot be inspected must not be assumed unrelated")
-        } catch {
-            XCTAssertTrue(error.localizedDescription.contains("parent"))
-        }
+        let running = try await lifecycle.runningProcesses(matching: ["com.example.Main"])
+
+        XCTAssertTrue(running.isEmpty,
+                      "macOS reparents the orphan to launchd; the next snapshot would end its chain there too")
+    }
+
+    func testUnreadableProcessWhoseParentExitedStillMatchesByItsOwnIdentity() async throws {
+        let orphan = ProcessIdentity(processIdentifier: 731,
+                                     executablePath: "/usr/local/libexec/main-helper",
+                                     signingIdentifier: "com.example.Main",
+                                     responsibility: .unreadable(parentProcessIdentifier: 732),
+                                     userIdentifier: 0)
+        let lifecycle = WorkspaceApplicationLifecycle(inventory: InventoryFixture(processes: [orphan]))
+
+        let running = try await lifecycle.runningProcesses(matching: ["com.example.Main"])
+
+        XCTAssertEqual(running.map(\.processIdentifier), [731])
     }
 
     func testCyclicParentChainFailsClosed() async {
