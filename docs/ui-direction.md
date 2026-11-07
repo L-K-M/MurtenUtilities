@@ -66,7 +66,8 @@ not a notification center bolted on.
 - The default 1040-by-720 home window fits all ten tools without a scrollbar.
   Keep enough vertical space for the grid; smaller windows and longer feeds
   can still scroll. Check the complete home layout when changing tile sizes.
-- The app's Dock icon uses a figure with a general-purpose toolbox. Its
+- The app's Dock icon is a small workshop: a figure perched on a retro Mac,
+  working on it with a large wrench, against a sunflower-yellow plate. Its
   1024-point master shares the production drawing helpers: regenerate it with
   `./scripts/generate-app-icon.sh`. `make-icon.swift` preserves transparency
   when making every iconset size; `swift scripts/test-iconset.swift` verifies
