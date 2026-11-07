@@ -82,7 +82,8 @@ struct ResetAllContentView: View {
     private var summary: some View {
         HStack {
             Text(processSummary).font(.headline)
-            Text("\(session.clients.count) recorded clients").foregroundStyle(.secondary)
+            Text(session.hasInspected ? "\(session.clients.count) known clients" : "Scope not yet verified")
+                .foregroundStyle(.secondary)
             Button("Review Clients…") { showsClients = true }
                 .popover(isPresented: $showsClients) {
                     ScrollView {
@@ -147,7 +148,7 @@ struct ResetAllContentView: View {
         .frame(minHeight: 140)
         .overlay {
             if session.rows.isEmpty {
-                Text(session.hasInspected ? "No affected processes are running." : "Reading affected apps and helpers…")
+                Text(emptyTableMessage)
                     .foregroundStyle(.secondary)
                     .allowsHitTesting(false)
             }
@@ -188,7 +189,15 @@ struct ResetAllContentView: View {
         }
     }
 
+    private var emptyTableMessage: String {
+        if session.inventoryFailure != nil { return "Process status is unavailable. Refresh to try again." }
+        return session.hasInspected ? "No affected processes are running." : "Reading affected apps and helpers…"
+    }
+
     private var processSummary: String {
+        guard session.hasInspected else {
+            return session.inventoryFailure == nil ? "Reading process status…" : "Process status unavailable"
+        }
         let exited = session.rows.filter { $0.state == .exited }.count
         if session.inventoryFailure != nil {
             return "\(session.unverifiedCount) unverified · \(exited) previously exited"

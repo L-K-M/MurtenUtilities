@@ -338,12 +338,14 @@ final class WorkspaceApplicationLifecycle: ApplicationLifecycleManaging {
     private struct ProcessKey: Hashable {
         let processIdentifier: Int32
         let executablePath: String
+        let startTime: ProcessStartTime?
     }
 
     private let inventory: any ProcessInventoryReading
     private let forceTerminator: any ProcessForceTerminating
     /// Once a helper has been attributed to an affected app, keep recognizing
-    /// the same live PID/path even after its responsible main app exits.
+    /// the same live process even after its responsible main app exits. Birth
+    /// time prevents a replacement PID from inheriting the old attribution.
     private var implicatedProcesses = Set<ProcessKey>()
 
     init(inventory: any ProcessInventoryReading = SystemProcessInventory(),
@@ -360,7 +362,7 @@ final class WorkspaceApplicationLifecycle: ApplicationLifecycleManaging {
         let byProcessIdentifier = Dictionary(snapshot.map { ($0.processIdentifier, $0) }) { first, _ in first }
         let liveKeys = Set(snapshot.map {
             ProcessKey(processIdentifier: $0.processIdentifier,
-                       executablePath: Self.normalizedPath($0.executablePath))
+                       executablePath: Self.normalizedPath($0.executablePath), startTime: $0.startTime)
         })
         implicatedProcesses.formIntersection(liveKeys)
 
@@ -404,7 +406,7 @@ final class WorkspaceApplicationLifecycle: ApplicationLifecycleManaging {
             }
 
             let key = ProcessKey(processIdentifier: process.processIdentifier,
-                                 executablePath: executablePath)
+                                 executablePath: executablePath, startTime: process.startTime)
             let directlyMatches = pathClients.contains(executablePath)
                 || !attributedIdentifiers.isDisjoint(with: bundleIdentifiers)
             if directlyMatches { implicatedProcesses.insert(key) }
@@ -481,7 +483,7 @@ final class WorkspaceApplicationLifecycle: ApplicationLifecycleManaging {
 
     private func keyFor(_ process: ProcessIdentity) -> ProcessKey {
         ProcessKey(processIdentifier: process.processIdentifier,
-                   executablePath: Self.normalizedPath(process.executablePath))
+                   executablePath: Self.normalizedPath(process.executablePath), startTime: process.startTime)
     }
 
     private static func sorted<S: Sequence>(_ processes: S) -> [AffectedProcess] where S.Element == AffectedProcess {

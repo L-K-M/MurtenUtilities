@@ -235,6 +235,7 @@ struct ResetAllPermissions {
 
     private func prepareProcesses(_ clients: Set<String>, policy: RunningAppsPolicy,
                                   progress: @MainActor (Progress) -> Void) async throws {
+        try Task.checkCancellation()
         if policy == .allowRunning {
             // Acknowledgement waives only quiescence, never inventory or scope
             // verification. It does not silently quit or force-kill anything.
@@ -260,7 +261,7 @@ struct ResetAllPermissions {
             }
             try await Task.sleep(nanoseconds: timing.pollNanoseconds)
         }
-        if stableSamples > 0 { throw ResetAllError.appsNotStable }
+        if stableSamples > 0 || lastRunning.isEmpty { throw ResetAllError.appsNotStable }
         throw ResetAllError.appsStillRunning(lastRunning)
     }
 }

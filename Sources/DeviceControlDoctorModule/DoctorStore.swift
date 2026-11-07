@@ -383,6 +383,7 @@ import UniformTypeIdentifiers
 
     func forceQuitResetAllProcess(_ process: AffectedProcess) throws {
         guard !isChecking, !isRepairing else { throw ProcessTerminationError.busy }
+        guard process.canForceTerminate else { throw ProcessTerminationError.unavailable }
         try lifecycle.forceTerminate(process)
     }
 

@@ -233,7 +233,7 @@ final class ResetAllPermissionsTests: XCTestCase {
     func testAcknowledgedOverrideResetsWithoutQuittingRunningProcesses() async {
         let runner = configuredRunner()
         let process = AffectedProcess(processIdentifier: 101, name: "Stubborn helper",
-                                      executablePath: "/fixture/helper", canRequestTermination: false)
+                                      executablePath: "/fixture/helper", canRequestTermination: true)
         let lifecycle = FakeApplicationLifecycle(running: [process], runner: runner)
         lifecycle.refusesTermination = true
 
@@ -357,6 +357,34 @@ final class ResetAllPermissionsTests: XCTestCase {
         XCTAssertTrue(result.succeeded, result.failure ?? "")
         XCTAssertFalse(lifecycle.matchedClients.isEmpty)
         XCTAssertTrue(lifecycle.matchedClients.allSatisfy { $0.contains("com.example.AlreadyReset") })
+    }
+
+    func testCancellationBeforeOverridePreflightDoesNotStartAnotherInventory() async {
+        let runner = configuredRunner()
+        let lifecycle = FakeApplicationLifecycle(running: [], runner: runner)
+        let reset = makeReset(runner: runner, lifecycle: lifecycle)
+        let result = await Task {
+            await reset.apply(policy: .allowRunning) { update in
+                if case .clients = update { withUnsafeCurrentTask { $0?.cancel() } }
+            }
+        }.value
+
+        XCTAssertTrue(result.failure?.contains("cancelled") == true)
+        XCTAssertTrue(lifecycle.matchedClients.isEmpty)
+        XCTAssertTrue(resetCalls(runner).isEmpty)
+    }
+
+    func testZeroPollBudgetDoesNotClaimThatZeroProcessesAreStillRunning() async {
+        let runner = configuredRunner()
+        let lifecycle = FakeApplicationLifecycle(running: [], runner: runner)
+        let reset = ResetAllPermissions(runner: runner, lifecycle: lifecycle,
+                                       timing: .init(pollNanoseconds: 0, stableSamples: 1, maximumPolls: 0))
+
+        let result = await reset.apply()
+
+        XCTAssertFalse(result.succeeded)
+        XCTAssertFalse(result.failure?.contains("0 affected processes are still running") == true)
+        XCTAssertTrue(resetCalls(runner).isEmpty)
     }
 
     private func configuredRunner(clearsAfterReset: Bool = true) -> FakeProcessRunner {

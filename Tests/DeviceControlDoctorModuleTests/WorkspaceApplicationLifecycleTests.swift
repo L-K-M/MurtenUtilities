@@ -386,6 +386,25 @@ final class WorkspaceApplicationLifecycleTests: XCTestCase {
         XCTAssertEqual(Set(running.map(\.processIdentifier)), [711, 712, 713])
     }
 
+    func testReusedPIDDoesNotInheritAnOldHelpersAttribution() async throws {
+        let app = ProcessIdentity(processIdentifier: 98_790, executablePath: "/fixture/app",
+                                  signingIdentifier: "com.example.App")
+        let helper = ProcessIdentity(processIdentifier: 98_791, executablePath: "/fixture/shared-helper",
+                                     signingIdentifier: "com.example.Helper", responsibility: .process(98_790),
+                                     startTime: .init(seconds: 100, microseconds: 0))
+        let replacement = ProcessIdentity(processIdentifier: 98_791, executablePath: helper.executablePath,
+                                          signingIdentifier: helper.signingIdentifier,
+                                          startTime: .init(seconds: 200, microseconds: 0))
+        let lifecycle = WorkspaceApplicationLifecycle(inventory: SequencedInventory(snapshots: [[app, helper], [replacement]]))
+        let initiallyAffected = try await lifecycle.runningProcesses(matching: ["com.example.App"])
+        XCTAssertEqual(Set(initiallyAffected.map(\.id)), [app.processIdentifier, helper.processIdentifier])
+
+        let afterPIDReuse = try await lifecycle.runningProcesses(matching: ["com.example.App"])
+
+        XCTAssertTrue(afterPIDReuse.isEmpty,
+                      "an unrelated replacement must not inherit the cached attribution or appear as a Force Quit target")
+    }
+
     func testForceQuitIsOfferedOnlyForVerifiedOwnProcesses() async throws {
         let birth = ProcessStartTime(seconds: 100, microseconds: 0)
         let own = ProcessIdentity(processIdentifier: 98_780, executablePath: "/fixture/own",

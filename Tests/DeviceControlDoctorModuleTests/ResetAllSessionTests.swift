@@ -148,6 +148,35 @@ final class ResetAllSessionTests: XCTestCase {
         XCTAssertFalse(runner.ranReset)
     }
 
+    func testBusyInspectionDoesNotOverwriteTheSharedNotice() async throws {
+        let mac = try FixtureMac()
+        defer { mac.remove() }
+        let runner = configuredRunner()
+        let doctor = makeStore(mac: mac, runner: runner, lifecycle: SessionLifecycle(running: []))
+        doctor.notice = "Previous repair result"
+        doctor.isChecking = true
+
+        do {
+            _ = try await doctor.inspectResetAll()
+            XCTFail("a busy store must not start a parallel inventory")
+        } catch {
+            XCTAssertEqual(doctor.notice, "Previous repair result")
+            XCTAssertTrue(runner.calls.isEmpty)
+        }
+    }
+
+    func testStoreRejectsForceQuitWhenCapabilityWasNotGranted() throws {
+        let mac = try FixtureMac()
+        defer { mac.remove() }
+        let disallowed = AffectedProcess(processIdentifier: 108, name: "Unqualified helper",
+                                         executablePath: "/fixture/helper", canRequestTermination: true)
+        let lifecycle = SessionLifecycle(running: [disallowed])
+        let doctor = makeStore(mac: mac, runner: configuredRunner(), lifecycle: lifecycle)
+
+        XCTAssertThrowsError(try doctor.forceQuitResetAllProcess(disallowed))
+        XCTAssertTrue(lifecycle.forced.isEmpty)
+    }
+
     private func makeSession(mac: FixtureMac, runner: FakeProcessRunner,
                              lifecycle: SessionLifecycle) -> ResetAllSession {
         ResetAllSession(doctor: makeStore(mac: mac, runner: runner, lifecycle: lifecycle))
