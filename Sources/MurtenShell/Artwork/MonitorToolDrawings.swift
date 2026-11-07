@@ -2,11 +2,11 @@ import SwiftUI
 
 extension ToolDrawing {
     func runnerManager() {
-        ellipse(Self.blue, x: 42, y: 9, width: 21, height: 21)
+        ellipse(Self.blue, x: 43, y: 8, width: 19, height: 19)
         fill(Self.coral) { p in
-            p.move(to: CGPoint(x: 51, y: 34))
-            p.addQuadCurve(to: CGPoint(x: 29, y: 66), control: CGPoint(x: 34, y: 40))
-            p.addQuadCurve(to: CGPoint(x: 45, y: 57), control: CGPoint(x: 43, y: 63))
+            p.move(to: CGPoint(x: 52, y: 31))
+            p.addQuadCurve(to: CGPoint(x: 27, y: 70), control: CGPoint(x: 34, y: 40))
+            p.addQuadCurve(to: CGPoint(x: 46, y: 59), control: CGPoint(x: 43, y: 68))
             p.closeSubpath()
         }
         fill(Self.blue) { p in
@@ -46,20 +46,20 @@ extension ToolDrawing {
 
     func systemMonitor() {
         standingFigure(limbs: Self.coral, shirt: Self.teal)
-        polygon(Self.yellow, CGPoint(x: 111, y: 42), CGPoint(x: 123, y: 50),
-                CGPoint(x: 123, y: 94), CGPoint(x: 109, y: 101))
-        box(Self.blue, x: 60, y: 38, width: 53, height: 64, radius: 8)
-        box(.white, x: 65, y: 44, width: 43, height: 48, radius: 4)
-        box(Self.teal, x: 69, y: 48, width: 35, height: 40, radius: 2)
-        polygon(Self.yellow, CGPoint(x: 81, y: 101), CGPoint(x: 94, y: 101),
-                CGPoint(x: 98, y: 110), CGPoint(x: 110, y: 115),
-                CGPoint(x: 65, y: 115), CGPoint(x: 79, y: 110))
+        polygon(Self.yellow, CGPoint(x: 114, y: 48), CGPoint(x: 123, y: 54),
+                CGPoint(x: 123, y: 86), CGPoint(x: 114, y: 92))
+        box(Self.blue, x: 52, y: 45, width: 64, height: 48, radius: 7)
+        box(.white, x: 57, y: 50, width: 54, height: 36, radius: 4)
+        box(Self.teal, x: 61, y: 54, width: 46, height: 28, radius: 2)
+        polygon(Self.yellow, CGPoint(x: 77, y: 92), CGPoint(x: 91, y: 92),
+                CGPoint(x: 95, y: 105), CGPoint(x: 106, y: 112),
+                CGPoint(x: 63, y: 112), CGPoint(x: 75, y: 105))
         stroke(.white, width: 2.5) { p in
-            p.move(to: CGPoint(x: 72, y: 70)); p.addLine(to: CGPoint(x: 79, y: 70))
-            p.addLine(to: CGPoint(x: 84, y: 57)); p.addLine(to: CGPoint(x: 91, y: 80))
-            p.addLine(to: CGPoint(x: 96, y: 68)); p.addLine(to: CGPoint(x: 102, y: 68))
-            p.move(to: CGPoint(x: 116, y: 61)); p.addLine(to: CGPoint(x: 120, y: 59))
-            p.move(to: CGPoint(x: 116, y: 72)); p.addLine(to: CGPoint(x: 120, y: 70))
+            p.move(to: CGPoint(x: 65, y: 68)); p.addLine(to: CGPoint(x: 73, y: 68))
+            p.addLine(to: CGPoint(x: 79, y: 58)); p.addLine(to: CGPoint(x: 87, y: 77))
+            p.addLine(to: CGPoint(x: 94, y: 66)); p.addLine(to: CGPoint(x: 103, y: 66))
+            p.move(to: CGPoint(x: 117, y: 62)); p.addLine(to: CGPoint(x: 120, y: 60))
+            p.move(to: CGPoint(x: 117, y: 72)); p.addLine(to: CGPoint(x: 120, y: 70))
         }
     }
 }

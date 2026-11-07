@@ -54,11 +54,34 @@ jobs:
         with:
           xcode-version: '26.0'   # pin so a runner-image bump can't change the toolchain
 
+      - name: Verify iconset transparency and sizes
+        run: swift scripts/test-iconset.swift
+
       - name: Build
         run: swift build
 
       - name: Test
+        id: tests
         run: swift test
+
+      # Preserve the normal test result; collect precise compiler evidence only
+      # after a failure, without changing the successful CI/release invocation.
+      - name: Diagnose failed shell test compilation
+        if: ${{ failure() && steps.tests.outcome == 'failure' }}
+        run: |
+          swift build --target MurtenShellTests --jobs 1 --verbose \
+            -Xswiftc -disable-batch-mode -Xswiftc -driver-show-job-lifecycle \
+            -Xswiftc -Xfrontend -Xswiftc -debug-time-function-bodies
+
+      - name: Report Swift frontend crashes
+        if: ${{ failure() && steps.tests.outcome == 'failure' }}
+        run: |
+          for MU_REPORT in "$HOME"/Library/Logs/DiagnosticReports/swift-frontend*; do
+            if [ -f "$MU_REPORT" ]; then
+              printf 'Swift compiler crash report: %s\n' "$MU_REPORT"
+              cat "$MU_REPORT"
+            fi
+          done
 
       # Same invocation release.yml uses, so the release path is exercised on
       # every change rather than first failing under a tag.

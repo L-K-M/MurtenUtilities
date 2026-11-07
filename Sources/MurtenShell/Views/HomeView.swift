@@ -18,7 +18,8 @@ struct HomeView: View {
                     SuggestionFeed(model: model)
                     tools
                 }
-                .padding(20)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
             }
             .background(InsetWell())
             .padding(10)
@@ -99,7 +100,7 @@ struct ModuleTile: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .top) {
                     ToolIcon(module: module)
-                        .frame(width: 72, height: 72)
+                        .frame(width: 88, height: 88)
                     Spacer()
                     badge
                 }
@@ -111,7 +112,7 @@ struct ModuleTile: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(10)
-            .frame(maxWidth: .infinity, minHeight: 152, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 168, alignment: .topLeading)
             .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 6))
             .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.quaternary))
             .contentShape(RoundedRectangle(cornerRadius: 6))

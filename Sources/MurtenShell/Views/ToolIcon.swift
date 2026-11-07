@@ -2,6 +2,7 @@ import SwiftUI
 import MurtenCore
 
 /// The suite's illustrated tool identity; labels supply its accessible name.
+/// Callers supply a frame; artwork fits uniformly within that rectangle.
 struct ToolIcon: View {
     let module: SuiteModule
 
@@ -9,10 +10,8 @@ struct ToolIcon: View {
         Group {
             if let artwork = ToolArtwork(rawValue: module.id) {
                 Canvas { context, size in
-                    context.scaleBy(x: size.width / 128, y: size.height / 128)
-                    artwork.draw(in: context)
+                    artwork.draw(in: context, fitting: size)
                 }
-                .aspectRatio(1, contentMode: .fit)
             } else {
                 Image(systemName: module.systemImage)
                     .resizable()
