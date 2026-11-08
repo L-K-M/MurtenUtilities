@@ -15,13 +15,31 @@ final class RepairPlanTests: XCTestCase {
     func testGlobalPlanResetsEveryManagedServiceWithoutAClientIdentifier() {
         let plan = GlobalRepairPlan()
 
-        XCTAssertEqual(plan.services, [.accessibility, .postEvent, .listenEvent])
+        XCTAssertEqual(plan.services, [.accessibility, .postEvent, .listenEvent, .screenCapture, .audioCapture])
         XCTAssertEqual(plan.arguments, [
             ["reset", "Accessibility"],
             ["reset", "PostEvent"],
-            ["reset", "ListenEvent"]
+            ["reset", "ListenEvent"],
+            ["reset", "ScreenCapture"],
+            ["reset", "AudioCapture"]
         ])
     }
+    func testGlobalPlanIncludesRecordingWithoutExpandingTheWatchList() {
+        XCTAssertEqual(GlobalRepairPlan().services.map(\.rawValue), [
+            "Accessibility", "PostEvent", "ListenEvent", "ScreenCapture", "AudioCapture"
+        ])
+        XCTAssertEqual(PermissionService.allCases.map(\.rawValue), [
+            "Accessibility", "PostEvent", "ListenEvent"
+        ], "recording recovery must not add unimplemented functional tests or watcher checks")
+    }
+
+    func testRecordingServicesUseTheirCanonicalNamesAndSharedSettingsPane() {
+        XCTAssertEqual(GlobalResetService.screenCapture.rawValue, "ScreenCapture")
+        XCTAssertEqual(GlobalResetService.audioCapture.rawValue, "AudioCapture")
+        XCTAssertEqual(GlobalResetService.screenCapture.settingsAnchor, "Privacy_ScreenCapture")
+        XCTAssertEqual(GlobalResetService.audioCapture.settingsAnchor, "Privacy_ScreenCapture")
+    }
+
     func testUnknownIsNotTreatedAsDenied() {
         var app = WatchedApp(name: "Example", bundleID: "com.example.App", path: "/Applications/Example.app", version: "1")
         app.expectedServices = [.accessibility]

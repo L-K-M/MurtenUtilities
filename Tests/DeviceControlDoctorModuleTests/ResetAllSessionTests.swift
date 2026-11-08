@@ -53,6 +53,7 @@ final class ResetAllSessionTests: XCTestCase {
         await session.reset()
 
         XCTAssertTrue(session.completed)
+        XCTAssertEqual(session.activity, "All 5 permission services were reset.")
         XCTAssertEqual(session.runningCount, 1)
         XCTAssertTrue(lifecycle.quitRequests.isEmpty)
         XCTAssertTrue(lifecycle.forced.isEmpty)
@@ -177,6 +178,24 @@ final class ResetAllSessionTests: XCTestCase {
         XCTAssertTrue(lifecycle.forced.isEmpty)
     }
 
+    func testRecordingSettingsNavigationUsesTheSharedScreenAudioPane() throws {
+        let mac = try FixtureMac()
+        defer { mac.remove() }
+        var opened: [URL] = []
+        let doctor = DoctorStore(defaults: UserDefaults(suiteName: "ResetAllSessionTests.\(UUID().uuidString)")!,
+                                 runner: configuredRunner(), storageURL: mac.watchList,
+                                 lifecycle: SessionLifecycle(running: []),
+                                 settingsOpener: { opened.append($0) })
+
+        doctor.openResetSettings(.screenCapture)
+        doctor.openResetSettings(.audioCapture)
+
+        XCTAssertEqual(opened.map(\.absoluteString), [
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
+        ])
+    }
+
     private func makeSession(mac: FixtureMac, runner: FakeProcessRunner,
                              lifecycle: SessionLifecycle) -> ResetAllSession {
         ResetAllSession(doctor: makeStore(mac: mac, runner: runner, lifecycle: lifecycle))
@@ -186,14 +205,15 @@ final class ResetAllSessionTests: XCTestCase {
                            lifecycle: SessionLifecycle) -> DoctorStore {
         DoctorStore(defaults: UserDefaults(suiteName: "ResetAllSessionTests.\(UUID().uuidString)")!,
                     runner: runner, storageURL: mac.watchList, lifecycle: lifecycle,
-                    resetTiming: .init(pollNanoseconds: 0, stableSamples: 1, maximumPolls: 3))
+                    resetTiming: .init(pollNanoseconds: 0, stableSamples: 1, maximumPolls: 3),
+                    settingsOpener: { _ in })
     }
 
     private func configuredRunner() -> FakeProcessRunner {
         let runner = FakeProcessRunner()
         runner.offerListing()
         runner.clearListedServiceAfterReset()
-        for service in PermissionService.allCases {
+        for service in GlobalRepairPlan().services {
             runner.respond(to: [SystemTool.tccutil, "list", "-s", service.rawValue],
                            with: CommandResult(output: "com.example.App", exitCode: 0))
             runner.respond(to: [SystemTool.tccutil, "reset", service.rawValue],

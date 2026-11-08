@@ -87,7 +87,7 @@ struct MainView: View {
                 Divider()
                 VStack(alignment: .leading, spacing: 8) {
                     Text("All apps").font(.headline)
-                    Text("Clear Accessibility, event-generation, and input-monitoring decisions for every app, not just your watch list.")
+                    Text("Clear device-control, input-monitoring, and Screen & System Audio Recording decisions for every app, not just your watch list.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Button("Reset All Permissions…", role: .destructive) { showsResetAll = true }

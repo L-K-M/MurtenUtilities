@@ -87,14 +87,14 @@ final class ResetAllLayoutTests: XCTestCase {
                            lifecycle: LayoutLifecycle) -> DoctorStore {
         let defaults = UserDefaults(suiteName: "ResetAllLayoutTests.\(UUID().uuidString)")!
         return DoctorStore(defaults: defaults, runner: runner, storageURL: mac.watchList,
-                           lifecycle: lifecycle)
+                           lifecycle: lifecycle, settingsOpener: { _ in })
     }
 
     private func listedClients(count: Int) -> FakeProcessRunner {
         let runner = FakeProcessRunner()
         runner.offerListing()
         let clients = (0..<count).map { "com.example.Client\($0)" }.joined(separator: "\n")
-        for service in PermissionService.allCases {
+        for service in GlobalRepairPlan().services {
             runner.respond(to: [SystemTool.tccutil, "list", "-s", service.rawValue],
                            with: CommandResult(output: clients, exitCode: 0))
         }

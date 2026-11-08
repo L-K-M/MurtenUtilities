@@ -15,8 +15,8 @@ struct ResetAllPermissions {
         case clients(Set<String>)
         case processes([AffectedProcess])
         case quitRequested([AffectedProcess])
-        case resetting(PermissionService)
-        case verifying(PermissionService)
+        case resetting(GlobalResetService)
+        case verifying(GlobalResetService)
     }
 
     struct Preparation: Equatable, Sendable {
@@ -25,7 +25,7 @@ struct ResetAllPermissions {
     }
 
     struct Outcome: Equatable, Sendable {
-        let service: PermissionService
+        let service: GlobalResetService
         let failure: String?
     }
 
@@ -35,7 +35,7 @@ struct ResetAllPermissions {
 
         var succeeded: Bool {
             failure == nil
-                && outcomes.count == PermissionService.allCases.count
+                && outcomes.count == GlobalRepairPlan().services.count
                 && outcomes.allSatisfy { $0.failure == nil }
         }
     }
@@ -49,7 +49,7 @@ struct ResetAllPermissions {
     }
 
     private struct Scope {
-        let clientsByService: [PermissionService: Set<String>]
+        let clientsByService: [GlobalResetService: Set<String>]
         var clients: Set<String> {
             clientsByService.values.reduce(into: Set<String>()) { $0.formUnion($1) }
         }
@@ -88,7 +88,7 @@ struct ResetAllPermissions {
             var knownClients = scope.clients.union(previouslyKnownClients)
             progress(.clients(knownClients))
             guard !scope.clients.isEmpty else {
-                return Result(outcomes: [], failure: "There are no Device Control and Data Access settings to reset.")
+                return Result(outcomes: [], failure: "There are no recorded decisions for these permission services to reset.")
             }
 
             try await prepareProcesses(knownClients, policy: policy, progress: progress)
@@ -174,15 +174,15 @@ struct ResetAllPermissions {
     }
 
     private func readScope() async throws -> Scope {
-        var clientsByService: [PermissionService: Set<String>] = [:]
-        for service in PermissionService.allCases {
+        var clientsByService: [GlobalResetService: Set<String>] = [:]
+        for service in GlobalRepairPlan().services {
             try Task.checkCancellation()
             clientsByService[service] = try await readClients(for: service)
         }
         return Scope(clientsByService: clientsByService)
     }
 
-    private func readClients(for service: PermissionService) async throws -> Set<String> {
+    private func readClients(for service: GlobalResetService) async throws -> Set<String> {
         let command = await runner.run(SystemTool.tccutil, ["list", "-s", service.rawValue])
         guard !command.outputTruncated, !command.timedOut, command.exitCode == 0 else {
             throw ResetAllError.clientListFailed(service, command)
@@ -207,7 +207,7 @@ struct ResetAllPermissions {
     /// If the service scope changes while processes are being inspected, try
     /// again with the expanded cumulative client set instead of mutating from
     /// a stale snapshot.
-    private func verifyStableScope(service: PermissionService, knownClients: inout Set<String>,
+    private func verifyStableScope(service: GlobalResetService, knownClients: inout Set<String>,
                                    policy: RunningAppsPolicy,
                                    progress: @MainActor (Progress) -> Void) async throws {
         for _ in 0..<3 {
@@ -281,9 +281,9 @@ private enum ResetAllError: LocalizedError {
     }
 
     case clientListUnavailable
-    case clientListFailed(PermissionService, CommandResult)
-    case clientListMalformed(PermissionService, String)
-    case clientListUnstable(PermissionService)
+    case clientListFailed(GlobalResetService, CommandResult)
+    case clientListMalformed(GlobalResetService, String)
+    case clientListUnstable(GlobalResetService)
     case appsStillRunning([AffectedProcess])
     case appsNotStable
     case stopped(any Error, Progress)
@@ -291,7 +291,7 @@ private enum ResetAllError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .clientListUnavailable:
-            return "This Mac cannot provide the complete Device Control and Data Access client list. Reset All is disabled because affected apps cannot be verified."
+            return "This Mac cannot provide complete client lists for all permission services in this reset. Reset All is disabled because affected apps cannot be verified."
         case .clientListFailed(let service, let command):
             let detail: String
             if command.outputTruncated {

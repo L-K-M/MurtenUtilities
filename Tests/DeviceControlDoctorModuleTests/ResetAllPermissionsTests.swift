@@ -20,7 +20,9 @@ final class ResetAllPermissionsTests: XCTestCase {
         XCTAssertEqual(resetCalls(runner), [
             [SystemTool.tccutil, "reset", "Accessibility"],
             [SystemTool.tccutil, "reset", "PostEvent"],
-            [SystemTool.tccutil, "reset", "ListenEvent"]
+            [SystemTool.tccutil, "reset", "ListenEvent"],
+            [SystemTool.tccutil, "reset", "ScreenCapture"],
+            [SystemTool.tccutil, "reset", "AudioCapture"]
         ])
     }
 
@@ -240,7 +242,7 @@ final class ResetAllPermissionsTests: XCTestCase {
         let result = await makeReset(runner: runner, lifecycle: lifecycle).apply(policy: .allowRunning)
 
         XCTAssertTrue(result.succeeded, result.failure ?? "")
-        XCTAssertEqual(resetCalls(runner).count, 3)
+        XCTAssertEqual(resetCalls(runner).count, 5)
         XCTAssertTrue(lifecycle.terminationRequests.isEmpty,
                       "override resets without automatically quitting or force-quitting apps")
         XCTAssertFalse(lifecycle.matchedClients.isEmpty, "override must still inspect processes")
@@ -387,6 +389,126 @@ final class ResetAllPermissionsTests: XCTestCase {
         XCTAssertTrue(resetCalls(runner).isEmpty)
     }
 
+    func testInspectionIncludesScreenAndAudioOnlyClients() async throws {
+        let runner = configuredRunner()
+        runner.respond(to: [SystemTool.tccutil, "list", "-s", "ScreenCapture"],
+                       with: CommandResult(output: "com.example.ScreenRecorder", exitCode: 0))
+        runner.respond(to: [SystemTool.tccutil, "list", "-s", "AudioCapture"],
+                       with: CommandResult(output: "com.example.AudioRecorder", exitCode: 0))
+        let lifecycle = FakeApplicationLifecycle(running: [], runner: runner)
+
+        let preparation = try await makeReset(runner: runner, lifecycle: lifecycle).inspect()
+
+        XCTAssertTrue(preparation.clients.contains("com.example.ScreenRecorder"))
+        XCTAssertTrue(preparation.clients.contains("com.example.AudioRecorder"))
+        XCTAssertTrue(lifecycle.matchedClients.last?.contains("com.example.ScreenRecorder") == true)
+        XCTAssertTrue(lifecycle.matchedClients.last?.contains("com.example.AudioRecorder") == true)
+        XCTAssertTrue(resetCalls(runner).isEmpty)
+    }
+
+    func testResetAllResetsScreenAndSystemAudioServicesToo() async {
+        let runner = configuredRunner()
+        for service in ["ScreenCapture", "AudioCapture"] {
+            runner.respond(to: [SystemTool.tccutil, "list", "-s", service],
+                           with: CommandResult(output: "com.example.Recorder", exitCode: 0))
+            runner.respond(to: [SystemTool.tccutil, "reset", service],
+                           with: CommandResult(output: "", exitCode: 0))
+        }
+        let lifecycle = FakeApplicationLifecycle(running: [], runner: runner)
+
+        let result = await makeReset(runner: runner, lifecycle: lifecycle).apply()
+
+        XCTAssertTrue(result.succeeded, result.failure ?? "")
+        XCTAssertEqual(resetCalls(runner).suffix(2).map { $0 }, [
+            [SystemTool.tccutil, "reset", "ScreenCapture"],
+            [SystemTool.tccutil, "reset", "AudioCapture"]
+        ])
+        XCTAssertEqual(result.outcomes.count, 5)
+    }
+
+    func testRecordingOnlyClientsAreCheckedBeforeResetAndOverrideRemainsExplicit() async {
+        for service in [GlobalResetService.screenCapture, .audioCapture] {
+            let runner = configuredRunner()
+            for permission in PermissionService.allCases {
+                runner.respond(to: [SystemTool.tccutil, "list", "-s", permission.rawValue],
+                               with: CommandResult(output: "", exitCode: 0))
+            }
+            runner.respond(to: [SystemTool.tccutil, "list", "-s", service.rawValue],
+                           with: CommandResult(output: "com.example.RecordingOnly", exitCode: 0))
+            let process = AffectedProcess(processIdentifier: 301, name: "Recorder",
+                                          executablePath: "/fixture/recorder", canRequestTermination: true)
+            let lifecycle = FakeApplicationLifecycle(running: [process], runner: runner)
+            lifecycle.refusesTermination = true
+            let reset = makeReset(runner: runner, lifecycle: lifecycle)
+
+            let blocked = await reset.apply()
+
+            XCTAssertFalse(blocked.succeeded)
+            XCTAssertTrue(resetCalls(runner).isEmpty)
+            XCTAssertTrue(lifecycle.matchedClients.last?.contains("com.example.RecordingOnly") == true)
+            let quitRequests = lifecycle.terminationRequests.count
+
+            let acknowledged = await reset.apply(policy: .allowRunning)
+
+            XCTAssertTrue(acknowledged.succeeded, acknowledged.failure ?? "")
+            XCTAssertEqual(resetCalls(runner).count, 5)
+            XCTAssertEqual(lifecycle.terminationRequests.count, quitRequests)
+        }
+    }
+
+    func testUnverifiableRecordingClientListsBlockEvenTheOverrideBeforeAnyReset() async {
+        let failures = [
+            CommandResult(output: "Unsupported service", exitCode: 1),
+            CommandResult(output: "", exitCode: -1, timedOut: true),
+            CommandResult(output: "com.example.Recorder", exitCode: 0, outputTruncated: true)
+        ]
+        for service in [GlobalResetService.screenCapture, .audioCapture] {
+            for failure in failures {
+                let runner = configuredRunner()
+                runner.respond(to: [SystemTool.tccutil, "list", "-s", service.rawValue], with: failure)
+                let lifecycle = FakeApplicationLifecycle(running: [], runner: runner)
+
+                let result = await makeReset(runner: runner, lifecycle: lifecycle).apply(policy: .allowRunning)
+
+                XCTAssertFalse(result.succeeded)
+                XCTAssertTrue(result.failure?.contains(service.title) == true)
+                XCTAssertTrue(resetCalls(runner).isEmpty)
+                XCTAssertTrue(lifecycle.terminationRequests.isEmpty)
+            }
+        }
+    }
+
+    func testRecordingServicesRequireTheirOwnVerifiedEmptyPostconditions() async {
+        for (service, attemptedCount) in [(GlobalResetService.screenCapture, 4), (.audioCapture, 5)] {
+            let runner = configuredRunner(clearsAfterReset: false)
+            for permission in GlobalRepairPlan().services {
+                runner.respond(to: [SystemTool.tccutil, "list", "-s", permission.rawValue],
+                               with: CommandResult(output: "", exitCode: 0))
+            }
+            runner.respond(to: [SystemTool.tccutil, "list", "-s", service.rawValue],
+                           with: CommandResult(output: "com.example.Recorder", exitCode: 0))
+            let lifecycle = FakeApplicationLifecycle(running: [], runner: runner)
+
+            let result = await makeReset(runner: runner, lifecycle: lifecycle).apply()
+
+            XCTAssertFalse(result.succeeded)
+            XCTAssertEqual(resetCalls(runner).count, attemptedCount)
+            XCTAssertEqual(result.outcomes.last?.service, service)
+            XCTAssertNotNil(result.outcomes.last?.failure)
+            XCTAssertTrue(result.failure?.contains("not empty after reset") == true)
+        }
+    }
+
+    func testOnlyResettingTheThreeLegacyServicesIsNotComplete() {
+        let incomplete = ResetAllPermissions.Result(outcomes: [
+            .init(service: .accessibility, failure: nil),
+            .init(service: .postEvent, failure: nil),
+            .init(service: .listenEvent, failure: nil)
+        ], failure: nil)
+
+        XCTAssertFalse(incomplete.succeeded)
+    }
+
     private func configuredRunner(clearsAfterReset: Bool = true) -> FakeProcessRunner {
         let runner = FakeProcessRunner()
         if clearsAfterReset { runner.clearListedServiceAfterReset() }
@@ -397,7 +519,11 @@ final class ResetAllPermissionsTests: XCTestCase {
                        with: CommandResult(output: "com.example.First", exitCode: 0))
         runner.respond(to: [SystemTool.tccutil, "list", "-s", "ListenEvent"],
                        with: CommandResult(output: "com.example.Second", exitCode: 0))
-        for service in PermissionService.allCases {
+        for service in [GlobalResetService.screenCapture, .audioCapture] {
+            runner.respond(to: [SystemTool.tccutil, "list", "-s", service.rawValue],
+                           with: CommandResult(output: "", exitCode: 0))
+        }
+        for service in GlobalRepairPlan().services {
             runner.respond(to: [SystemTool.tccutil, "reset", service.rawValue], with: CommandResult(output: "", exitCode: 0))
         }
         return runner
