@@ -181,7 +181,10 @@ granted but fail functionally. `DoctorCore` is pure, `ProcessRunning` is the
 only subprocess boundary, `tccutil`/`codesign` run via fixed paths, repair is
 user-confirmed per service. The pane sidebar's always-visible All apps
 section also offers an explicitly confirmed, service-wide Reset All for
-recovery when individual repairs are insufficient.
+recovery when individual repairs are insufficient. Reset All's global-only
+roster adds ScreenCapture (Screen & System Audio Recording) and AudioCapture
+(System Audio Recording Only). These recording services are reset-only, not
+watched or functionally tested.
 
 - **Status:** available. `DoctorCore` (in `Sources/DeviceControlDoctorCore`)
   and `DeviceControlDoctorModule`; the source's tests run as
@@ -199,7 +202,9 @@ recovery when individual repairs are insufficient.
   closed-app requirement only through an explicit session-only checkbox in
   its confirmation. Its fixed-size confirmation keeps the heading, failure
   summary and Cancel/reset controls visible around a scrolling process table;
-  recorded client IDs can be reviewed in a bounded popover.
+  recorded client IDs can be reviewed in a bounded popover. A completed reset
+  links to the Privacy_ScreenCapture settings pane for the two recording
+  grants.
 - **Watcher:** every 30 minutes (120 s timeout, local), per watched app:
   `tccutil list` for its expected permissions and `codesign` against the
   identity the pane saved. One finding per app (scope: its watch-list id)
@@ -214,9 +219,15 @@ recovery when individual repairs are insufficient.
 - **Preselection:** the route selects the named app in the watch list and
   nothing else. The repair sheet opens only on the user's click, with the
   app's expected permissions checked, as in the standalone app.
-- **Reset All safety:** before clearing Accessibility, PostEvent and
-  ListenEvent decisions for every client, the module requires complete,
-  strictly parsed `tccutil list` output. It inventories every process through
+- **Reset All safety:** before clearing Accessibility, PostEvent,
+  ListenEvent, ScreenCapture and AudioCapture decisions for every client,
+  the module requires complete, strictly parsed `tccutil list` output.
+  ScreenCapture covers Screen & System Audio Recording and AudioCapture
+  covers System Audio Recording Only; both are separate TCC grants in the
+  same Privacy_ScreenCapture settings pane. The watch list, Test Pad, per-app
+  repairs and watcher checks stay on PermissionService's original three
+  device-control/input permissions, so no recording monitoring or functional
+  tests are claimed. Reset All inventories every process through
   libproc and Security.framework signing identifiers (the kernel's
   identifier for the running code when another user's executable is
   unreadable, as with Xcode's Instruments helpers). The confirmation shows a
@@ -262,7 +273,10 @@ recovery when individual repairs are insufficient.
 - **Source facts:** the cheap signal detects identity and record changes, not
   functional failure, so a suggestion can only say "verify again". Reads use
   `tccutil list`, which its AGENTS.md records as verified only on macOS 27.2;
-  elsewhere they degrade to unavailable.
+  elsewhere they degrade to unavailable. The ScreenCapture and AudioCapture
+  identifiers were checked against macOS 27.0.1's TCC exports and SDK.
+  Both recording service client lists must be readable during preparation
+  before any service reset is allowed.
 
 ### Shortcut Detective (from Shortking) — effort: medium — phase 3
 

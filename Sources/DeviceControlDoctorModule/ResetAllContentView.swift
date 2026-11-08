@@ -51,7 +51,7 @@ struct ResetAllContentView: View {
                     .font(.title2.weight(.semibold))
                 Text(session.completed
                      ? "Approve access again in System Settings. Restart any apps you left running."
-                     : "Clear every app’s Accessibility, event-generation, and input-monitoring decisions. Completed resets cannot be undone.")
+                     : "Clear every app’s Accessibility, event-generation, input-monitoring, Screen & System Audio Recording, and system-audio-only decisions. Completed resets cannot be undone.")
                     .font(.callout)
             }
         }
@@ -174,7 +174,11 @@ struct ResetAllContentView: View {
                 Text(session.activity).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                 Spacer()
                 if session.completed {
-                    Button("Open System Settings") { doctor.openSettings(.accessibility) }
+                    Menu("Open System Settings") {
+                        Button("Accessibility and Event Generation") { doctor.openResetSettings(.accessibility) }
+                        Button("Input Monitoring") { doctor.openResetSettings(.listenEvent) }
+                        Button("Screen & System Audio Recording") { doctor.openResetSettings(.screenCapture) }
+                    }
                 }
                 Button(session.completed ? "Done" : "Cancel") { dismiss() }
                     .keyboardShortcut(.cancelAction)

@@ -32,10 +32,12 @@ public final class DeviceControlDoctorProvider: SuiteModuleProvider {
     /// list file; tests pass a fake runner and a fixture file.
     init(context: ModuleContext, runner: any ProcessRunning, watchList: URL,
          home: String = FileManager.default.homeDirectoryForCurrentUser.path,
-         lifecycle: (any ApplicationLifecycleManaging)? = nil) {
+         lifecycle: (any ApplicationLifecycleManaging)? = nil,
+         settingsOpener: (@MainActor (URL) -> Void)? = nil) {
         let lifecycle = lifecycle ?? WorkspaceApplicationLifecycle()
         store = DoctorStore(defaults: context.defaults, runner: runner, storageURL: watchList,
-                            lifecycle: lifecycle, watchListChanged: context.requestRecheck)
+                            lifecycle: lifecycle, settingsOpener: settingsOpener,
+                            watchListChanged: context.requestRecheck)
         watch = WatcherRegistration(watcher: PermissionWatcher(watchList: watchList, runner: runner, home: home),
                                     rule: VerificationRule())
     }

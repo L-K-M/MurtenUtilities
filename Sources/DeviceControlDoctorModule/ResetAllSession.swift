@@ -1,4 +1,5 @@
 import Combine
+import DoctorCore
 import Foundation
 
 /// Sheet-local repair state. Closing and reopening the sheet always drops the
@@ -78,7 +79,7 @@ final class ResetAllSession: ObservableObject {
         }
         completed = succeeded
         if succeeded {
-            activity = "All three services were reset."
+            activity = "All \(GlobalRepairPlan().services.count) permission services were reset."
         } else {
             failure = doctor.notice ?? "Reset All stopped. Review the process states and try again."
             activity = "Reset stopped. Review the remaining processes, then retry."

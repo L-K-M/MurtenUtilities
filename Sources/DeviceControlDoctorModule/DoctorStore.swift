@@ -33,6 +33,7 @@ import UniformTypeIdentifiers
     private let runner: any ProcessRunning
     private let resetAll: ResetAllPermissions
     private let lifecycle: any ApplicationLifecycleManaging
+    private let settingsOpener: @MainActor (URL) -> Void
     /// Tells the suite to re-run the watcher after a change the user made,
     /// so a suggestion that change settled resolves soon.
     private let watchListChanged: @MainActor () -> Void
@@ -48,12 +49,14 @@ import UniformTypeIdentifiers
          storageURL: URL = WatchListFile.defaultURL,
          lifecycle: (any ApplicationLifecycleManaging)? = nil,
          resetTiming: ResetAllPermissions.Timing = .live,
+         settingsOpener: (@MainActor (URL) -> Void)? = nil,
          watchListChanged: @escaping @MainActor () -> Void = {}) {
         self.defaults = defaults
         self.runner = runner
         let lifecycle = lifecycle ?? WorkspaceApplicationLifecycle()
         self.lifecycle = lifecycle
         self.resetAll = ResetAllPermissions(runner: runner, lifecycle: lifecycle, timing: resetTiming)
+        self.settingsOpener = settingsOpener ?? { _ = NSWorkspace.shared.open($0) }
         self.storageURL = storageURL
         self.watchListChanged = watchListChanged
         if defaults.object(forKey: Self.monitorEnabledKey) != nil {
@@ -276,8 +279,16 @@ import UniformTypeIdentifiers
         return Array(Set(paths)).sorted()
     }
     func openSettings(_ service: PermissionService) {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(service.settingsAnchor)") {
-            NSWorkspace.shared.open(url)
+        openSettings(anchor: service.settingsAnchor)
+    }
+
+    func openResetSettings(_ service: GlobalResetService) {
+        openSettings(anchor: service.settingsAnchor)
+    }
+
+    private func openSettings(anchor: String) {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(anchor)") {
+            settingsOpener(url)
         }
     }
     func revealApp(_ app: WatchedApp) { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: app.path)]) }
@@ -421,8 +432,8 @@ import UniformTypeIdentifiers
 
         if result.succeeded {
             notice = policy == .requireClosed
-                ? "Reset all Device Control and Data Access settings. Re-enable each app in System Settings before opening it again."
-                : "Reset all Device Control and Data Access settings with the running-app override. Restart affected apps and approve access again in System Settings."
+                ? "Reset all device-control, input-monitoring, screen-recording, and system-audio recording decisions. Re-enable each app in System Settings before opening it again."
+                : "Reset all device-control, input-monitoring, screen-recording, and system-audio recording decisions with the running-app override. Restart affected apps and approve access again in System Settings."
         } else {
             let completed = succeeded.isEmpty ? "" : "\n\nCompleted before stopping: \(succeeded.joined(separator: ", "))."
             notice = (result.failure ?? "Reset All did not complete.") + completed

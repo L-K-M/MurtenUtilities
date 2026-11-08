@@ -34,6 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fresh identity check. An unchecked, session-only risk acknowledgement
   permits resetting with apps still running without bypassing inventory,
   client-scope or reset-result verification.
+- App Permission Checkup's Reset All now inventories and clears
+  ScreenCapture (Screen & System Audio Recording) and AudioCapture (System
+  Audio Recording Only) alongside Accessibility, PostEvent and ListenEvent,
+  and links to the Privacy_ScreenCapture settings pane. The watch list,
+  Test Pad, per-app repairs and watcher checks still cover only the original
+  three device-control/input permissions.
 
 - Corrected uneven or pinched limbs in Startup Manager, Local Network Access
   and CI Runner Manager. System Monitor's seated figure now faces left, with

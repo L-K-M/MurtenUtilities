@@ -19,7 +19,7 @@ final class DeviceControlDoctorProviderTests: XCTestCase {
         let context = ModuleContext(moduleID: DoctorRoute.moduleID, defaults: defaults,
                                     requestRecheck: { rechecks.count += 1 }, open: { _ in })
         return DeviceControlDoctorProvider(context: context, runner: runner, watchList: mac.watchList,
-                                           home: mac.home.path, lifecycle: lifecycle)
+                                           home: mac.home.path, lifecycle: lifecycle, settingsOpener: { _ in })
     }
 
     @MainActor
@@ -218,7 +218,7 @@ final class DeviceControlDoctorProviderTests: XCTestCase {
         let runner = FakeProcessRunner()
         runner.clearListedServiceAfterReset()
         runner.offerListing()
-        for service in PermissionService.allCases {
+        for service in GlobalRepairPlan().services {
             runner.respond(to: [SystemTool.tccutil, "list", "-s", service.rawValue],
                            with: CommandResult(output: "de.ergonis.PopChar", exitCode: 0))
             runner.respond(to: [SystemTool.tccutil, "reset", service.rawValue],
