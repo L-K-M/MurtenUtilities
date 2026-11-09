@@ -181,10 +181,10 @@ granted but fail functionally. `DoctorCore` is pure, `ProcessRunning` is the
 only subprocess boundary, `tccutil`/`codesign` run via fixed paths, repair is
 user-confirmed per service. The pane sidebar's always-visible All apps
 section also offers an explicitly confirmed, service-wide Reset All for
-recovery when individual repairs are insufficient. Reset All's global-only
-roster adds ScreenCapture (Screen & System Audio Recording) and AudioCapture
-(System Audio Recording Only). These recording services are reset-only, not
-watched or functionally tested.
+recovery when individual repairs are insufficient. Both repair scopes offer
+ScreenCapture (Screen & System Audio Recording) and AudioCapture (System
+Audio Recording Only). These recording services are reset-only, not watched
+or functionally tested by the Test Pad.
 
 - **Status:** available. `DoctorCore` (in `Sources/DeviceControlDoctorCore`)
   and `DeviceControlDoctorModule`; the source's tests run as
@@ -219,16 +219,28 @@ watched or functionally tested.
 - **Preselection:** the route selects the named app in the watch list and
   nothing else. The repair sheet opens only on the user's click, with the
   app's expected permissions checked, as in the standalone app.
+- **Per-app repair:** the bounded, scrolling confirmation offers all five
+  `ResetService` choices; recording resets are not checked by default. Every
+  command retains the validated bundle identifier, for example
+  `tccutil reset ScreenCapture com.microsoft.teams2`. Quit/reopen choices
+  remain explicit. This path does not require client listing or an empty
+  service-wide client list. Completion means `tccutil` reported successful
+  commands, not that local records disappeared or effective access changed.
+  Organization (MDM) policy may still allow or deny access and cannot be
+  overridden here. Check System Settings and test recording in the affected
+  app; the Test Pad cannot verify recording. Selected services link to their
+  Privacy settings panes, including Privacy_ScreenCapture for both recording
+  grants.
 - **Reset All safety:** before clearing Accessibility, PostEvent,
   ListenEvent, ScreenCapture and AudioCapture decisions for every client,
   the module requires complete, strictly parsed `tccutil list` output.
   ScreenCapture covers Screen & System Audio Recording and AudioCapture
   covers System Audio Recording Only; both are separate TCC grants in the
-  same Privacy_ScreenCapture settings pane. The watch list, Test Pad, per-app
-  repairs and watcher checks stay on PermissionService's original three
-  device-control/input permissions, so no recording monitoring or functional
-  tests are claimed. Reset All inventories every process through
-  libproc and Security.framework signing identifiers (the kernel's
+  same Privacy_ScreenCapture settings pane. The watch list, Test Pad and
+  watcher checks stay on PermissionService's original three
+  device-control/input permissions, separate from the broader ResetService
+  roster, so no recording monitoring or functional tests are claimed. Reset All
+  inventories every process through libproc and Security.framework signing identifiers (the kernel's
   identifier for the running code when another user's executable is
   unreadable, as with Xcode's Instruments helpers). The confirmation shows a
   live per-process table with each process's name, PID and state; exited rows
@@ -244,8 +256,12 @@ watched or functionally tested.
   without reopening the sheet. The complete cumulative client set is checked
   again around every service reset; a relaunch blocks the default mode.
   In either mode, incomplete inventory, changing scope, command failure or
-  an unverifiable postcondition stops the remaining resets. Apps are not
-  reopened automatically.
+  an unverifiable postcondition stops the remaining resets. Remaining entries
+  may be organization-managed or recreated by running apps; this is not an
+  MDM diagnosis. The failure explains that the command completed but the
+  empty postcondition was not met, and suggests explicit per-app repair.
+  There is no automatic bundle-scoped fallback or policy bypass. Apps are
+  not reopened automatically.
   Per-process Force Quit is offered only behind an explicit click and only
   after confirming the unsaved-data warning. It is unprivileged, acts only on
   the user's own processes, freshly re-verifies each PID, path and start
@@ -276,7 +292,8 @@ watched or functionally tested.
   elsewhere they degrade to unavailable. The ScreenCapture and AudioCapture
   identifiers were checked against macOS 27.0.1's TCC exports and SDK.
   Both recording service client lists must be readable during preparation
-  before any service reset is allowed.
+  before any Reset All service reset is allowed; per-app repair does not
+  require listing.
 
 ### Shortcut Detective (from Shortking) — effort: medium — phase 3
 

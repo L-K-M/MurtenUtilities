@@ -172,6 +172,20 @@ final class ResetAllPermissionsTests: XCTestCase {
         XCTAssertEqual(resetCalls(runner), [[SystemTool.tccutil, "reset", "Accessibility"]])
     }
 
+    func testRemainingEntriesExplainPossiblePolicyWithoutClaimingAManagedDiagnosis() async {
+        let runner = configuredRunner(clearsAfterReset: false)
+        let lifecycle = FakeApplicationLifecycle(running: [], runner: runner)
+
+        let result = await makeReset(runner: runner, lifecycle: lifecycle).apply()
+
+        XCTAssertFalse(result.succeeded)
+        XCTAssertTrue(result.failure?.contains("MDM") == true)
+        XCTAssertTrue(result.failure?.contains("per-app") == true)
+        XCTAssertTrue(result.failure?.contains("may") == true, "remaining records alone are not proof of MDM")
+        XCTAssertEqual(resetCalls(runner).count, 1, "do not silently retry narrower commands")
+        XCTAssertNotNil(result.outcomes.first?.failure)
+    }
+
     func testCancellationBeforeInventoryRunsNoReset() async {
         let runner = configuredRunner()
         runner.cancelCallingTask()
@@ -427,7 +441,7 @@ final class ResetAllPermissionsTests: XCTestCase {
     }
 
     func testRecordingOnlyClientsAreCheckedBeforeResetAndOverrideRemainsExplicit() async {
-        for service in [GlobalResetService.screenCapture, .audioCapture] {
+        for service in [ResetService.screenCapture, .audioCapture] {
             let runner = configuredRunner()
             for permission in PermissionService.allCases {
                 runner.respond(to: [SystemTool.tccutil, "list", "-s", permission.rawValue],
@@ -462,7 +476,7 @@ final class ResetAllPermissionsTests: XCTestCase {
             CommandResult(output: "", exitCode: -1, timedOut: true),
             CommandResult(output: "com.example.Recorder", exitCode: 0, outputTruncated: true)
         ]
-        for service in [GlobalResetService.screenCapture, .audioCapture] {
+        for service in [ResetService.screenCapture, .audioCapture] {
             for failure in failures {
                 let runner = configuredRunner()
                 runner.respond(to: [SystemTool.tccutil, "list", "-s", service.rawValue], with: failure)
@@ -479,7 +493,7 @@ final class ResetAllPermissionsTests: XCTestCase {
     }
 
     func testRecordingServicesRequireTheirOwnVerifiedEmptyPostconditions() async {
-        for (service, attemptedCount) in [(GlobalResetService.screenCapture, 4), (.audioCapture, 5)] {
+        for (service, attemptedCount) in [(ResetService.screenCapture, 4), (.audioCapture, 5)] {
             let runner = configuredRunner(clearsAfterReset: false)
             for permission in GlobalRepairPlan().services {
                 runner.respond(to: [SystemTool.tccutil, "list", "-s", permission.rawValue],
@@ -519,7 +533,7 @@ final class ResetAllPermissionsTests: XCTestCase {
                        with: CommandResult(output: "com.example.First", exitCode: 0))
         runner.respond(to: [SystemTool.tccutil, "list", "-s", "ListenEvent"],
                        with: CommandResult(output: "com.example.Second", exitCode: 0))
-        for service in [GlobalResetService.screenCapture, .audioCapture] {
+        for service in [ResetService.screenCapture, .audioCapture] {
             runner.respond(to: [SystemTool.tccutil, "list", "-s", service.rawValue],
                            with: CommandResult(output: "", exitCode: 0))
         }

@@ -6,9 +6,29 @@ final class RepairPlanTests: XCTestCase {
         let plan = try RepairPlan(bundleIdentifier: "com.example.Helper", services: [.postEvent, .accessibility])
         XCTAssertEqual(plan.arguments, [["reset", "Accessibility", "com.example.Helper"], ["reset", "PostEvent", "com.example.Helper"]])
     }
+    func testRecordingPlanTargetsTeamsWithBothSelectedServices() throws {
+        let plan = try RepairPlan(bundleIdentifier: "com.microsoft.teams2", services: [.audioCapture, .screenCapture])
+
+        XCTAssertEqual(plan.arguments, [
+            ["reset", "ScreenCapture", "com.microsoft.teams2"],
+            ["reset", "AudioCapture", "com.microsoft.teams2"]
+        ])
+    }
+
+    func testEveryResettableServiceCanBeScopedToOneBundle() throws {
+        for service in ResetService.allCases {
+            let plan = try RepairPlan(bundleIdentifier: "com.microsoft.teams2", services: [service])
+            XCTAssertEqual(plan.arguments, [["reset", service.rawValue, "com.microsoft.teams2"]])
+        }
+    }
+
+    func testWatchListDefaultsDoNotSelectRecordingResets() {
+        XCTAssertEqual(PermissionService.allCases.map { ResetService($0) }, [.accessibility, .postEvent, .listenEvent])
+    }
+
     func testNoBroadOrPathResetsCanBeConstructed() {
         for id in ["", "All", "/Applications/Test.app/Contents/MacOS/Test", "com.example.App --all", "com.example.App\n", "-com.example.App"] {
-            XCTAssertThrowsError(try RepairPlan(bundleIdentifier: id, services: [.accessibility]), id)
+            XCTAssertThrowsError(try RepairPlan(bundleIdentifier: id, services: Set(ResetService.allCases)), id)
         }
         XCTAssertThrowsError(try RepairPlan(bundleIdentifier: "com.example.App", services: []))
     }
@@ -34,10 +54,10 @@ final class RepairPlanTests: XCTestCase {
     }
 
     func testRecordingServicesUseTheirCanonicalNamesAndSharedSettingsPane() {
-        XCTAssertEqual(GlobalResetService.screenCapture.rawValue, "ScreenCapture")
-        XCTAssertEqual(GlobalResetService.audioCapture.rawValue, "AudioCapture")
-        XCTAssertEqual(GlobalResetService.screenCapture.settingsAnchor, "Privacy_ScreenCapture")
-        XCTAssertEqual(GlobalResetService.audioCapture.settingsAnchor, "Privacy_ScreenCapture")
+        XCTAssertEqual(ResetService.screenCapture.rawValue, "ScreenCapture")
+        XCTAssertEqual(ResetService.audioCapture.rawValue, "AudioCapture")
+        XCTAssertEqual(ResetService.screenCapture.settingsAnchor, "Privacy_ScreenCapture")
+        XCTAssertEqual(ResetService.audioCapture.settingsAnchor, "Privacy_ScreenCapture")
     }
 
     func testUnknownIsNotTreatedAsDenied() {

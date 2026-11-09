@@ -83,6 +83,26 @@ final class ResetAllLayoutTests: XCTestCase {
         XCTAssertFalse(runner.ranReset)
     }
 
+    func testPerAppRecordingRepairScrollsWithoutGrowingOrResetting() async throws {
+        let mac = try FixtureMac()
+        defer { mac.remove() }
+        let runner = FakeProcessRunner()
+        let store = makeStore(mac: mac, runner: runner, lifecycle: LayoutLifecycle(processCount: 0))
+        let app = WatchedApp(name: "Teams", bundleID: "com.microsoft.teams2",
+                             path: "/Applications/" + String(repeating: "Long folder/", count: 250) + "Teams.app", version: "1")
+        let probe = LayoutProbe(root: RepairView(app: app).environmentObject(store),
+                                size: NSSize(width: 620, height: 620))
+        defer { probe.close() }
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        let size = probe.fittingSize()
+        XCTAssertLessThanOrEqual(size.height, 620)
+        XCTAssertLessThanOrEqual(size.width, 620)
+        try probe.scrollReviewToBottom()
+        XCTAssertEqual(probe.fittingSize(), size)
+        XCTAssertTrue(runner.calls.isEmpty, "opening the dialog must neither query nor reset permissions")
+    }
+
     private func makeStore(mac: FixtureMac, runner: FakeProcessRunner,
                            lifecycle: LayoutLifecycle) -> DoctorStore {
         let defaults = UserDefaults(suiteName: "ResetAllLayoutTests.\(UUID().uuidString)")!

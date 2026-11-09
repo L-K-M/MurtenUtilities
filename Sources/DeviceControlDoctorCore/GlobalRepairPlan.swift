@@ -4,7 +4,7 @@ import Foundation
 /// from `RepairPlan` prevents an ordinary per-app repair from accidentally
 /// dropping its bundle-identifier scope.
 public struct GlobalRepairPlan: Sendable {
-    public let services = GlobalResetService.allCases
+    public let services = ResetService.allCases
 
     public init() {}
 
