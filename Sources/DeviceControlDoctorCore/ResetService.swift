@@ -1,14 +1,23 @@
 import Foundation
 
-/// Service-wide recovery has a broader scope than the keyboard/input
+/// Resettable permissions have a broader scope than the keyboard/input
 /// permissions managed by the watch list and its functional Test Pad.
-public enum GlobalResetService: String, CaseIterable, Identifiable, Sendable {
+/// Both scoped and service-wide repair plans use this roster.
+public enum ResetService: String, CaseIterable, Identifiable, Sendable {
     case accessibility = "Accessibility"
     case postEvent = "PostEvent"
     case listenEvent = "ListenEvent"
     case screenCapture = "ScreenCapture"
     /// System-audio-only access is separate from screen capture and microphone access.
     case audioCapture = "AudioCapture"
+
+    public init(_ permission: PermissionService) {
+        switch permission {
+        case .accessibility: self = .accessibility
+        case .postEvent: self = .postEvent
+        case .listenEvent: self = .listenEvent
+        }
+    }
 
     public var id: String { rawValue }
 

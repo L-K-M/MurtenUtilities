@@ -38,8 +38,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ScreenCapture (Screen & System Audio Recording) and AudioCapture (System
   Audio Recording Only) alongside Accessibility, PostEvent and ListenEvent,
   and links to the Privacy_ScreenCapture settings pane. The watch list,
-  Test Pad, per-app repairs and watcher checks still cover only the original
-  three device-control/input permissions.
+  Test Pad and watcher checks still cover only the original three
+  device-control/input permissions.
+- App Permission Checkup's per-app Repair dialog now offers ScreenCapture
+  and AudioCapture with explicit bundle-scoped commands, including
+  `tccutil reset ScreenCapture com.microsoft.teams2`. Its bounded review
+  scrolls while confirmation controls stay visible. Results distinguish
+  command success from unverified effective access and explain that MDM
+  policy cannot be overridden. Reset All still stops if entries remain,
+  explains possible policy or app recreation, and suggests per-app repair
+  without silently retrying narrower commands.
 
 - Corrected uneven or pinched limbs in Startup Manager, Local Network Access
   and CI Runner Manager. System Monitor's seated figure now faces left, with

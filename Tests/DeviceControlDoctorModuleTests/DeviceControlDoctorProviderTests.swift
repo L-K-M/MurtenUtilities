@@ -145,6 +145,82 @@ final class DeviceControlDoctorProviderTests: XCTestCase {
     }
 
     @MainActor
+    func testScopedRecordingResetReportsCommandSuccessNotEffectiveAccess() async throws {
+        let mac = try FixtureMac()
+        defer { mac.remove() }
+        let app = try mac.installApp("Teams", bundleID: "com.microsoft.teams2")
+        try mac.saveWatchList([app])
+        let runner = FakeProcessRunner()
+        runner.withholdListing()
+        runner.respond(to: [SystemTool.tccutil, "reset", "ScreenCapture", app.bundleID],
+                       with: CommandResult(output: "Successfully reset", exitCode: 0))
+        let defaults = UserDefaults(suiteName: "ScopedRecordingResetTests.\(UUID().uuidString)")!
+        var openedURLs: [URL] = []
+        var rechecks = 0
+        let store = DoctorStore(defaults: defaults, runner: runner, storageURL: mac.watchList,
+                                settingsOpener: { openedURLs.append($0) }, watchListChanged: { rechecks += 1 })
+        store.apps[0].functionalTest = .init(outcome: .passed, note: "Worked", appPath: app.path, appVersion: app.version)
+
+        // The fixture uses Teams' real identifier. Never quit or launch the
+        // live app; the only reset command runs through the fake boundary.
+        let result = await store.reset(appID: app.id, services: [.screenCapture], quitFirst: false, reopen: false)
+
+        XCTAssertTrue(result, "a scoped reset does not require an empty service-wide client list")
+        XCTAssertEqual(runner.calls.first, [SystemTool.tccutil, "reset", "ScreenCapture", app.bundleID])
+        XCTAssertEqual(runner.calls.filter { $0.dropFirst().first == "reset" }, [
+            [SystemTool.tccutil, "reset", "ScreenCapture", app.bundleID]
+        ])
+        XCTAssertEqual(openedURLs.map(\.absoluteString), ["x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"])
+        XCTAssertTrue(store.notice?.contains("reported successful reset commands") == true)
+        XCTAssertTrue(store.notice?.contains("Effective access has not been verified") == true)
+        XCTAssertTrue(store.notice?.contains("MDM") == true)
+        XCTAssertFalse(store.events.contains { $0.message.contains("User approval is required again") })
+        XCTAssertNil(store.apps[0].functionalTest)
+        XCTAssertEqual(store.apps[0].expectedServices, app.expectedServices)
+        XCTAssertEqual(rechecks, 1)
+        XCTAssertFalse(store.isRepairing)
+    }
+
+    @MainActor
+    func testPartialRecordingResetDoesNotReportAllCommandsCompleted() async throws {
+        let mac = try FixtureMac()
+        defer { mac.remove() }
+        let app = try mac.installApp("Teams", bundleID: "com.microsoft.teams2")
+        try mac.saveWatchList([app])
+        let runner = FakeProcessRunner()
+        runner.respond(to: [SystemTool.tccutil, "reset", "ScreenCapture", app.bundleID],
+                       with: CommandResult(output: "", exitCode: 0))
+        runner.respond(to: [SystemTool.tccutil, "reset", "AudioCapture", app.bundleID],
+                       with: CommandResult(output: "Reset denied", exitCode: 1))
+        let provider = makeProvider(mac: mac, runner: runner)
+
+        let result = await provider.store.reset(appID: app.id, services: [.screenCapture, .audioCapture], quitFirst: false, reopen: false)
+
+        XCTAssertFalse(result)
+        XCTAssertTrue(provider.store.notice?.contains("Screen & System Audio Recording") == true)
+        XCTAssertTrue(provider.store.notice?.contains("System Audio Recording Only: Reset denied") == true)
+        XCTAssertTrue(provider.store.notice?.contains("MDM") == true)
+        XCTAssertFalse(provider.store.isRepairing)
+    }
+
+    @MainActor
+    func testScopedRecordingResetRevalidatesTheAppBeforeWriting() async throws {
+        let mac = try FixtureMac()
+        defer { mac.remove() }
+        let app = try mac.installApp("Teams", bundleID: "com.microsoft.teams2")
+        try mac.saveWatchList([app])
+        let runner = FakeProcessRunner()
+        let provider = makeProvider(mac: mac, runner: runner)
+        try mac.writeInfo(bundleID: "com.example.Replaced", name: "Replacement", at: URL(fileURLWithPath: app.path))
+
+        let result = await provider.store.reset(appID: app.id, services: [.screenCapture], quitFirst: false, reopen: false)
+
+        XCTAssertFalse(result)
+        XCTAssertFalse(runner.ranReset)
+        XCTAssertTrue(provider.store.notice?.contains("bundle identifier changed") == true)
+    }
+
+    @MainActor
     func testResetAllClearsFunctionalEvidenceAndRequestsARecheck() async throws {
         let mac = try FixtureMac()
         defer { mac.remove() }

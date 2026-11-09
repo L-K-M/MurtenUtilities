@@ -282,7 +282,7 @@ import UniformTypeIdentifiers
         openSettings(anchor: service.settingsAnchor)
     }
 
-    func openResetSettings(_ service: GlobalResetService) {
+    func openResetSettings(_ service: ResetService) {
         openSettings(anchor: service.settingsAnchor)
     }
 
@@ -324,7 +324,9 @@ import UniformTypeIdentifiers
     }
 
     /// Called only after the repair dialog's explicit confirmation. Never run by monitoring.
-    func reset(appID: UUID, services: Set<PermissionService>, quitFirst: Bool, reopen: Bool) async -> Bool {
+    /// Success means the commands reported success, not that effective access
+    /// changed: organization policy can remain in force after a local reset.
+    func reset(appID: UUID, services: Set<ResetService>, quitFirst: Bool, reopen: Bool) async -> Bool {
         guard !isChecking, !isRepairing, let app = apps.first(where: { $0.id == appID }) else { return false }
         let plan: RepairPlan
         do { plan = try RepairPlan(bundleIdentifier: app.bundleID, services: services) }
@@ -354,7 +356,7 @@ import UniformTypeIdentifiers
                 addEvent(app, "Reset did not report success for \(service.title). \(detail)")
             } else {
                 succeeded.append(service.title)
-                addEvent(app, "Reset \(service.title) for \(app.bundleID). User approval is required again.")
+                addEvent(app, "tccutil reported a successful \(service.title) reset command for \(app.bundleID). Effective access is unverified; organization (MDM) policy may still apply.")
             }
         }
         if let index = apps.firstIndex(where: { $0.id == appID }) { apps[index].functionalTest = nil }
@@ -363,12 +365,12 @@ import UniformTypeIdentifiers
         isRepairing = false
         if !succeeded.isEmpty {
             if reopen { openApp(app) }
-            openSettings(plan.services.first ?? .accessibility)
+            openResetSettings(plan.services.first ?? .accessibility)
         }
-        notice = (succeeded.isEmpty ? "No reset reported success." : "Reset: \(succeeded.joined(separator: ", ")). Enable \(app.name) again in System Settings, then run a functional test.")
+        notice = (succeeded.isEmpty ? "No reset command reported success." : "tccutil reported successful reset commands for: \(succeeded.joined(separator: ", ")). Effective access has not been verified. Organization (MDM) policy may still allow or deny access. Check System Settings and test the affected feature in \(app.name).")
             + (failures.isEmpty ? "" : "\n\n" + failures.joined(separator: "\n"))
         refresh(appID: appID)
-        return failures.isEmpty
+        return failures.isEmpty && succeeded.count == plan.services.count
     }
 
     /// Reads the complete service-wide client scope for the Reset All sheet.

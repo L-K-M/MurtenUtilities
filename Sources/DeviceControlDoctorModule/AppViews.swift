@@ -559,11 +559,11 @@ private struct AddAppsView: View {
     }
 }
 
-private struct RepairView: View {
+struct RepairView: View {
     @EnvironmentObject private var doctor: DoctorStore
     @Environment(\.dismiss) private var dismiss
     let app: WatchedApp
-    @State private var services: Set<PermissionService>
+    @State private var services: Set<ResetService>
     @State private var quitFirst = true
     @State private var reopen = true
     @State private var completed = false
@@ -571,59 +571,70 @@ private struct RepairView: View {
 
     init(app: WatchedApp) {
         self.app = app
-        _services = State(initialValue: Set(app.expectedServices))
+        _services = State(initialValue: Set(app.expectedServices.map { ResetService($0) }))
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 19) {
-            HStack(spacing: 12) {
-                Image(systemName: completed ? "checkmark.circle" : "wrench.and.screwdriver")
-                    .font(.system(size: 28, weight: .light)).foregroundStyle(DoctorStyle.accent)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(completed ? "Reset completed" : "Reset selected permissions")
-                        .font(.title2.weight(.semibold))
-                    Text(app.name).font(.headline)
-                }
-            }
-            Text(app.bundleID).font(.caption.monospaced()).textSelection(.enabled)
-            Text(app.path).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
-            if completed {
-                Text("Approve access again in System Settings, then use the Test Pad to verify the affected capability. A completed reset does not mean access has been restored.")
-                    .font(.callout)
-                HStack {
-                    Button("Open Device Control Settings") { doctor.openSettings(.accessibility) }
-                    if services.contains(.listenEvent) {
-                        Button("Input Monitoring") { doctor.openSettings(.listenEvent) }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 19) {
+                    HStack(spacing: 12) {
+                        Image(systemName: completed ? "checkmark.circle" : "wrench.and.screwdriver")
+                            .font(.system(size: 28, weight: .light)).foregroundStyle(DoctorStyle.accent)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(completed ? "Reset commands completed" : "Reset selected permissions")
+                                .font(.title2.weight(.semibold))
+                            Text(app.name).font(.headline)
+                        }
                     }
-                }
-            } else {
-                Text("This clears the selected approval decisions for this bundle identifier, including other installed copies. You must grant access again in System Settings.")
-                    .font(.callout)
-                VStack(alignment: .leading, spacing: 12) {
-                    ForEach(PermissionService.allCases) { service in
-                        Toggle(isOn: Binding(
-                            get: { services.contains(service) },
-                            set: { if $0 { services.insert(service) } else { services.remove(service) } }
-                        )) {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(service.title).font(.callout.weight(.medium))
-                                Text(service.rawValue).font(.caption.monospaced()).foregroundStyle(.secondary)
+                    Text(app.bundleID).font(.caption.monospaced()).textSelection(.enabled)
+                    Text(app.path).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                    if completed {
+                        Text("tccutil reported success for the selected reset commands. Effective access has not been verified. Organization (MDM) policy may still allow or deny access.")
+                            .font(.callout)
+                        if services.contains(.screenCapture) || services.contains(.audioCapture) {
+                            Text("Check System Settings and test recording in this app. The Test Pad cannot verify screen or system-audio recording.")
+                                .font(.callout)
+                        } else {
+                            Text("Check System Settings, then use the Test Pad to verify the affected keyboard or input capability.")
+                                .font(.callout)
+                        }
+                        Menu("Open Privacy Settings") {
+                            ForEach(ResetService.allCases.filter { services.contains($0) }) { service in
+                                Button(service.title) { doctor.openResetSettings(service) }
                             }
                         }
-                        .toggleStyle(.checkbox)
+                    } else {
+                        Text("This asks tccutil to reset the selected local approval decisions for this bundle identifier, including other installed copies. You may need to approve access again in System Settings. Organization (MDM) policy cannot be changed here.")
+                            .font(.callout)
+                        VStack(alignment: .leading, spacing: 12) {
+                            ForEach(ResetService.allCases) { service in
+                                Toggle(isOn: Binding(
+                                    get: { services.contains(service) },
+                                    set: { if $0 { services.insert(service) } else { services.remove(service) } }
+                                )) {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(service.title).font(.callout.weight(.medium))
+                                        Text(service.rawValue).font(.caption.monospaced()).foregroundStyle(.secondary)
+                                    }
+                                }
+                                .toggleStyle(.checkbox)
+                            }
+                        }
+                        .padding(16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 10))
+                        .disabled(doctor.isRepairing)
+                        Toggle("Quit this app before resetting", isOn: $quitFirst).toggleStyle(.checkbox).disabled(doctor.isRepairing)
+                        Toggle("Reopen this app afterwards", isOn: $reopen).toggleStyle(.checkbox).disabled(doctor.isRepairing)
+                        Text("Quitting is a normal quit request. If the app remains open, the reset will stop so you can finish any work first.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        if attempted, let notice = doctor.notice {
+                            Text(notice).font(.callout).foregroundStyle(DoctorStyle.warning).textSelection(.enabled)
+                        }
                     }
                 }
-                .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 10))
-                .disabled(doctor.isRepairing)
-                Toggle("Quit this app before resetting", isOn: $quitFirst).toggleStyle(.checkbox).disabled(doctor.isRepairing)
-                Toggle("Reopen this app afterwards", isOn: $reopen).toggleStyle(.checkbox).disabled(doctor.isRepairing)
-                Text("Quitting is a normal quit request. If the app remains open, the reset will stop so you can finish any work first.")
-                    .font(.caption).foregroundStyle(.secondary)
-                if attempted, let notice = doctor.notice {
-                    Text(notice).font(.callout).foregroundStyle(DoctorStyle.warning).textSelection(.enabled)
-                }
             }
             Divider()
             HStack {
@@ -646,7 +657,7 @@ private struct RepairView: View {
             }
         }
         .padding(26)
-        .frame(width: 570)
+        .frame(width: 620, height: 620)
         .interactiveDismissDisabled(doctor.isRepairing)
         .tint(DoctorStyle.accent)
     }

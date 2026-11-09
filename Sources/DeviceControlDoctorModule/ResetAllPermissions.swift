@@ -15,8 +15,8 @@ struct ResetAllPermissions {
         case clients(Set<String>)
         case processes([AffectedProcess])
         case quitRequested([AffectedProcess])
-        case resetting(GlobalResetService)
-        case verifying(GlobalResetService)
+        case resetting(ResetService)
+        case verifying(ResetService)
     }
 
     struct Preparation: Equatable, Sendable {
@@ -25,7 +25,7 @@ struct ResetAllPermissions {
     }
 
     struct Outcome: Equatable, Sendable {
-        let service: GlobalResetService
+        let service: ResetService
         let failure: String?
     }
 
@@ -49,7 +49,7 @@ struct ResetAllPermissions {
     }
 
     private struct Scope {
-        let clientsByService: [GlobalResetService: Set<String>]
+        let clientsByService: [ResetService: Set<String>]
         var clients: Set<String> {
             clientsByService.values.reduce(into: Set<String>()) { $0.formUnion($1) }
         }
@@ -145,7 +145,7 @@ struct ResetAllPermissions {
                 let remaining = try await readClients(for: service)
                 guard remaining.isEmpty else {
                     knownClients.formUnion(remaining)
-                    let failure = "The client list was not empty after reset. No further permissions were reset."
+                    let failure = "The reset command completed, but the client list was not empty after reset. Entries may remain because of organization (MDM) policy or running apps recreating them. Try an explicit per-app repair for a specific app; it cannot override MDM policy. No further permissions were reset."
                     outcomes[outcomes.count - 1] = Outcome(service: service, failure: failure)
                     return Result(outcomes: outcomes, failure: "\(service.title): \(failure)")
                 }
@@ -174,7 +174,7 @@ struct ResetAllPermissions {
     }
 
     private func readScope() async throws -> Scope {
-        var clientsByService: [GlobalResetService: Set<String>] = [:]
+        var clientsByService: [ResetService: Set<String>] = [:]
         for service in GlobalRepairPlan().services {
             try Task.checkCancellation()
             clientsByService[service] = try await readClients(for: service)
@@ -182,7 +182,7 @@ struct ResetAllPermissions {
         return Scope(clientsByService: clientsByService)
     }
 
-    private func readClients(for service: GlobalResetService) async throws -> Set<String> {
+    private func readClients(for service: ResetService) async throws -> Set<String> {
         let command = await runner.run(SystemTool.tccutil, ["list", "-s", service.rawValue])
         guard !command.outputTruncated, !command.timedOut, command.exitCode == 0 else {
             throw ResetAllError.clientListFailed(service, command)
@@ -207,7 +207,7 @@ struct ResetAllPermissions {
     /// If the service scope changes while processes are being inspected, try
     /// again with the expanded cumulative client set instead of mutating from
     /// a stale snapshot.
-    private func verifyStableScope(service: GlobalResetService, knownClients: inout Set<String>,
+    private func verifyStableScope(service: ResetService, knownClients: inout Set<String>,
                                    policy: RunningAppsPolicy,
                                    progress: @MainActor (Progress) -> Void) async throws {
         for _ in 0..<3 {
@@ -281,9 +281,9 @@ private enum ResetAllError: LocalizedError {
     }
 
     case clientListUnavailable
-    case clientListFailed(GlobalResetService, CommandResult)
-    case clientListMalformed(GlobalResetService, String)
-    case clientListUnstable(GlobalResetService)
+    case clientListFailed(ResetService, CommandResult)
+    case clientListMalformed(ResetService, String)
+    case clientListUnstable(ResetService)
     case appsStillRunning([AffectedProcess])
     case appsNotStable
     case stopped(any Error, Progress)
