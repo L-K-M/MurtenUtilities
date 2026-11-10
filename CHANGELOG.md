@@ -92,6 +92,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Developer Cleanup now applies every completed measurement before marking a
   scan ready.
 - Startup Manager serializes journal access across concurrent tasks.
+- Developer Cleanup: Stop now stops an administrator delete. The rest of a
+  batch of system-area items or local snapshots used to be deleted anyway;
+  now nothing further is deleted once the item in progress is done.
 
 ## [0.1.0] - 2026-11-01
 

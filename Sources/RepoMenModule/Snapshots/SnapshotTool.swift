@@ -237,8 +237,9 @@ enum SnapshotTool {
             .joined(separator: " ")
     }
 
-    /// One admin prompt for a whole batch. Per date: `OK` (deleted) or `ERR`
-    /// (tmutil failed even as root); records are `STATUS\tDATE`, NUL-separated and
+    /// One admin prompt for a whole batch. Per date: `OK` (deleted), `ERR`
+    /// (tmutil failed even as root) or `STOP` (the run was stopped first; see
+    /// `PrivilegedRunner.keepGoingTest`); records are `STATUS\tDATE`, NUL-separated and
     /// base64-wrapped exactly like the SystemAreas scripts. tmutil's own chatter is
     /// discarded — the verdict per date is what matters.
     static func privilegedDeleteScript(for snapshots: [LocalSnapshot]) -> String {
@@ -246,7 +247,8 @@ enum SnapshotTool {
         var lines = ["("]
         for snapshot in snapshots {
             let q = PrivilegedRunner.shellQuote(snapshot.dateToken)
-            lines.append("if \(tool) \(deleteVerb) \(q) >/dev/null 2>&1;"
+            lines.append("if ! \(PrivilegedRunner.keepGoingTest); then printf 'STOP\\t%s\\0' \(q);"
+                + " elif \(tool) \(deleteVerb) \(q) >/dev/null 2>&1;"
                 + " then printf 'OK\\t%s\\0' \(q); else printf 'ERR\\t%s\\0' \(q); fi")
         }
         lines.append(") | /usr/bin/base64")
@@ -340,6 +342,7 @@ enum SnapshotTool {
                 switch statuses[snapshot.dateToken] {
                 case "OK": failure = nil
                 case "ERR": failure = "tmutil could not delete it, even as administrator"
+                case "STOP": failure = "stopped before this snapshot was reached"
                 default: failure = "the privileged helper reported no result"
                 }
                 if let failure {
@@ -350,10 +353,15 @@ enum SnapshotTool {
                 return Outcome(snapshot: snapshot, failure: failure)
             }
         } catch {
-            let reason = (error as? PrivilegedRunner.Failure) == .cancelled
-                ? "administrator authorization was cancelled"
-                : error.localizedDescription
-            Log.snapshots.warning("privileged delete did not run: \(reason, privacy: .public)")
+            let reason: String
+            if (error as? PrivilegedRunner.Failure) == .cancelled {
+                reason = "administrator authorization was cancelled"
+            } else if Task.isCancelled {
+                reason = "stopped before the helper reported; refresh to see what was deleted"
+            } else {
+                reason = error.localizedDescription
+            }
+            Log.snapshots.warning("privileged delete did not finish: \(reason, privacy: .public)")
             return snapshots.map { Outcome(snapshot: $0, failure: reason) }
         }
     }

@@ -163,6 +163,23 @@ final class SnapshotToolTests: XCTestCase {
         XCTAssertFalse(script.contains("rm "), "the script only ever calls tmutil")
     }
 
+    func testPrivilegedDeleteScriptChecksForAStopBeforeEachSnapshot() {
+        let script = SnapshotTool.privilegedDeleteScript(for: [older, newer])
+        let guarded = "if ! \(PrivilegedRunner.keepGoingTest); then printf 'STOP\\t%s\\0' "
+        XCTAssertTrue(script.contains(guarded + "'2026-09-06-091500'; elif '/usr/bin/tmutil'"))
+        XCTAssertTrue(script.contains(guarded + "'2026-09-07-101010'; elif '/usr/bin/tmutil'"))
+    }
+
+    func testSnapshotsSkippedByAStopAreNotReportedAsDeleted() async {
+        let outcomes = await SnapshotTool.delete([older, newer], runner: { _, _ in
+            self.output(1, stderr: "requires root")
+        }, adminRunner: { _ in
+            self.payload([("OK", self.older.dateToken), ("STOP", self.newer.dateToken)])
+        })
+        XCTAssertNil(outcomes[0].failure)
+        XCTAssertEqual(outcomes[1].failure, "stopped before this snapshot was reached")
+    }
+
     // MARK: Privilege-failure heuristic
 
     func testPrivilegeFailureHeuristicOnlyFiresOnFailedRunsThatMentionPrivileges() {
