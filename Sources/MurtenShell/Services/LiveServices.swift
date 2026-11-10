@@ -97,7 +97,7 @@ final class UserNotificationNotifier: NSObject, SuggestionNotifying, UNUserNotif
         content.userInfo = [Self.routeKey: suggestion.route.url.absoluteString]
 
         // Same key → replaces the earlier notification instead of stacking.
-        let request = UNNotificationRequest(identifier: suggestion.key.description, content: content, trigger: nil)
+        let request = UNNotificationRequest(identifier: Self.identifier(for: suggestion.key), content: content, trigger: nil)
         center.add(request)
     }
 
@@ -109,6 +109,15 @@ final class UserNotificationNotifier: NSObject, SuggestionNotifying, UNUserNotif
                 .map(\.request.identifier)
             center.removeDeliveredNotifications(withIdentifiers: identifiers)
         }
+    }
+
+    func withdraw(suggestions keys: Set<SuggestionKey>) {
+        guard let center, !keys.isEmpty else { return }
+        center.removeDeliveredNotifications(withIdentifiers: keys.map(Self.identifier(for:)))
+    }
+
+    private static func identifier(for key: SuggestionKey) -> String {
+        key.description
     }
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,

@@ -94,6 +94,7 @@ final class RecordingNotifier: SuggestionNotifying {
     var authorization: NotificationAuthorization = .granted
     private(set) var delivered: [Suggestion] = []
     private(set) var withdrawn: [Set<String>] = []
+    private(set) var withdrawnSuggestions: [Set<SuggestionKey>] = []
 
     func requestAuthorization() async -> NotificationAuthorization { authorization }
 
@@ -103,6 +104,10 @@ final class RecordingNotifier: SuggestionNotifying {
 
     func withdraw(modules moduleIDs: Set<String>) {
         withdrawn.append(moduleIDs)
+    }
+
+    func withdraw(suggestions keys: Set<SuggestionKey>) {
+        withdrawnSuggestions.append(keys)
     }
 }
 
@@ -131,26 +136,70 @@ final class FakeWake: SystemWakeObserving {
     }
 }
 
-struct FakeUpdates: SuiteUpdateChecking {
-    var release = SuiteRelease(version: ReleaseVersion("9.9.9")!, pageURL: URL(string: "https://example.com/release")!)
+/// Answers with a fixed release, or fails while `failure` is set, and
+/// counts how often it was asked.
+final class FakeUpdates: SuiteUpdateChecking, @unchecked Sendable {
+    struct Offline: LocalizedError {
+        var errorDescription: String? { "The Internet connection appears to be offline." }
+    }
 
-    func latestRelease() async throws -> SuiteRelease { release }
+    private let lock = NSLock()
+    private var answer = SuiteRelease(version: ReleaseVersion("9.9.9")!,
+                                      pageURL: URL(string: "https://example.com/release")!)
+    private var failing = false
+    private var asked = 0
+
+    var release: SuiteRelease {
+        get { lock.withLock { answer } }
+        set { lock.withLock { answer = newValue } }
+    }
+
+    var isFailing: Bool {
+        get { lock.withLock { failing } }
+        set { lock.withLock { failing = newValue } }
+    }
+
+    var requests: Int { lock.withLock { asked } }
+
+    func latestRelease() async throws -> SuiteRelease {
+        try lock.withLock {
+            asked += 1
+            if failing { throw Offline() }
+            return answer
+        }
+    }
 }
 
 // MARK: - Module
 
 let fakeModuleID = "dockvac"
 
-/// Reports a fixed amount of reclaimable space, for one scope.
+/// The reclaimable space the fake watcher reports; a test changes it to
+/// let the condition resolve.
+final class ReclaimableSpace: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: Int64
+
+    init(_ bytes: Int64) {
+        stored = bytes
+    }
+
+    var bytes: Int64 {
+        get { lock.withLock { stored } }
+        set { lock.withLock { stored = newValue } }
+    }
+}
+
+/// Reports the current amount of reclaimable space, for one scope.
 struct FakeWatcher: Watcher {
     let moduleID = fakeModuleID
     let cadence = WatchCadence(interval: 30 * 60)
     let clock: TestClock
-    let bytes: Int64
+    let space: ReclaimableSpace
 
     func observe() async -> WatchObservation {
         let finding = Finding(moduleID: moduleID, condition: "reclaimable", observedAt: clock.now(),
-                              evidence: ["bytes": .bytes(bytes)])
+                              evidence: ["bytes": .bytes(space.bytes)])
         return .complete(moduleID: moduleID, at: clock.now(), findings: [finding])
     }
 }
@@ -197,6 +246,8 @@ struct Harness {
     let settings: MemorySettings
     let notifier: RecordingNotifier
     let wake: FakeWake
+    let updates: FakeUpdates
+    let space: ReclaimableSpace
     var provider: FakeProvider { providerBox.provider! }
     private let providerBox: ProviderBox
 
@@ -210,18 +261,20 @@ struct Harness {
         let settings = MemorySettings(initial)
         let notifier = RecordingNotifier()
         let wake = FakeWake()
+        let updates = FakeUpdates()
+        let space = ReclaimableSpace(bytes)
         let box = ProviderBox()
 
         let services = ShellServices(
             settings: settings, suggestionPersistence: MemorySuggestions(), notifier: notifier,
             environment: FixedEnvironment(), launchAtLogin: FakeLoginItem(), wake: wake,
-            updates: FakeUpdates(), clock: clock, currentVersion: ReleaseVersion("0.1.0"),
+            updates: updates, clock: clock, currentVersion: ReleaseVersion("0.1.0"),
             moduleDefaults: { UserDefaults(suiteName: "MurtenShellTests.\($0).\(UUID().uuidString)")! },
             stateDefaults: UserDefaults(suiteName: "MurtenShellTests.state.\(UUID().uuidString)")!)
 
         let factory = ModuleFactory(moduleID: fakeModuleID) { context in
             let provider = FakeProvider(context: context,
-                                        watcher: withWatcher ? FakeWatcher(clock: clock, bytes: bytes) : nil)
+                                        watcher: withWatcher ? FakeWatcher(clock: clock, space: space) : nil)
             provider.applicabilityResult = applicability
             box.provider = provider
             return provider
@@ -232,6 +285,8 @@ struct Harness {
         self.settings = settings
         self.notifier = notifier
         self.wake = wake
+        self.updates = updates
+        self.space = space
         providerBox = box
     }
 }

@@ -13,9 +13,16 @@ struct SuggestionFeed: View {
                 .accessibilityAddTraits(.isHeader)
 
             if model.settings.residentMode == .off {
-                Text("Background checks are off. Turn them on in Settings to have Murten Utilities notice when a tool would help.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text("Background checks are off. Turn them on in Settings to have Murten Utilities notice when a tool would help.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    // The hint names Settings; this takes the user there.
+                    SettingsLink {
+                        Text("Open Settings…")
+                    }
+                }
             } else if model.suggestions.isEmpty {
                 Text("Nothing needs your attention.")
                     .font(.callout)

@@ -74,7 +74,8 @@ struct HomeView: View {
     }
 
     private var statusMessage: String {
-        let available = model.modules.filter { model.isMigrated($0.id) }.count
+        // Counts what the grid shows as available, not what was migrated.
+        let available = model.modules.filter { model.isAvailable($0.id) }.count
         let tools = "\(available) of \(model.modules.count) tools available"
         guard model.settings.residentMode == .on else { return "\(tools) · background checks off" }
         let count = model.suggestions.count
@@ -119,11 +120,12 @@ struct ModuleTile: View {
         }
         .buttonStyle(.plain)
         .disabled(state != .available)
-        .accessibilityElement(children: .ignore)
+        // The button stays the accessibility element, so it keeps its press
+        // action. Replacing it with accessibilityElement(children: .ignore)
+        // left a button-shaped element VoiceOver could not activate.
         .accessibilityLabel(module.name)
         .accessibilityValue(accessibilityState)
         .accessibilityHint(state == .available ? "Opens the tool. \(module.summary)" : caption)
-        .accessibilityAddTraits(.isButton)
     }
 
     private var caption: String {

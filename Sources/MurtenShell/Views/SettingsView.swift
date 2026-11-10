@@ -52,10 +52,29 @@ private struct GeneralSettings: View {
                 Text("Asks GitHub for the latest release. Nothing is downloaded or installed.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Button("Check Now") { Task { await model.checkForUpdates() } }
+                HStack {
+                    Button("Check Now") { Task { await model.checkForUpdates() } }
+                        .disabled(model.updateCheck == .checking)
+                    if let updateStatus {
+                        Text(updateStatus)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
         }
         .formStyle(.grouped)
+    }
+
+    /// The outcome of the last check, so Check Now never ends in silence.
+    private var updateStatus: String? {
+        switch model.updateCheck {
+        case .notChecked: return nil
+        case .checking: return "Checking…"
+        case .upToDate: return "You have the latest release."
+        case .available(let version): return "Version \(version) is available."
+        case .failed(let message): return "Could not check for updates: \(message)"
+        }
     }
 
     private var residentBinding: Binding<Bool> {
@@ -74,6 +93,15 @@ private struct BackgroundSettings: View {
 
     var body: some View {
         Form {
+            if model.settings.residentMode == .off {
+                // Everything below is disabled; say why and where to change it.
+                Section {
+                    Text("Background checks run only while Murten Utilities is in the menu bar. Turn that on under General.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             Section("Tools") {
                 if model.watchedModules.isEmpty {
                     Text("No tool has a background check yet.")
@@ -130,14 +158,27 @@ private struct WatcherRow: View {
                         .frame(width: 28, height: 28)
                 }
                 Spacer()
-                Toggle("Check", isOn: enabled)
-                Toggle("Notify", isOn: notify)
+                captionedSwitch("Check", isOn: enabled, describedAs: "Check \(module.name) in the background")
+                captionedSwitch("Notify", isOn: notify, describedAs: "Notify about \(module.name)")
             }
             Text(healthText)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
         .disabled(model.settings.residentMode == .off)
+    }
+
+    /// A switch with its caption directly beside it. A form's own toggle
+    /// layout pushes the two apart, so "Notify" read as the caption of the
+    /// Check switch. The accessible name says which tool the switch is for.
+    private func captionedSwitch(_ title: String, isOn: Binding<Bool>, describedAs label: String) -> some View {
+        HStack(spacing: 6) {
+            Text(title)
+                .accessibilityHidden(true)
+            Toggle(label, isOn: isOn)
+                .labelsHidden()
+        }
+        .padding(.leading, 8)
     }
 
     private var enabled: Binding<Bool> {
@@ -154,6 +195,11 @@ private struct WatcherRow: View {
     }
 
     private var healthText: String {
+        // An inapplicable tool never runs its check; "not checked yet" would
+        // suggest it is about to.
+        if case .inapplicable(let reason)? = model.applicability[module.id] {
+            return "Cannot check on this Mac: \(reason)"
+        }
         guard let health = model.watchHealth[module.id] else { return "Not checked yet." }
         if let failedAt = health.lastFailureAt, failedAt >= (health.lastSuccessAt ?? .distantPast) {
             return "Last check failed \(failedAt.formatted(.relative(presentation: .named))): \(health.lastFailure?.message ?? "unknown error")"
