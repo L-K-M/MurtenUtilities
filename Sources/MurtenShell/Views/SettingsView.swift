@@ -52,10 +52,29 @@ private struct GeneralSettings: View {
                 Text("Asks GitHub for the latest release. Nothing is downloaded or installed.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Button("Check Now") { Task { await model.checkForUpdates() } }
+                HStack {
+                    Button("Check Now") { Task { await model.checkForUpdates() } }
+                        .disabled(model.updateCheck == .checking)
+                    if let updateStatus {
+                        Text(updateStatus)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
         }
         .formStyle(.grouped)
+    }
+
+    /// The outcome of the last check, so Check Now never ends in silence.
+    private var updateStatus: String? {
+        switch model.updateCheck {
+        case .notChecked: return nil
+        case .checking: return "Checking…"
+        case .upToDate: return "You have the latest release."
+        case .available(let version): return "Version \(version) is available."
+        case .failed(let message): return "Could not check for updates: \(message)"
+        }
     }
 
     private var residentBinding: Binding<Bool> {

@@ -25,6 +25,9 @@ public protocol SuggestionNotifying: AnyObject {
     /// Withdraws delivered notifications of these modules, so none outlives
     /// the user turning them (or the companion) off.
     func withdraw(modules moduleIDs: Set<String>)
+    /// Withdraws the delivered notifications of these suggestions: one that
+    /// resolved, or that the user snoozed or dismissed, must not linger.
+    func withdraw(suggestions keys: Set<SuggestionKey>)
 }
 
 /// Samples power, network and time for the watch gate.

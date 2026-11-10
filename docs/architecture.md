@@ -99,6 +99,9 @@ click suggestion ──▶ deep link ──▶ module pane ──▶ explicit co
 - **Surfaces** show active suggestions and distinguish stale observations from
   current ones. Only per-category opt-in permits `UNUserNotification`.
   Refreshes and startup restoration never replay old notifications.
+  A delivered notification is withdrawn when its suggestion resolves, is
+  snoozed or dismissed, or its module stops notifying (notifications,
+  background check or resident mode turned off).
 - **Routes** identify a module, an allowlisted action and typed context, not a
   command or an executable path: `murten://<moduleID>[/<action>][?key=value]`.
   The app registers no URL scheme; the notation round-trips through
@@ -226,8 +229,11 @@ the others through the GitHub releases API):
 Inside the suite a module has no version of its own, so these checks would
 announce standalone releases the suite cannot install, and three of them do
 it through surfaces the suite rules out (a default-on notification, a modal).
-The suite has one update check for its own bundle; whether it runs by default
-is open (PLAN.md, *Suite updates*).
+The suite has one update check for its own bundle, off by default (PLAN.md,
+*Decisions so far*). Turned on, it runs at launch and then daily while the
+app stays up, since a resident companion may not relaunch for weeks. A failed
+check retries hourly and is reported next to Check Now in Settings, never as
+a banner; only an available release raises one.
 
 ## Module applicability
 

@@ -84,6 +84,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The daily suite update check now repeats while the app keeps running and
+  starts as soon as you turn it on; it used to run only at launch. A failed
+  check retries within the hour and reports next to Check Now instead of
+  raising a home-window banner, and Check Now says when you already have the
+  latest release.
+- A notification is withdrawn once its suggestion resolves or you snooze or
+  dismiss it, and when you switch its tool's background check off. A
+  notification clicked while the app is still launching opens its tool.
 - Opened up the tool figures' cramped torso proportions and made artwork
   fitting uniform in non-square frames. App-icon resampling retains alpha.
 - Widened the System Monitor illustration's screen and kept the ten-tool

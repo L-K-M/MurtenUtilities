@@ -122,6 +122,15 @@ final class AppModelTests: XCTestCase {
         XCTAssertGreaterThan(harness.model.windowRequests, 0)
     }
 
+    func testNotificationClickedDuringStartupStillOpensItsTool() {
+        // Clicking a delivered notification can launch the app; the click
+        // may then arrive before start() has finished restoring.
+        let harness = Harness()
+
+        harness.notifier.onOpen?(URL(string: "murten://dockvac/reclaim?endpoint=local")!)
+        XCTAssertEqual(harness.model.openRoute?.moduleID, fakeModuleID)
+    }
+
     func testModuleContextOpensRoutesThroughTheModel() async {
         let harness = Harness()
         await harness.model.start()
@@ -153,6 +162,38 @@ final class AppModelTests: XCTestCase {
         await harness.model.dismiss(harness.model.suggestions[0])
         let dismissed = await eventually { harness.model.suggestions.isEmpty }
         XCTAssertTrue(dismissed)
+        await harness.model.stop()
+    }
+
+    func testAnsweredSuggestionsLoseTheirNotification() async {
+        let harness = Harness(settings: residentSettings(notifying: [fakeModuleID]))
+        await harness.model.start()
+        harness.clock.advance(by: WatchSchedule.initialDelay)
+        _ = await eventually { harness.notifier.delivered.count == 1 }
+        let suggestion = harness.model.suggestions[0]
+
+        await harness.model.snooze(suggestion, for: .oneDay)
+        XCTAssertEqual(harness.notifier.withdrawnSuggestions, [[suggestion.key]])
+
+        await harness.model.dismiss(suggestion)
+        XCTAssertEqual(harness.notifier.withdrawnSuggestions, [[suggestion.key], [suggestion.key]])
+        await harness.model.stop()
+    }
+
+    func testResolvedConditionWithdrawsItsNotification() async {
+        let harness = Harness(settings: residentSettings(notifying: [fakeModuleID]))
+        await harness.model.start()
+        harness.clock.advance(by: WatchSchedule.initialDelay)
+        _ = await eventually { harness.notifier.delivered.count == 1 }
+        let key = harness.model.suggestions[0].key
+        XCTAssertTrue(harness.notifier.withdrawnSuggestions.isEmpty, "a refresh withdraws nothing")
+
+        // The user cleaned up: the next check finds nothing to reclaim.
+        harness.space.bytes = 0
+        harness.clock.advance(by: 30 * 60)
+        let resolved = await eventually { harness.model.suggestions.isEmpty }
+        XCTAssertTrue(resolved)
+        XCTAssertEqual(harness.notifier.withdrawnSuggestions, [[key]])
         await harness.model.stop()
     }
 
@@ -189,6 +230,71 @@ final class AppModelTests: XCTestCase {
         let checking = Harness(settings: settings)
         await checking.model.start()
         XCTAssertEqual(checking.model.availableUpdate?.version, ReleaseVersion("9.9.9"))
+        XCTAssertEqual(checking.model.updateCheck, .available(ReleaseVersion("9.9.9")!))
+    }
+
+    private func dailyUpdateSettings() -> SuiteSettings {
+        var settings = SuiteSettings()
+        settings.updateChecks = .daily
+        return settings
+    }
+
+    func testDailyUpdateCheckRepeatsWhileTheAppKeepsRunning() async {
+        let harness = Harness(settings: dailyUpdateSettings())
+        await harness.model.start()
+        XCTAssertEqual(harness.updates.requests, 1)
+
+        harness.clock.advance(by: AppModel.updateCheckInterval - 60)
+        await harness.model.periodicRefresh()
+        XCTAssertEqual(harness.updates.requests, 1, "at most one check a day")
+
+        harness.clock.advance(by: 60)
+        await harness.model.periodicRefresh()
+        XCTAssertEqual(harness.updates.requests, 2, "a companion that never quits still checks daily")
+        await harness.model.stop()
+    }
+
+    func testFailedUpdateCheckStaysQuietAndRetriesWithinTheDay() async {
+        let harness = Harness(settings: dailyUpdateSettings())
+        harness.updates.isFailing = true
+        await harness.model.start()
+
+        XCTAssertEqual(harness.model.updateCheck, .failed("The Internet connection appears to be offline."))
+        XCTAssertTrue(harness.model.diagnostics.isEmpty, "an automatic check that found no network raises no banner")
+        XCTAssertNil(harness.model.availableUpdate)
+
+        harness.clock.advance(by: AppModel.updateRetryInterval - 60)
+        await harness.model.periodicRefresh()
+        XCTAssertEqual(harness.updates.requests, 1, "retries are spaced out")
+
+        harness.updates.isFailing = false
+        harness.clock.advance(by: 60)
+        await harness.model.periodicRefresh()
+        XCTAssertEqual(harness.updates.requests, 2, "the retry does not wait a day")
+        XCTAssertEqual(harness.model.availableUpdate?.version, ReleaseVersion("9.9.9"))
+        await harness.model.stop()
+    }
+
+    func testCheckNowReportsWhenNothingIsNewer() async {
+        let harness = Harness()
+        harness.updates.release = SuiteRelease(version: ReleaseVersion("0.1.0")!,
+                                               pageURL: URL(string: "https://example.com/release")!)
+        XCTAssertEqual(harness.model.updateCheck, .notChecked)
+
+        await harness.model.checkForUpdates()
+        XCTAssertEqual(harness.model.updateCheck, .upToDate)
+        XCTAssertNil(harness.model.availableUpdate)
+    }
+
+    func testTurningUpdateChecksOnChecksWithoutARelaunch() async {
+        let harness = Harness()
+        await harness.model.start()
+        XCTAssertEqual(harness.updates.requests, 0)
+
+        harness.model.settings.updateChecks = .daily
+        let checked = await eventually { harness.model.availableUpdate != nil }
+        XCTAssertTrue(checked)
+        await harness.model.stop()
     }
 
     func testBackgroundWorkNeedsResidentModeAndAnEnabledModule() async {
@@ -213,6 +319,12 @@ final class AppModelTests: XCTestCase {
 
         harness.model.settings.residentMode = .on
         await harness.model.setNotifications(.off, for: fakeModuleID)
+        XCTAssertEqual(harness.notifier.withdrawn.last, [fakeModuleID])
+
+        // Switching the module's background check off silences it as well.
+        await harness.model.setNotifications(.on, for: fakeModuleID)
+        harness.model.settings.disabledWatchers = [fakeModuleID]
+        XCTAssertEqual(harness.notifier.withdrawn.count, 3)
         XCTAssertEqual(harness.notifier.withdrawn.last, [fakeModuleID])
         await harness.model.stop()
     }
