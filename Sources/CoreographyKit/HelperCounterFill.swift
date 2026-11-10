@@ -10,6 +10,7 @@ import CoreographyDrivers
 /// ```
 /// A row whose start time differs is a reused PID and stays restricted.
 struct HelperCounterFill: ProcessSampleReading {
+    private static let nanosecondsPerSecond = 1_000_000_000.0
     private let base: any ProcessSampleReading
     private let helper: PrivilegedHelper
 
@@ -34,8 +35,14 @@ struct HelperCounterFill: ProcessSampleReading {
                   counters.startMicroseconds == process.startMicroseconds else { return process }
             return process.filled(from: counters)
         }
+        // The helper read after the base sample was stamped. The sample is
+        // as new as its newest row, as the base driver stamps its own; the
+        // monitor drops a row that is newer than its sample.
+        let newest = processes.map(\.monotonicNanoseconds).max() ?? raw.monotonicNanoseconds
+        let time = max(raw.monotonicNanoseconds, newest)
+        let later = Double(time - raw.monotonicNanoseconds) / Self.nanosecondsPerSecond
         return RawProcessSnapshot(
-            clockID: raw.clockID, monotonicNanoseconds: raw.monotonicNanoseconds, wallTime: raw.wallTime,
+            clockID: raw.clockID, monotonicNanoseconds: time, wallTime: raw.wallTime.addingTimeInterval(later),
             logicalCPUCount: raw.logicalCPUCount, collectorPID: raw.collectorPID,
             enumeration: .success(ProcessEnumeration(
                 processes: processes, failures: enumeration.failures, isTruncated: enumeration.isTruncated

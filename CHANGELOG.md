@@ -121,6 +121,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   disables it, instead of reporting it as listening while it hears nothing.
 - Docker Cleaner encodes the build-cache ID it sends to the daemon instead
   of pasting it into the request.
+- System Monitor no longer drops the processes its privileged helper reads
+  for it. With the helper installed, other users' and system processes went
+  missing from the process table and were counted as identity failures.
 
 ## [0.1.0] - 2026-11-01
 
