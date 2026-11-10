@@ -32,6 +32,15 @@ public enum NotificationPreference: Sendable {
     case off
 }
 
+/// Where the suite's own update check stands, shown next to Check Now.
+public enum UpdateCheckStatus: Equatable, Sendable {
+    case notChecked
+    case checking
+    case upToDate
+    case available(ReleaseVersion)
+    case failed(String)
+}
+
 /// A non-modal problem the home window shows until dismissed.
 public struct ShellDiagnostic: Identifiable, Equatable, Sendable {
     public let id: String
@@ -51,7 +60,10 @@ public struct ShellDiagnostic: Identifiable, Equatable, Sendable {
 public final class AppModel {
     /// Minimum time between automatic update checks.
     static let updateCheckInterval: TimeInterval = 24 * 3600
-    /// The feed re-reads the store this often so expired snoozes reappear.
+    /// A failed check is tried again after this long instead of a day later.
+    static let updateRetryInterval: TimeInterval = 3600
+    /// The feed re-reads the store this often so expired snoozes reappear;
+    /// the same tick runs the update check once it is due.
     static let feedRefreshInterval: TimeInterval = 5 * 60
     private static let lastUpdateCheckKey = "lastSuiteUpdateCheck"
 
@@ -68,6 +80,7 @@ public final class AppModel {
     public private(set) var diagnostics: [ShellDiagnostic] = []
     public private(set) var launchAtLogin: LaunchAtLoginStatus = .disabled
     public private(set) var availableUpdate: SuiteRelease?
+    public private(set) var updateCheck: UpdateCheckStatus = .notChecked
     public private(set) var notificationAuthorization: NotificationAuthorization?
 
     public var settings: SuiteSettings {
@@ -76,6 +89,12 @@ public final class AppModel {
             services.settings.save(settings)
             withdrawSilencedNotifications(previous: oldValue)
             Task { await applyWatchers() }
+            // Turning checks on checks now, not at the next launch. It is a
+            // request from the user, so the daily and retry limits that pace
+            // the automatic check do not hold it back.
+            if started, settings.updateChecks == .daily, oldValue.updateChecks != .daily {
+                Task { await checkForUpdates() }
+            }
         }
     }
 
@@ -87,6 +106,8 @@ public final class AppModel {
     @ObservationIgnored private var coordinator: WatchCoordinator?
     @ObservationIgnored private var background: [Task<Void, Never>] = []
     @ObservationIgnored private var started = false
+    /// Not persisted: a relaunch may try again at once.
+    @ObservationIgnored private var lastFailedUpdateCheck: Date?
 
     public init(factories: [ModuleFactory], services: ShellServices,
                 modules: [SuiteModule] = ModuleRegistry.all) {
@@ -127,6 +148,10 @@ public final class AppModel {
             registrations: registrations, clock: services.clock,
             gate: { [weak self] resources in await self?.gate(for: resources) ?? .open },
             sink: { [weak self] observation, registration in await self?.receive(observation, from: registration) })
+
+        // Hooked up here, not in start(): a click on a notification that
+        // launched the app can arrive while start() is still restoring.
+        services.notifier.onOpen = { [weak self] url in self?.openExternal(url) }
     }
 
     // MARK: - Lifecycle
@@ -149,7 +174,6 @@ public final class AppModel {
         }
 
         launchAtLogin = services.launchAtLogin.status
-        services.notifier.onOpen = { [weak self] url in self?.openExternal(url) }
         services.wake.observeWake { [weak self] in self?.systemDidWake() }
 
         await refreshApplicability()
@@ -169,6 +193,14 @@ public final class AppModel {
 
     public func isMigrated(_ moduleID: String) -> Bool {
         providers[moduleID] != nil
+    }
+
+    /// Whether the module's tile opens a pane on this Mac: migrated and not
+    /// inapplicable (Docker missing, no Zen profile).
+    public func isAvailable(_ moduleID: String) -> Bool {
+        guard isMigrated(moduleID) else { return false }
+        if case .inapplicable? = applicability[moduleID] { return false }
+        return true
     }
 
     public func module(_ moduleID: String) -> SuiteModule? {
@@ -297,12 +329,16 @@ public final class AppModel {
 
     // MARK: - Suggestions
 
+    /// Snoozing or dismissing a suggestion also withdraws its notification:
+    /// the user has answered it.
     public func snooze(_ suggestion: Suggestion, for duration: SnoozeDuration) async {
         await store.snooze(suggestion.key, until: services.clock.now().addingTimeInterval(duration.interval))
+        services.notifier.withdraw(suggestions: [suggestion.key])
     }
 
     public func dismiss(_ suggestion: Suggestion) async {
         await store.dismiss(suggestion.key)
+        services.notifier.withdraw(suggestions: [suggestion.key])
     }
 
     public func recheck(_ moduleID: String) {
@@ -330,10 +366,16 @@ public final class AppModel {
         background.append(Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: UInt64(Self.feedRefreshInterval * 1_000_000_000))
-                guard let self else { return }
-                await self.refreshFeed()
+                guard !Task.isCancelled, let self else { return }
+                await self.periodicRefresh()
             }
         })
+    }
+
+    /// The recurring work of a running app, every `feedRefreshInterval`.
+    func periodicRefresh() async {
+        await refreshFeed()
+        await checkForUpdatesIfDue()
     }
 
     /// Shows suggestions only for watchers that may run: resident mode on,
@@ -368,6 +410,14 @@ public final class AppModel {
     private func receive(_ observation: WatchObservation, from registration: WatcherRegistration) async {
         let now = services.clock.now()
         let events = await store.record(observation, rule: registration.rule, at: now)
+
+        // A condition that went away takes its notification with it.
+        let resolved = Set(events.compactMap { event -> SuggestionKey? in
+            guard case .resolved(let key) = event else { return nil }
+            return key
+        })
+        if !resolved.isEmpty { services.notifier.withdraw(suggestions: resolved) }
+
         let notify = settings.notifyingModules.intersection(runnableWatchers())
         let claimed = await store.claimNotifications(for: events, notifying: notify, at: now)
         for suggestion in claimed {
@@ -382,11 +432,12 @@ public final class AppModel {
         }
     }
 
-    /// Turning the companion or a module's notifications off withdraws the
-    /// notifications already delivered, so a stale one cannot be clicked.
+    /// Turning the companion, a module's background check or its
+    /// notifications off withdraws the notifications already delivered, so a
+    /// stale one cannot be clicked.
     private func withdrawSilencedNotifications(previous: SuiteSettings) {
-        let wasNotifying = previous.residentMode == .on ? previous.notifyingModules : []
-        let isNotifying = settings.residentMode == .on ? settings.notifyingModules : []
+        let wasNotifying = previous.runnableWatchers(among: previous.notifyingModules)
+        let isNotifying = settings.runnableWatchers(among: settings.notifyingModules)
         let silenced = wasNotifying.subtracting(isNotifying)
         guard !silenced.isEmpty else { return }
         services.notifier.withdraw(modules: silenced)
@@ -418,28 +469,50 @@ public final class AppModel {
 
     // MARK: - Suite updates
 
-    /// Checks at most daily, and only when the user turned checks on.
+    /// Checks at most daily, and only when the user turned checks on. Runs
+    /// at launch and from the periodic refresh, so a companion that stays up
+    /// for weeks still checks daily.
     public func checkForUpdatesIfDue() async {
         guard settings.updateChecks == .daily else { return }
 
         let now = services.clock.now()
         if let last = services.stateDefaults.object(forKey: Self.lastUpdateCheckKey) as? Date,
            now.timeIntervalSince(last) < Self.updateCheckInterval { return }
+        if let failed = lastFailedUpdateCheck,
+           now.timeIntervalSince(failed) < Self.updateRetryInterval { return }
 
         await checkForUpdates()
     }
 
+    /// Asks for the latest release and records the outcome in `updateCheck`.
+    /// A failure is shown next to Check Now rather than as a home-window
+    /// banner: an automatic check that found no network is not worth the
+    /// user's attention, and it retries after `updateRetryInterval`.
     public func checkForUpdates() async {
-        services.stateDefaults.set(services.clock.now(), forKey: Self.lastUpdateCheckKey)
+        guard updateCheck != .checking else { return }
+        updateCheck = .checking
+
         do {
             let release = try await services.updates.latestRelease()
-            guard let current = services.currentVersion, current < release.version else {
+            // Only an answered check counts as today's.
+            services.stateDefaults.set(services.clock.now(), forKey: Self.lastUpdateCheckKey)
+            lastFailedUpdateCheck = nil
+
+            guard let current = services.currentVersion else {
                 availableUpdate = nil
+                updateCheck = .failed("This build has no version number to compare with \(release.version).")
+                return
+            }
+            guard current < release.version else {
+                availableUpdate = nil
+                updateCheck = .upToDate
                 return
             }
             availableUpdate = release
+            updateCheck = .available(release.version)
         } catch {
-            report(ShellDiagnostic(id: "update-check", message: "Could not check for updates: \(error.localizedDescription)"))
+            lastFailedUpdateCheck = services.clock.now()
+            updateCheck = .failed(error.localizedDescription)
         }
     }
 }
