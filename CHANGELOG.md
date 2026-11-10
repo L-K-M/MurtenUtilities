@@ -92,6 +92,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A notification is withdrawn once its suggestion resolves or you snooze or
   dismiss it, and when you switch its tool's background check off. A
   notification clicked while the app is still launching opens its tool.
+- Settings › Background Checks keeps each Check and Notify caption next to its
+  own switch, names the tool in the switches' accessibility labels, explains
+  why the tab is disabled while the menu-bar companion is off, and says when a
+  tool cannot be checked on this Mac. The home window's hint about background
+  checks has an Open Settings button.
+- The home window's status bar no longer counts an unavailable tool as
+  available.
 - Opened up the tool figures' cramped torso proportions and made artwork
   fitting uniform in non-square frames. App-icon resampling retains alpha.
 - Widened the System Monitor illustration's screen and kept the ten-tool

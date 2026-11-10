@@ -193,6 +193,14 @@ public final class AppModel {
         providers[moduleID] != nil
     }
 
+    /// Whether the module's tile opens a pane on this Mac: migrated and not
+    /// inapplicable (Docker missing, no Zen profile).
+    public func isAvailable(_ moduleID: String) -> Bool {
+        guard isMigrated(moduleID) else { return false }
+        if case .inapplicable? = applicability[moduleID] { return false }
+        return true
+    }
+
     public func module(_ moduleID: String) -> SuiteModule? {
         modules.first { $0.id == moduleID }
     }

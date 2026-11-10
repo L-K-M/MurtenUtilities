@@ -342,6 +342,20 @@ final class AppModelTests: XCTestCase {
         await harness.model.stop()
     }
 
+    func testInapplicableToolDoesNotCountAsAvailable() async {
+        let harness = Harness(applicability: .inapplicable(reason: "Docker is not installed"))
+        XCTAssertTrue(harness.model.isAvailable(fakeModuleID), "available until a check says otherwise")
+        XCTAssertFalse(harness.model.isAvailable("repomen"), "no provider, no pane")
+
+        await harness.model.start()
+        XCTAssertFalse(harness.model.isAvailable(fakeModuleID), "the status bar must agree with the UNAVAILABLE tile")
+
+        harness.provider.applicabilityResult = .applicable
+        await harness.model.refreshEnvironment()
+        XCTAssertTrue(harness.model.isAvailable(fakeModuleID))
+        await harness.model.stop()
+    }
+
     func testQuitGuardListsBusyModules() async {
         let harness = Harness()
         XCTAssertTrue(harness.model.interruptionWarnings().isEmpty)
