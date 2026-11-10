@@ -179,7 +179,10 @@ public enum HealthChecker {
             )
         }
 
+        // Releasing the port does not unregister the tap; invalidating does.
+        // Left alone, every scan would add one more tap for the life of the app.
         CGEvent.tapEnable(tap: tap, enable: false)
+        CFMachPortInvalidate(tap)
 
         return HealthCheck(
             id: "input-monitoring",
