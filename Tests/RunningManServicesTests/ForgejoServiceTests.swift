@@ -183,6 +183,20 @@ final class ForgejoServiceTests: XCTestCase {
         let calls = await api.recorded()
         XCTAssertTrue(calls.contains { $0.method == "DELETE" && $0.path == "/repos/example/project/actions/runners/42" })
     }
+    func testForgejoDeleteWorksWhenOnlyTheLoginServiceFileIsLeft() async throws {
+        // A copy or restore that skips dotfiles loses the .service marker. The
+        // service is still found by its label, so removal must not need the marker.
+        let runner = try await create()
+        let marker = root.appendingPathComponent(".service")
+        let plist = try String(contentsOf: marker, encoding: .utf8)
+        try FileManager.default.removeItem(at: marker)
+        let controller = RunnerServiceController(homeDirectory: home, executor: executor, forgejoAPI: api)
+        try await controller.delete(runner)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: plist), "the login service file must be removed")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent(RunnerInstallationDescriptor.fileName).path))
+        let calls = await api.recorded()
+        XCTAssertTrue(calls.contains { $0.method == "DELETE" && $0.path == "/repos/example/project/actions/runners/42" })
+    }
     func testForgejoFailedDeleteRestoresServiceAndPublicDescriptor() async throws {
         let runner = try await create()
         await api.configure(failDelete: true)
