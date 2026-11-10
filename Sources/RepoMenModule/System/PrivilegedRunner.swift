@@ -95,7 +95,8 @@ enum PrivilegedRunner {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
         process.arguments = appleScriptArguments(
-            for: "\(keepGoingVariable)=\(shellQuote(keepGoing.url.path))\n\(script)",
+            // Exported, so a shell the script starts sees it too.
+            for: "export \(keepGoingVariable)=\(shellQuote(keepGoing.url.path))\n\(script)",
             privileges: privileges)
         let stdout = Pipe()
         let stderr = Pipe()

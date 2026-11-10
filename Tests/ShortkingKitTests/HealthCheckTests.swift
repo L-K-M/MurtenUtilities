@@ -6,10 +6,11 @@ final class HealthCheckTests: XCTestCase {
     /// The Input Monitoring probe creates an event tap to see whether it may.
     /// Every scan runs it, so a tap it left registered would pile up for the
     /// life of the app.
-    func testInputMonitoringProbeLeavesNoEventTapBehind() {
+    func testInputMonitoringProbeLeavesNoEventTapBehind() throws {
+        // Without Input Monitoring no tap is created and this would hold trivially.
+        try XCTSkipUnless(CGPreflightListenEventAccess(), "creating an event tap needs Input Monitoring")
         let before = Self.ownEventTaps()
         for _ in 0..<3 { _ = HealthChecker.inputMonitoringCheck() }
-        // Without Input Monitoring no tap is created and this holds trivially.
         XCTAssertEqual(Self.ownEventTaps(), before)
     }
 

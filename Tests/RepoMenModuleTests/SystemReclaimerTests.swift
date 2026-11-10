@@ -56,6 +56,7 @@ final class SystemReclaimerTests: XCTestCase {
         try process.run()
         let output = String(data: stdout.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
         process.waitUntilExit()
+        XCTAssertEqual(process.terminationStatus, 0, "the batch script failed: \(output)")
 
         let records = try XCTUnwrap(PrivilegedRunner.decodePayload(output))
         let statuses = SystemReclaimer.parseStatuses(records)

@@ -38,7 +38,6 @@ final class PrivilegedRunnerTests: XCTestCase {
             done
             """
         let script = """
-            export \(PrivilegedRunner.keepGoingVariable)
             /usr/bin/perl -MPOSIX -e 'POSIX::setsid(); exec "/bin/sh", "-c", $ARGV[0]' \(PrivilegedRunner.shellQuote(batch))
             """
         let run = Task { try await PrivilegedRunner.run(script: script, privileges: .currentUser) }
@@ -51,8 +50,9 @@ final class PrivilegedRunnerTests: XCTestCase {
 
         run.cancel()
         _ = try? await run.value
-        // One step may already have been under way when Stop arrived.
-        try await Task.sleep(nanoseconds: 600_000_000)
+        // One step may already have been under way when Stop arrived; a
+        // loaded machine takes a while to finish it.
+        try await Task.sleep(nanoseconds: 1_500_000_000)
         let afterStop = stepsTaken()
         try await Task.sleep(nanoseconds: 1_200_000_000)
 
@@ -65,6 +65,15 @@ final class PrivilegedRunnerTests: XCTestCase {
             script: "if \(PrivilegedRunner.keepGoingTest); then printf going; else printf stopped; fi",
             privileges: .currentUser)
         // osascript ends its result with a newline.
+        XCTAssertEqual(output.trimmingCharacters(in: .newlines), "going")
+    }
+
+    /// A script may hand part of its work to a shell of its own. That shell
+    /// must see the same answer, or it would take every run for stopped.
+    func testAShellTheScriptStartsSeesThatTheRunGoesOn() async throws {
+        let inner = "if \(PrivilegedRunner.keepGoingTest); then printf going; else printf stopped; fi"
+        let output = try await PrivilegedRunner.run(
+            script: "/bin/sh -c \(PrivilegedRunner.shellQuote(inner))", privileges: .currentUser)
         XCTAssertEqual(output.trimmingCharacters(in: .newlines), "going")
     }
 

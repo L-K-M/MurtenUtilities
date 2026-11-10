@@ -189,6 +189,7 @@ final class ForgejoServiceTests: XCTestCase {
         let runner = try await create()
         let marker = root.appendingPathComponent(".service")
         let plist = try String(contentsOf: marker, encoding: .utf8)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: plist), "the login service file must start out installed")
         try FileManager.default.removeItem(at: marker)
         let controller = RunnerServiceController(homeDirectory: home, executor: executor, forgejoAPI: api)
         try await controller.delete(runner)
