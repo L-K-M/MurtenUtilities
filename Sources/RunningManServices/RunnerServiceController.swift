@@ -581,7 +581,9 @@ public actor RunnerServiceController {
         _ = try await forgejoAPI.request(path: path + "/" + String(id), serverURL: server, method: "GET", body: nil)
         let descriptor = try optionalService(for: runner)
         let marker = runner.directory.appendingPathComponent(".service")
-        let markerData = descriptor == nil ? nil : try Data(contentsOf: marker)
+        // Kept to restore the marker if removal fails. A Forgejo service is
+        // also found by its label alone, so there may be no marker to keep.
+        let markerData = descriptor == nil || Self.isMissing(marker) ? nil : try Data(contentsOf: marker)
         try await stop(runner, force: force)
         do {
             if let descriptor { try FileManager.default.removeItem(at: descriptor.url) }

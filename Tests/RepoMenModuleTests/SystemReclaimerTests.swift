@@ -33,6 +33,62 @@ final class SystemReclaimerTests: XCTestCase {
         XCTAssertTrue(script.contains("| /usr/bin/base64"))
     }
 
+    // MARK: Stopping
+
+    /// Runs the real batch script with /bin/sh on two scratch directories.
+    private func runScript(stopped: Bool) throws -> (statuses: [String: String], left: [String]) {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("murten-reclaim-test-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let targets = ["first", "second"].map { root.appendingPathComponent($0).path }
+        for target in targets {
+            try FileManager.default.createDirectory(atPath: target, withIntermediateDirectories: true)
+        }
+        let keepGoing = root.appendingPathComponent("keep-going").path
+        if !stopped { FileManager.default.createFile(atPath: keepGoing, contents: nil) }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", SystemReclaimer.script(for: targets)]
+        process.environment = [PrivilegedRunner.keepGoingVariable: keepGoing]
+        let stdout = Pipe()
+        process.standardOutput = stdout
+        try process.run()
+        let output = String(data: stdout.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        process.waitUntilExit()
+        XCTAssertEqual(process.terminationStatus, 0, "the batch script failed: \(output)")
+
+        let records = try XCTUnwrap(PrivilegedRunner.decodePayload(output))
+        let statuses = SystemReclaimer.parseStatuses(records)
+        let named = Dictionary(uniqueKeysWithValues: statuses.map {
+            (URL(fileURLWithPath: $0.key).lastPathComponent, $0.value)
+        })
+        return (named, targets.filter { FileManager.default.fileExists(atPath: $0) }
+            .map { URL(fileURLWithPath: $0).lastPathComponent })
+    }
+
+    func testAStoppedBatchDeletesNothingFurther() throws {
+        let result = try runScript(stopped: true)
+        XCTAssertEqual(result.left, ["first", "second"], "nothing may be deleted once the run is stopped")
+        XCTAssertEqual(result.statuses, ["first": "STOP", "second": "STOP"])
+    }
+
+    func testABatchThatIsNotStoppedDeletesEveryPath() throws {
+        let result = try runScript(stopped: false)
+        XCTAssertEqual(result.left, [])
+        XCTAssertEqual(result.statuses, ["first": "OK", "second": "OK"])
+    }
+
+    func testItemsSkippedByAStopAreNotReportedAsReclaimed() async {
+        let items = [systemItem(logsChild), systemItem(cachesChild)]
+        let outcomes = await SystemReclaimer.reclaim(items, runner: { _ in
+            self.payload([("OK", self.logsChild), ("STOP", self.cachesChild)])
+        })
+        XCTAssertNil(outcomes.first { $0.item.path == self.logsChild }?.failure)
+        XCTAssertEqual(outcomes.first { $0.item.path == self.cachesChild }?.failure,
+                       "stopped before this item was reached")
+    }
+
     func testScriptQuotesHostileNames() {
         let hostile = "/private/var/root/Library/Logs/we'ird $(name)"
         let script = SystemReclaimer.script(for: [hostile])

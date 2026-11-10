@@ -139,12 +139,21 @@ public struct DockerEngineClient: Sendable {
 
   /// `docker builder prune --filter id=<id>`: removes exactly one cache record.
   public func pruneBuildCache(id: String) async throws -> BuildPruneResult {
-    let filters = "{\"id\":[\"\(id)\"]}"
+    let filters = try Self.buildCacheFilters(id: id)
     let encoded =
       filters.addingPercentEncoding(withAllowedCharacters: Self.queryValueAllowed) ?? filters
     let response = try await perform(
       HTTPRequest(method: "POST", path: "/build/prune?filters=\(encoded)"))
     return try decode { try DockerEngineDecoder.decodeBuildPruneResponse(response.body) }
+  }
+
+  /// The `filters` value naming exactly one cache record. Encoded rather than
+  /// interpolated: the ID comes from the daemon, and one containing a quote
+  /// must stay inside its string instead of naming another record.
+  static func buildCacheFilters(id: String) throws -> String {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.withoutEscapingSlashes]
+    return String(decoding: try encoder.encode(["id": [id]]), as: UTF8.self)
   }
 
   // MARK: - Plumbing

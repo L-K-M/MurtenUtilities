@@ -30,11 +30,74 @@ enum PrivilegedRunner {
     }
 
     /// Runs `script` as root and returns its stdout. Task cancellation terminates
-    /// the osascript process (taking a pending password dialog down with it).
+    /// the osascript process (taking a pending password dialog down with it) and
+    /// removes the run's keep-going file, which is what stops the script itself.
     static func run(script: String) async throws -> String {
+        try await run(script: script, privileges: .administrator)
+    }
+
+    /// Whose rights the script runs with. `.currentUser` exists so a test can
+    /// drive the real osascript bridge, cancellation included, without a
+    /// password dialog.
+    enum Privileges {
+        case administrator
+        case currentUser
+    }
+
+    // MARK: Stopping a running script
+
+    /// The sh variable every script gets: the path of a file that exists for
+    /// as long as the run may continue.
+    static let keepGoingVariable = "MURTEN_KEEP_GOING"
+
+    /// sh test that holds until the run is stopped. Terminating osascript does
+    /// not stop the shell it started, and this app could not signal a root
+    /// shell anyway, so a script that deletes must check this before each step
+    /// or Stop would let the rest of the batch run. Unset or missing means
+    /// stopped: the check fails safe.
+    static let keepGoingTest = "[ -e \"$\(keepGoingVariable)\" ]"
+
+    /// A private directory holding one run's keep-going file. Only its
+    /// existence is ever tested, as root, so nothing is read from or written
+    /// to a user-writable place with privileges.
+    private struct KeepGoingFile: Sendable {
+        let directory: URL
+        var url: URL { directory.appendingPathComponent("keep-going") }
+
+        init() throws {
+            directory = FileManager.default.temporaryDirectory
+                .appendingPathComponent("murten-privileged-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false,
+                                                    attributes: [.posixPermissions: 0o700])
+            guard FileManager.default.createFile(atPath: url.path, contents: nil) else {
+                try? FileManager.default.removeItem(at: directory)
+                throw CocoaError(.fileWriteUnknown)
+            }
+        }
+
+        func remove() {
+            try? FileManager.default.removeItem(at: directory)
+        }
+    }
+
+    static func run(script: String, privileges: Privileges) async throws -> String {
+        try Task.checkCancellation()
+        let keepGoing: KeepGoingFile
+        do {
+            keepGoing = try KeepGoingFile()
+        } catch {
+            throw Failure.failed("Could not prepare the privileged run: \(error.localizedDescription)")
+        }
+        // Also when the run ends by itself: nothing it started may go on
+        // working once the caller has its answer.
+        defer { keepGoing.remove() }
+
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        process.arguments = appleScriptArguments(for: script)
+        process.arguments = appleScriptArguments(
+            // Exported, so a shell the script starts sees it too.
+            for: "export \(keepGoingVariable)=\(shellQuote(keepGoing.url.path))\n\(script)",
+            privileges: privileges)
         let stdout = Pipe()
         let stderr = Pipe()
         process.standardOutput = stdout
@@ -73,6 +136,9 @@ enum PrivilegedRunner {
                 }
             }
         } onCancel: {
+            // First the file, so the script stops before its next step even
+            // though it outlives osascript.
+            keepGoing.remove()
             if process.isRunning { process.terminate() }
         }
     }
@@ -89,11 +155,13 @@ enum PrivilegedRunner {
 
     /// The `osascript` argument list: one `-e` per script line, since AppleScript
     /// string literals cannot hold raw newlines and `with timeout` needs a block.
-    static func appleScriptArguments(for script: String) -> [String] {
-        [
+    static func appleScriptArguments(for script: String,
+                                     privileges: Privileges = .administrator) -> [String] {
+        let rights = privileges == .administrator ? " with administrator privileges" : ""
+        return [
             "-e", "with timeout of \(timeoutSeconds) seconds",
             "-e", "do shell script \"\(escapeForAppleScript(script))\""
-                + " with administrator privileges without altering line endings",
+                + rights + " without altering line endings",
             "-e", "end timeout",
         ]
     }

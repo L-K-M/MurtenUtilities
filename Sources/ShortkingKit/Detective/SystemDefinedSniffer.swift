@@ -130,6 +130,7 @@ public final class SystemDefinedSniffer {
                 continue
             }
 
+            context.port = port
             CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
             CGEvent.tapEnable(tap: port, enable: true)
 
@@ -164,6 +165,8 @@ final class SnifferContext {
     let ownerName: String
     let bundleID: String?
     let handler: (SystemDefinedSniffer.Delivery) -> Void
+    /// The tap this box belongs to, so the callback can switch it back on.
+    var port: CFMachPort?
 
     init(
         pid: Int32,
@@ -201,16 +204,27 @@ final class SnifferContext {
 }
 
 /// The C callback. Listen-only, so the event is always passed through unchanged.
-private func shortkingSniffCallback(
+func shortkingSniffCallback(
     proxy: CGEventTapProxy,
     type: CGEventType,
     event: CGEvent,
     userInfo: UnsafeMutableRawPointer?
 ) -> Unmanaged<CGEvent>? {
     guard let userInfo else { return Unmanaged.passUnretained(event) }
+    let context = Unmanaged<SnifferContext>.fromOpaque(userInfo).takeUnretainedValue()
+
+    // The system can switch a tap off, and says so here whatever the mask is.
+    // Not switched back on, it stays dead while the panel still reports it as
+    // listening. `SandwichTaps` re-arms its taps the same way.
+    if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+        if let port = context.port {
+            CGEvent.tapEnable(tap: port, enable: true)
+            Log.detective.warning("systemDefined sniffer tap for pid \(context.pid) disabled by the system; re-armed")
+        }
+        return nil
+    }
 
     if type.rawValue == SystemDefinedSniffer.systemDefinedRawType {
-        let context = Unmanaged<SnifferContext>.fromOpaque(userInfo).takeUnretainedValue()
         context.handle(event: event)
     }
 

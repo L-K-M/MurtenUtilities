@@ -41,6 +41,7 @@ enum SystemReclaimer {
                 case "OK": failure = nil
                 case "ERR": failure = "the privileged delete failed"
                 case "GONE": failure = "no longer a plain directory (vanished or replaced?)"
+                case "STOP": failure = "stopped before this item was reached"
                 default: failure = "the privileged helper reported no result"
                 }
                 if let failure {
@@ -51,11 +52,18 @@ enum SystemReclaimer {
                 outcomes.append(Reclaimer.Outcome(item: item, failure: failure))
             }
         } catch {
-            let reason = (error as? PrivilegedRunner.Failure) == .cancelled
-                ? "administrator authorization was cancelled"
-                : ((error as? PrivilegedRunner.Failure)?.errorDescription
-                   ?? error.localizedDescription)
-            Log.reclaim.warning("privileged reclaim did not run: \(reason, privacy: .public)")
+            let reason: String
+            if (error as? PrivilegedRunner.Failure) == .cancelled {
+                reason = "administrator authorization was cancelled"
+            } else if Task.isCancelled {
+                // Stop ended the helper before it could report, so what it had
+                // already deleted is unknown here. Say so instead of blaming it.
+                reason = "stopped before the helper reported; scan again to see what was deleted"
+            } else {
+                reason = (error as? PrivilegedRunner.Failure)?.errorDescription
+                    ?? error.localizedDescription
+            }
+            Log.reclaim.warning("privileged reclaim did not finish: \(reason, privacy: .public)")
             outcomes.append(contentsOf: deletable.map {
                 Reclaimer.Outcome(item: $0, failure: reason)
             })
@@ -64,14 +72,16 @@ enum SystemReclaimer {
     }
 
     /// POSIX sh for one batch. Per path: `OK` (deleted), `ERR` (rm failed), `GONE`
-    /// (vanished or became a symlink between scan and reclaim — refused). Records
+    /// (vanished or became a symlink between scan and reclaim — refused), `STOP`
+    /// (the run was stopped first; see `PrivilegedRunner.keepGoingTest`). Records
     /// are `STATUS\tPATH`, NUL-separated, base64-wrapped exactly like the probe's.
     /// Callers must have validated every path via `SystemAreas.validate` first.
     static func script(for paths: [String]) -> String {
         var lines = ["("]
         for path in paths {
             let q = PrivilegedRunner.shellQuote(path)
-            lines.append("if [ -d \(q) ] && [ ! -L \(q) ]; then"
+            lines.append("if ! \(PrivilegedRunner.keepGoingTest); then printf 'STOP\\t%s\\0' \(q);"
+                + " elif [ -d \(q) ] && [ ! -L \(q) ]; then"
                 + " if rm -rf -- \(q); then printf 'OK\\t%s\\0' \(q);"
                 + " else printf 'ERR\\t%s\\0' \(q); fi;"
                 + " else printf 'GONE\\t%s\\0' \(q); fi")

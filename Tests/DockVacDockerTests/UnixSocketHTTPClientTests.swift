@@ -178,6 +178,16 @@ final class UnixSocketHTTPClientTests: XCTestCase {
         "POST /build/prune?filters=%7B%22id%22%3A%5B%22abc%22%5D%7D HTTP/1.1\r\n"), pruneRequest)
   }
 
+  func testBuildCacheFilterKeepsAHostileIDInsideItsString() throws {
+    // The ID comes from the daemon. One that closes the string must not be
+    // able to name a second record for the prune.
+    let hostile = "x\"],\"id\":[\"y"
+    let filters = try DockerEngineClient.buildCacheFilters(id: hostile)
+    let decoded = try JSONSerialization.jsonObject(with: Data(filters.utf8)) as? [String: [String]]
+    XCTAssertEqual(decoded, ["id": [hostile]])
+    XCTAssertEqual(try DockerEngineClient.buildCacheFilters(id: "abc"), "{\"id\":[\"abc\"]}")
+  }
+
   func testEngineClientReportsDecodingProblems() async throws {
     let payload =
       "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 4\r\n\r\nnull"

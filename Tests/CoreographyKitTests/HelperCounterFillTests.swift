@@ -54,6 +54,24 @@ final class HelperCounterFillTests: XCTestCase {
         XCTAssertEqual(asked, [.processCounters(pids: [3, 4])])
     }
 
+    /// The helper reads after the base sample is stamped. The monitor drops
+    /// a row that is newer than its snapshot, so the filled sample must
+    /// cover the helper's read time or every filled process goes missing.
+    func testTheMonitorKeepsAProcessTheHelperFilled() async throws {
+        let base = Sample([
+            Self.row(pid: 3, counters: .failure(.restricted(code: EPERM))),
+            Self.row(pid: 5, counters: .success(Self.counters(pid: 5).counters))
+        ])
+        let fill = HelperCounterFill(base: base, helper: Self.helper(Counting(Self.counters(pid: 3))))
+
+        let raw = await fill.read()
+        XCTAssertEqual(raw.monotonicNanoseconds, 2_000, "the sample is as new as its newest row")
+
+        let snapshot = try await ProcessMonitor(driver: fill, gpuClients: NoGPUClients()).sample()
+        XCTAssertEqual(snapshot.processes.map(\.id.pid), [3, 5])
+        XCTAssertEqual(snapshot.issues.map(\.pid), [])
+    }
+
     func testKernelTaskDoesNotSpoilTheRequest() async {
         // PID 0 is listed and restricted like other root processes, but the helper refuses it.
         let base = Sample([
@@ -166,6 +184,13 @@ private struct Sample: ProcessSampleReading {
             clockID: UUID(), monotonicNanoseconds: 1_000, wallTime: Date(), logicalCPUCount: 8, collectorPID: 1,
             enumeration: .success(ProcessEnumeration(processes: rows, failures: [], isTruncated: false))
         )
+    }
+}
+
+/// A Mac without the GPU client registry.
+private struct NoGPUClients: GPUClientTimeReading {
+    func read() async -> RawGPUClientSnapshot {
+        RawGPUClientSnapshot(clockID: UUID(), monotonicNanoseconds: 0, wallTime: Date(), walk: .failure(.unsupportedPlatform))
     }
 }
 
