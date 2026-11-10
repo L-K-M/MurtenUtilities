@@ -95,6 +95,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Developer Cleanup: Stop now stops an administrator delete. The rest of a
   batch of system-area items or local snapshots used to be deleted anyway;
   now nothing further is deleted once the item in progress is done.
+- CI Runner Manager can remove a Forgejo runner whose `.service` marker is
+  missing; removal used to fail before the runner was stopped.
+- Shortcut Detective no longer leaves an event tap registered after each
+  scan's Input Monitoring check.
+- Docker Cleaner encodes the build-cache ID it sends to the daemon instead
+  of pasting it into the request.
 
 ## [0.1.0] - 2026-11-01
 
