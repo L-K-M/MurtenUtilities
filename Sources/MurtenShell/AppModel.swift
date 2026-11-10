@@ -89,9 +89,11 @@ public final class AppModel {
             services.settings.save(settings)
             withdrawSilencedNotifications(previous: oldValue)
             Task { await applyWatchers() }
-            // Turning checks on checks now, not at the next launch.
+            // Turning checks on checks now, not at the next launch. It is a
+            // request from the user, so the daily and retry limits that pace
+            // the automatic check do not hold it back.
             if started, settings.updateChecks == .daily, oldValue.updateChecks != .daily {
-                Task { await checkForUpdatesIfDue() }
+                Task { await checkForUpdates() }
             }
         }
     }

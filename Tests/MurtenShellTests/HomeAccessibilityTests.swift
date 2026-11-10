@@ -104,18 +104,25 @@ final class HomeAccessibilityTests: XCTestCase {
             Node(object: host).first(named: module.name)
         }
 
+        /// Also withdraws the assistive client, so later tests in this
+        /// process see the app as they would without one.
         func close() {
             window.close()
+            Self.setAssistiveClientPresent(false)
         }
 
         /// SwiftUI builds its accessibility tree only once an assistive
         /// client has announced itself. Setting AXEnhancedUserInterface is
         /// how such a client does that; here the test plays the client.
         private static func activateAccessibility() {
+            setAssistiveClientPresent(true)
+        }
+
+        private static func setAssistiveClientPresent(_ present: Bool) {
             let selector = NSSelectorFromString("accessibilitySetValue:forAttribute:")
             let application = NSApplication.shared
             guard application.responds(to: selector) else { return }
-            application.perform(selector, with: true, with: "AXEnhancedUserInterface")
+            application.perform(selector, with: present, with: "AXEnhancedUserInterface")
         }
     }
 }

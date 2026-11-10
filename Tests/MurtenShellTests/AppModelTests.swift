@@ -297,6 +297,25 @@ final class AppModelTests: XCTestCase {
         await harness.model.stop()
     }
 
+    func testTurningUpdateChecksOnChecksEvenAfterARecentCheck() async {
+        // Turning the setting on is a request, not a scheduled check: it
+        // answers even when Check Now already ran today, or failed just now.
+        let harness = Harness()
+        await harness.model.start()
+        await harness.model.checkForUpdates()
+        harness.updates.isFailing = true
+        await harness.model.checkForUpdates()
+        XCTAssertEqual(harness.updates.requests, 2)
+
+        harness.updates.isFailing = false
+        harness.model.settings.updateChecks = .daily
+        let checked = await eventually { harness.updates.requests == 3 }
+        XCTAssertTrue(checked, "turning checks on must check at once")
+        let answered = await eventually { harness.model.updateCheck == .available(harness.updates.release.version) }
+        XCTAssertTrue(answered)
+        await harness.model.stop()
+    }
+
     func testBackgroundWorkNeedsResidentModeAndAnEnabledModule() async {
         let harness = Harness()
         await harness.model.start()
