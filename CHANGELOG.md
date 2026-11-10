@@ -84,6 +84,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- VoiceOver, Voice Control and Switch Control can open tools from the home
+  grid again: the tiles looked like buttons to them but offered no press
+  action.
 - The daily suite update check now repeats while the app keeps running and
   starts as soon as you turn it on; it used to run only at launch. A failed
   check retries within the hour and reports next to Check Now instead of

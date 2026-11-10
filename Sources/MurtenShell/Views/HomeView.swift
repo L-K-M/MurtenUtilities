@@ -120,11 +120,12 @@ struct ModuleTile: View {
         }
         .buttonStyle(.plain)
         .disabled(state != .available)
-        .accessibilityElement(children: .ignore)
+        // The button stays the accessibility element, so it keeps its press
+        // action. Replacing it with accessibilityElement(children: .ignore)
+        // left a button-shaped element VoiceOver could not activate.
         .accessibilityLabel(module.name)
         .accessibilityValue(accessibilityState)
         .accessibilityHint(state == .available ? "Opens the tool. \(module.summary)" : caption)
-        .accessibilityAddTraits(.isButton)
     }
 
     private var caption: String {
