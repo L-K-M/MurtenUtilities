@@ -177,7 +177,8 @@ attributes them to installed products, and investigates boot failures.
 ### App Permission Checkup (from DeviceControlDoctor) — effort: cheap — phase 2
 
 Diagnoses Device Control / Data Access (TCC) permission records that look
-granted but fail functionally. `DoctorCore` is pure, `ProcessRunning` is the
+granted but fail functionally, and lists every recorded privacy permission
+on the Mac in its All permissions view. `DoctorCore` is pure, `ProcessRunning` is the
 only subprocess boundary, `tccutil`/`codesign` run via fixed paths, repair is
 user-confirmed per service. The pane sidebar's always-visible All apps
 section also offers an explicitly confirmed, service-wide Reset All for
@@ -205,6 +206,48 @@ or functionally tested by the Test Pad.
   recorded client IDs can be reviewed in a bounded popover. A completed reset
   links to the Privacy_ScreenCapture settings pane for the two recording
   grants.
+- **All permissions:** the pane's second view (the sidebar's switch) lists
+  every recorded privacy decision. It reads on demand, never in the
+  background, and opens the databases read-only:
+  `/Library/Application Support/com.apple.TCC/TCC.db` ("For all users") and
+  `~/Library/Application Support/com.apple.TCC/TCC.db` ("For you"), with
+  `managed_overrides` folded in. Opening them needs Full Disk Access for the
+  whole suite. An `EPERM` refusal shows a setup card linking
+  Privacy_AllFiles, never an empty list. A missing per-user database
+  (macOS 27.0.1 has none) is reported as not readable, with links to each
+  per-user Settings list. Services come from a 40-entry catalog checked
+  against macOS 27.0.1 (the TCC framework's prompts, the Privacy & Security
+  extension's `TCCServiceList.plist`, titles and anchors); an unknown service
+  is listed under a title derived from its identifier. Clients are resolved
+  through LaunchServices and the file system. Every installed copy is
+  checked in-process (Security.framework, without hashing resources)
+  against the code requirement recorded with the decision.
+  - Filters: Leftover (no copy outside the Trash), Look-alike (same name,
+    different app identifier; an executable inside an app counts as that
+    app), Broken (no copy satisfies the recorded requirement) and High-risk
+    (a granted Full Disk Access, Accessibility, Event generation, Input
+    monitoring, Screen & System Audio Recording, System Audio Recording Only
+    or Remote Desktop).
+  - Other flags mark macOS's own clients (system folders, or `com.apple.`
+    without a copy outside them), Managed entries (`managed_overrides` or
+    reason 6), apps on a disconnected disk, and Automation entries whose
+    target is gone.
+  - Search covers names, identifiers and permission titles. Copy Report puts
+    a plain-text report on the clipboard; nothing else leaves the Mac.
+- **Inventory resets:** confirmed per entry, per app or for all leftovers.
+  Each runs one `tccutil reset SERVICE BUNDLE_ID` per app and service, never
+  `All` and never service-wide. Resets take the module's repair lock, so they
+  never overlap a check, a per-app repair, Reset All or a restart. macOS's
+  own entries, managed entries and path clients are never reset; they get
+  System Settings steps instead: the remove button where the list has one,
+  otherwise turning access off.
+  - Afterwards the databases are read again, and each entry is reported as
+    removed, still recorded, failed (with tccutil's answer), unverified or
+    Settings-only. Watched apps whose decisions were reset lose their test
+    evidence and are checked again.
+  - `tccutil` cannot reset an app LaunchServices does not know (exit 64,
+    OSStatus -10814, checked on 27.0.1), so most leftovers end with the
+    Settings steps. One still in the Trash can be reset.
 - **Watcher:** every 30 minutes (120 s timeout, local), per watched app:
   `tccutil list` for its expected permissions and `codesign` against the
   identity the pane saved. One finding per app (scope: its watch-list id)
@@ -215,7 +258,8 @@ or functionally tested by the Test Pad.
   healthy. Apps in, or linked into, privacy-guarded places (Desktop,
   Documents, Downloads, iCloud Drive and file providers, other apps'
   containers, other volumes, any home folder but `~/Applications` and
-  `~/Library`) are left to the pane. It never resets, writes or prompts.
+  `~/Library`) are left to the pane. It never resets, writes or prompts,
+  and never opens the privacy databases the All permissions view reads.
 - **Preselection:** the route selects the named app in the watch list and
   nothing else. The repair sheet opens only on the user's click, with the
   app's expected permissions checked, as in the standalone app.

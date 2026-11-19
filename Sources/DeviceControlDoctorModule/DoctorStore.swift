@@ -286,7 +286,7 @@ import UniformTypeIdentifiers
         openSettings(anchor: service.settingsAnchor)
     }
 
-    private func openSettings(anchor: String) {
+    func openSettings(anchor: String) {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(anchor)") {
             settingsOpener(url)
         }
@@ -371,6 +371,36 @@ import UniformTypeIdentifiers
             + (failures.isEmpty ? "" : "\n\n" + failures.joined(separator: "\n"))
         refresh(appID: appID)
         return failures.isEmpty && succeeded.count == plan.services.count
+    }
+
+    // MARK: - Inventory resets
+
+    /// Takes the module's repair lock for a confirmed inventory reset, so it
+    /// never overlaps a check, a per-app repair, Reset All or a restart.
+    /// False, with a notice, while one of those runs.
+    func beginInventoryReset() -> Bool {
+        guard !isChecking, !isRepairing else {
+            notice = ProcessTerminationError.busy.localizedDescription
+            return false
+        }
+        isRepairing = true
+        return true
+    }
+
+    /// Releases the lock. Watched apps whose decisions may have changed
+    /// (a command that did not report failure) lose their test evidence,
+    /// as after a per-app repair, and are checked again.
+    func endInventoryReset(resetBundles: Set<String>) {
+        isRepairing = false
+        let affected = apps.indices.filter { resetBundles.contains(apps[$0].bundleID) }
+        guard !affected.isEmpty else { return }
+        for index in affected {
+            apps[index].functionalTest = nil
+            addEvent(apps[index], "A reset from All permissions may have changed this app's decisions. Effective access is unverified; approve access again in System Settings and test the app.")
+        }
+        save()
+        watchListChanged()
+        refresh()
     }
 
     /// Reads the complete service-wide client scope for the Reset All sheet.

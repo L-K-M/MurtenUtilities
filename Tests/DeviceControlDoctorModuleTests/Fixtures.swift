@@ -13,6 +13,7 @@ final class FakeProcessRunner: ProcessRunning, @unchecked Sendable {
     private var cancelsCallingTask = false
     private var clearsListedServices = false
     private var clearedServices = Set<String>()
+    private var beforeNextAnswer: (@Sendable () async -> Void)?
 
     var calls: [[String]] {
         lock.lock(); defer { lock.unlock() }
@@ -36,6 +37,13 @@ final class FakeProcessRunner: ProcessRunning, @unchecked Sendable {
         cancelsCallingTask = true
     }
 
+    /// Runs `action` while the next call is in flight, as when the user
+    /// clicks something before a command answers.
+    func whileNextCallRuns(_ action: @escaping @Sendable () async -> Void) {
+        lock.lock(); defer { lock.unlock() }
+        beforeNextAnswer = action
+    }
+
     /// Models `tccutil reset SERVICE` removing that service's records, so
     /// Reset All can verify the postcondition with another list command.
     func clearListedServiceAfterReset() {
@@ -46,8 +54,16 @@ final class FakeProcessRunner: ProcessRunning, @unchecked Sendable {
     func run(_ executable: String, _ arguments: [String], timeout: TimeInterval) async -> CommandResult {
         let command = [executable] + arguments
         let (response, cancel) = record(command)
+        if let action = takeBeforeNextAnswer() { await action() }
         if cancel { withUnsafeCurrentTask { $0?.cancel() } }
         return response ?? CommandResult(output: "No fixture for \(command.joined(separator: " "))", exitCode: 127)
+    }
+
+    private func takeBeforeNextAnswer() -> (@Sendable () async -> Void)? {
+        lock.lock(); defer { lock.unlock() }
+        let action = beforeNextAnswer
+        beforeNextAnswer = nil
+        return action
     }
 
     private func record(_ command: [String]) -> (CommandResult?, cancel: Bool) {

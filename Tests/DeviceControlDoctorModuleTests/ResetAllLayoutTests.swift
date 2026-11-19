@@ -72,7 +72,8 @@ final class ResetAllLayoutTests: XCTestCase {
         let runner = FakeProcessRunner()
         runner.withholdListing()
         let store = makeStore(mac: mac, runner: runner, lifecycle: LayoutLifecycle(processCount: 0))
-        let probe = LayoutProbe(root: MainView(route: nil).environmentObject(store),
+        let inventory = InventoryStore(doctor: store, reader: FakeDatabaseReader(), resolver: FakeClientResolver(), runner: runner)
+        let probe = LayoutProbe(root: MainView(route: nil).environmentObject(store).environmentObject(inventory),
                                 size: NSSize(width: 980, height: 650))
         defer { probe.close() }
         try await Task.sleep(nanoseconds: 50_000_000)

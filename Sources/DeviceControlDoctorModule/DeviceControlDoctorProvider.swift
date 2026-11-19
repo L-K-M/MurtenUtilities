@@ -9,6 +9,8 @@ import MurtenModuleKit
 ///
 /// - Pane: the standalone app's main window. It checks when it appears and
 ///   every minute while visible; a suggestion's route only selects an app.
+///   Its All permissions view (`InventoryStore`) reads the privacy
+///   databases on demand, never in the background.
 /// - Watcher: `PermissionWatcher` with `VerificationRule`, observation only.
 /// - Window "test-pad": the Test Pad. Settings: monitoring and privacy.
 /// - Menu section: the standalone app's menu-bar extra.
@@ -23,6 +25,7 @@ public final class DeviceControlDoctorProvider: SuiteModuleProvider {
     public let routeActions = DoctorRoute.actions
     public let watch: WatcherRegistration?
     let store: DoctorStore
+    let inventory: InventoryStore
 
     public convenience init(context: ModuleContext) {
         self.init(context: context, runner: ProcessRunner(), watchList: WatchListFile.defaultURL)
@@ -33,17 +36,21 @@ public final class DeviceControlDoctorProvider: SuiteModuleProvider {
     init(context: ModuleContext, runner: any ProcessRunning, watchList: URL,
          home: String = FileManager.default.homeDirectoryForCurrentUser.path,
          lifecycle: (any ApplicationLifecycleManaging)? = nil,
-         settingsOpener: (@MainActor (URL) -> Void)? = nil) {
+         settingsOpener: (@MainActor (URL) -> Void)? = nil,
+         databaseReader: (any PrivacyDatabaseReading)? = nil,
+         clientResolver: (any ClientResolving)? = nil) {
         let lifecycle = lifecycle ?? WorkspaceApplicationLifecycle()
         store = DoctorStore(defaults: context.defaults, runner: runner, storageURL: watchList,
                             lifecycle: lifecycle, settingsOpener: settingsOpener,
                             watchListChanged: context.requestRecheck)
+        inventory = InventoryStore(doctor: store, reader: databaseReader ?? TCCDatabaseReader(home: home),
+                                   resolver: clientResolver ?? ClientResolver(home: home), runner: runner)
         watch = WatcherRegistration(watcher: PermissionWatcher(watchList: watchList, runner: runner, home: home),
                                     rule: VerificationRule())
     }
 
     public func makePane(route: ModuleRoute?) -> AnyView {
-        AnyView(MainView(route: route).environmentObject(store))
+        AnyView(MainView(route: route).environmentObject(store).environmentObject(inventory))
     }
 
     public func makeSettings() -> AnyView? {

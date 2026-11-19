@@ -4,17 +4,24 @@ import DoctorCore
 import MurtenCore
 import MurtenModuleKit
 
-private enum DoctorStyle {
+enum DoctorStyle {
     static let accent = Color.teal
     static let warning = Color.orange
     static let border = Color.primary.opacity(0.08)
 }
 
+/// The pane's two views: the watch list and every recorded permission.
+enum PaneSection: Hashable {
+    case watchList, allPermissions
+}
+
 struct MainView: View {
     @EnvironmentObject private var doctor: DoctorStore
+    @EnvironmentObject private var inventory: InventoryStore
     @Environment(\.openWindow) private var openWindow
     @State private var showsAddApps = false
     @State private var showsResetAll = false
+    @State private var section: PaneSection = .watchList
     /// The suggestion or tile click that opened the pane.
     let route: ModuleRoute?
 
@@ -25,65 +32,19 @@ struct MainView: View {
     var body: some View {
         NavigationSplitView {
             VStack(spacing: 0) {
-                HStack {
-                    Label("Watch list", systemImage: "stethoscope")
-                        .font(.headline)
-                    Spacer()
-                    Text("\(doctor.apps.count)")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                Picker("View", selection: $section) {
+                    Text("Watch list").tag(PaneSection.watchList)
+                    Text("All permissions").tag(PaneSection.allPermissions)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-
-                if doctor.apps.isEmpty {
-                    VStack(spacing: 10) {
-                        Image(systemName: "app.badge.checkmark")
-                            .font(.system(size: 30, weight: .light))
-                            .foregroundStyle(DoctorStyle.accent)
-                        Text("Watch the apps you rely on")
-                            .font(.headline)
-                        Text("Add apps that need device control or input access.")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                        Button("Add Apps…") { showsAddApps = true }
-                            .buttonStyle(.borderedProminent)
-                    }
-                    .padding(22)
-                    .frame(maxHeight: .infinity)
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .padding(.horizontal, 12)
+                .padding(.top, 12)
+                if section == .allPermissions {
+                    InventorySidebar()
                 } else {
-                    List(selection: $doctor.selectedID) {
-                        ForEach(doctor.apps) { app in
-                            WatchListRow(app: app)
-                                .tag(app.id)
-                                .contextMenu {
-                                    Button("Check permissions") { doctor.refresh(appID: app.id) }
-                                        .disabled(doctor.isChecking || doctor.isRepairing)
-                                    Button("Show in Finder") { doctor.revealApp(app) }
-                                    Divider()
-                                    Button("Remove from watch list", role: .destructive) { doctor.removeApp(app.id) }
-                                        .disabled(doctor.isRepairing)
-                                }
-                        }
-                    }
-                    .listStyle(.sidebar)
+                    watchListSidebar
                 }
-                Divider()
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        Circle().fill(doctor.monitorEnabled ? DoctorStyle.accent : .secondary).frame(width: 6, height: 6)
-                        Text(doctor.monitorEnabled ? "Checking every minute" : "Manual checks")
-                            .font(.caption)
-                    }
-                    if let checked = doctor.lastChecked {
-                        Text("Last checked \(checked.formatted(date: .omitted, time: .shortened))")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
                 Divider()
                 VStack(alignment: .leading, spacing: 8) {
                     Text("All apps").font(.headline)
@@ -112,7 +73,9 @@ struct MainView: View {
                     .background(DoctorStyle.accent.opacity(0.09))
                     Divider()
                 }
-                if let app = doctor.selectedApp {
+                if section == .allPermissions {
+                    InventoryDetailView()
+                } else if let app = doctor.selectedApp {
                     AppDetailView(app: app)
                         .id(app.id)
                 } else {
@@ -127,19 +90,23 @@ struct MainView: View {
                 Button { showsAddApps = true } label: { Label("Add Apps", systemImage: "plus") }
                     .help("Choose apps or import existing permission entries")
                     .disabled(doctor.isRepairing)
-                Button { doctor.refresh() } label: {
-                    if doctor.isChecking {
+                Button { refreshShownView() } label: {
+                    if doctor.isChecking || inventory.isReading || inventory.isResetting {
                         ProgressView().controlSize(.small).frame(width: 16, height: 16)
                     } else {
                         Label("Check", systemImage: "arrow.clockwise")
                     }
                 }
+                .help(section == .allPermissions ? "Read the privacy databases again" : "Check the watched apps' permissions")
                 .keyboardShortcut("r", modifiers: .command)
-                .disabled(doctor.isChecking || doctor.isRepairing || doctor.apps.isEmpty)
+                .disabled(section == .allPermissions ? !canRefreshInventory : doctor.isChecking || doctor.isRepairing || doctor.apps.isEmpty)
                 Button { openWindow(module: .testPad) } label: { Label("Test Pad", systemImage: "text.cursor") }
                     .help("Test an app against a controlled text field")
-                Button { doctor.exportReport() } label: { Label("Export Report", systemImage: "square.and.arrow.up") }
-                    .disabled(doctor.apps.isEmpty || doctor.isRepairing)
+                // The watch list's report; All permissions has Copy Report.
+                if section == .watchList {
+                    Button { doctor.exportReport() } label: { Label("Export Report", systemImage: "square.and.arrow.up") }
+                        .disabled(doctor.apps.isEmpty || doctor.isRepairing)
+                }
             }
         }
         .sheet(isPresented: $showsAddApps) { AddAppsView() }
@@ -150,14 +117,98 @@ struct MainView: View {
         .moduleCommands([
             ModuleCommand("Add Applications…", shortcut: KeyboardShortcut("o")) { doctor.chooseApps() },
             ModuleCommand("Refresh Permissions", shortcut: KeyboardShortcut("r"),
-                          isEnabled: !(doctor.isChecking || doctor.isRepairing)) { doctor.refresh() },
+                          isEnabled: section == .allPermissions ? canRefreshInventory : !(doctor.isChecking || doctor.isRepairing)) {
+                refreshShownView()
+            },
             ModuleCommand("Export Diagnostic Report…", shortcut: KeyboardShortcut("e", modifiers: [.command, .shift])) {
                 doctor.exportReport()
             }
         ])
-        .onAppear { doctor.apply(route) }
+        .onAppear {
+            doctor.apply(route)
+            // A suggestion names a watched app; show it.
+            if DoctorRoute.appID(in: route) != nil { section = .watchList }
+        }
         // Checks while the pane is visible; cancelled when it goes away.
         .task { await doctor.monitorWhileVisible() }
+    }
+
+    private var canRefreshInventory: Bool {
+        !(inventory.isReading || inventory.isResetting || doctor.isRepairing)
+    }
+
+    /// ⌘R refreshes what the pane shows: the watch list's check, or the
+    /// privacy databases' read.
+    private func refreshShownView() {
+        if section == .allPermissions {
+            Task { await inventory.refresh() }
+        } else {
+            doctor.refresh()
+        }
+    }
+
+    private var watchListSidebar: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Label("Watch list", systemImage: "stethoscope")
+                    .font(.headline)
+                Spacer()
+                Text("\(doctor.apps.count)")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+
+            if doctor.apps.isEmpty {
+                VStack(spacing: 10) {
+                    Image(systemName: "app.badge.checkmark")
+                        .font(.system(size: 30, weight: .light))
+                        .foregroundStyle(DoctorStyle.accent)
+                    Text("Watch the apps you rely on")
+                        .font(.headline)
+                    Text("Add apps that need device control or input access.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button("Add Apps…") { showsAddApps = true }
+                        .buttonStyle(.borderedProminent)
+                }
+                .padding(22)
+                .frame(maxHeight: .infinity)
+            } else {
+                List(selection: $doctor.selectedID) {
+                    ForEach(doctor.apps) { app in
+                        WatchListRow(app: app)
+                            .tag(app.id)
+                            .contextMenu {
+                                Button("Check permissions") { doctor.refresh(appID: app.id) }
+                                    .disabled(doctor.isChecking || doctor.isRepairing)
+                                Button("Show in Finder") { doctor.revealApp(app) }
+                                Divider()
+                                Button("Remove from watch list", role: .destructive) { doctor.removeApp(app.id) }
+                                    .disabled(doctor.isRepairing)
+                            }
+                    }
+                }
+                .listStyle(.sidebar)
+            }
+            Divider()
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Circle().fill(doctor.monitorEnabled ? DoctorStyle.accent : .secondary).frame(width: 6, height: 6)
+                    Text(doctor.monitorEnabled ? "Checking every minute" : "Manual checks")
+                        .font(.caption)
+                }
+                if let checked = doctor.lastChecked {
+                    Text("Last checked \(checked.formatted(date: .omitted, time: .shortened))")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     private var welcomeView: some View {
@@ -798,7 +849,7 @@ struct ResetAllView: View {
     }
 }
 
-private struct DoctorCard<Content: View>: View {
+struct DoctorCard<Content: View>: View {
     @ViewBuilder var content: () -> Content
     var body: some View {
         content()
@@ -809,7 +860,7 @@ private struct DoctorCard<Content: View>: View {
     }
 }
 
-private struct StatusPill: View {
+struct StatusPill: View {
     let title: String
     let color: Color
     var body: some View {

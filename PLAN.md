@@ -53,7 +53,7 @@ The confirmed roster — and what each tool is for — lives in
 | Docker Cleaner | `DockVac` (SwiftPM) | Docker disk reclaim | Engine API disk-usage growth → "clean up?" |
 | Developer Cleanup | `RepoMen` (.xcodeproj) | dev caches & build artifacts | cache growth → "12 GB of build products" |
 | Startup Manager | `BootCaptain` (Swift, GitHub-only) | startup items & boot failures | new/changed login items → "review what X added" |
-| App Permission Checkup | `DeviceControlDoctor` (SwiftPM) | TCC permission diagnostics | grant-vs-function drift → "re-check X" |
+| App Permission Checkup | `DeviceControlDoctor` (SwiftPM) | TCC permission diagnostics and inventory | grant-vs-function drift → "re-check X" |
 | Shortcut Detective | `Shortking` (Swift, GitHub-only) | shortcut inventory & diagnosis | new conflict → "X stole ⌘⇧Space" |
 | Local Network Access | `HallPass` (SwiftPM) | local-network CIDR exemptions | mostly on-demand |
 | Zen Session Recovery | `ZenBackupManager` (Swift, GitHub-only) | browser-session backups | backup staleness → "last snapshot 9 days ago" |
@@ -147,7 +147,8 @@ Per-module migration notes, satellites, and new-module ideas:
   RunningMan already works around both (`Sources/RunningManCore/Discovery.swift`,
   `Sources/RunningManServices/ForgejoConnectionStore.swift`). Shortking
   (Accessibility, Input Monitoring), BootCaptain (Automation, Full Disk Access
-  for login items) and RepoMen (Documents, Full Disk Access for snapshots)
+  for login items), RepoMen (Documents, Full Disk Access for snapshots)
+  and App Permission Checkup (Full Disk Access for its All permissions view)
   need a stable identity, Apple Development or Developer ID, to keep those
   grants across updates; until one is chosen they migrate with that
   limitation stated in their panes. BootCaptain's and Coreography's
