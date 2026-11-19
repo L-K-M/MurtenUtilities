@@ -57,7 +57,10 @@ struct TCCDatabaseReader: PrivacyDatabaseReading {
                 : []
             return .read(PermissionRecord.merging(access: access, managed: managed))
         } catch let error as ReadError {
-            return failure(handle, fallback: error.message)
+            // The file opened, so it is there; SQLite's last system error
+            // may be from a sidecar file and only a refusal is told apart.
+            if sqlite3_system_errno(handle) == EPERM { return .needsFullDiskAccess }
+            return .failed(error.message)
         } catch {
             return .failed(error.localizedDescription)
         }

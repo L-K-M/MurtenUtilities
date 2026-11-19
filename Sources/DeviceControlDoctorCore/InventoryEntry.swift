@@ -56,9 +56,15 @@ public struct InventoryEntry: Identifiable, Hashable, Sendable {
     }
 
     /// The flags in display order, with a short title each.
-    public var flagTitles: [String] {
-        Self.flagOrder.compactMap { flags.contains($0.flag) ? $0.title : nil }
+    public var flagTitles: [String] { flagLabels.map(\.title) }
+
+    /// The flags in display order, each with its title and whether it
+    /// calls for attention rather than adding context.
+    public var flagLabels: [(title: String, isWarning: Bool)] {
+        Self.flagOrder.compactMap { flags.contains($0.flag) ? ($0.title, Self.warningFlags.contains($0.flag)) : nil }
     }
+
+    static let warningFlags: Flags = [.leftover, .lookAlike, .broken, .highRisk, .missingTarget]
 
     static let flagOrder: [(flag: Flags, title: String)] = [
         (.leftover, "Leftover"), (.lookAlike, "Look-alike"), (.broken, "Broken"), (.highRisk, "High-risk"),

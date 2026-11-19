@@ -75,6 +75,7 @@ final class PermissionRecordTests: XCTestCase {
         XCTAssertTrue(merged[0].isManaged)
         XCTAssertEqual(merged[1].decision, .denied)
         XCTAssertFalse(merged[1].isManaged)
+        XCTAssertEqual(merged[2].decision, .allowed)
         XCTAssertTrue(merged[2].isManaged)
         XCTAssertTrue(merged.allSatisfy { $0.database == .system && $0.clientKind == .bundleIdentifier })
     }

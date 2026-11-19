@@ -21,6 +21,9 @@ struct ClientResolver: ClientResolving {
 
     func resolve(_ records: [PermissionRecord]) async -> [ResolvedRecord] {
         var clients: [String: Resolution] = [:]
+        // An app's rows for different services usually carry the same
+        // requirement, so each app is checked once per requirement.
+        var signatures: [SignatureKey: SignatureCheck] = [:]
         var result: [ResolvedRecord] = []
         result.reserveCapacity(records.count)
         // Never cut short: a partial list would read as a complete inventory.
@@ -37,8 +40,10 @@ struct ClientResolver: ClientResolving {
                 clients[targetKey] = resolved
                 target = resolved.status
             }
-            result.append(ResolvedRecord(record: record, client: client.status,
-                                         signature: signature(record, client: client), target: target))
+            let signatureKey = SignatureKey(client: key, requirement: record.requirement)
+            let check = signatures[signatureKey] ?? signature(record, client: client)
+            signatures[signatureKey] = check
+            result.append(ResolvedRecord(record: record, client: client.status, signature: check, target: target))
         }
         return result
     }
@@ -48,6 +53,11 @@ struct ClientResolver: ClientResolving {
     private struct Resolution {
         let status: ClientStatus
         let copies: [String]
+    }
+
+    private struct SignatureKey: Hashable {
+        let client: String
+        let requirement: Data?
     }
 
     private static func key(_ identifier: String, _ kind: PermissionRecord.ClientKind) -> String {

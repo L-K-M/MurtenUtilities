@@ -64,6 +64,8 @@ final class InventoryResetPlanTests: XCTestCase {
 
     func testServiceNameValidation() {
         XCTAssertFalse(InventoryResetPlan.isServiceName("All"))
+        XCTAssertFalse(InventoryResetPlan.isServiceName("all"))
+        XCTAssertFalse(InventoryResetPlan.isServiceName("ALL"))
         XCTAssertTrue(InventoryResetPlan.isServiceName("Camera"))
         XCTAssertFalse(InventoryResetPlan.isServiceName("Bad Name"))
         XCTAssertFalse(InventoryResetPlan.isServiceName(""))

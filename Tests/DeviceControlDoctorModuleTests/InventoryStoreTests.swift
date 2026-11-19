@@ -100,7 +100,7 @@ final class InventoryStoreTests: XCTestCase {
 
     // MARK: - Reading
 
-    func testRefreshReadsBothDatabasesAndClassifiesEntries() async {
+    func testRefreshReadsBothDatabasesAndClassifiesEntries() async throws {
         let reader = FakeDatabaseReader(system: .read([
             record("kTCCServiceSystemPolicyAllFiles", "com.example.Backup"),
             record("kTCCServiceCamera", "com.gone.App"),
@@ -112,11 +112,11 @@ final class InventoryStoreTests: XCTestCase {
 
         await inventory.refresh()
 
-        let read = try? XCTUnwrap(inventory.inventory)
-        XCTAssertEqual(read?.entries.count, 2)
-        XCTAssertEqual(read?.count(.leftovers), 1)
-        XCTAssertEqual(read?.count(.highRisk), 1)
-        XCTAssertEqual(read?.userDatabaseUnavailable, true)
+        let read = try XCTUnwrap(inventory.inventory)
+        XCTAssertEqual(read.entries.count, 2)
+        XCTAssertEqual(read.count(.leftovers), 1)
+        XCTAssertEqual(read.count(.highRisk), 1)
+        XCTAssertTrue(read.userDatabaseUnavailable)
         XCTAssertEqual(reader.reads(of: .system), 1)
         XCTAssertEqual(reader.reads(of: .user), 1)
         XCTAssertEqual(inventory.leftovers.map(\.record.client), ["com.gone.App"])
@@ -192,6 +192,23 @@ final class InventoryStoreTests: XCTestCase {
         XCTAssertEqual(inventory.inventory?.entries.map(\.service.resetName), ["Camera"], "the fresh read is shown")
         XCTAssertFalse(doctor.isRepairing, "the module's repair lock is released")
         XCTAssertFalse(inventory.isResetting)
+    }
+
+    func testARefreshAskedForDuringAResetDoesNotRead() async throws {
+        let reader = FakeDatabaseReader(system: .read([record("kTCCServiceCamera", "com.example.App")]))
+        reader.then(.system, .read([]))
+        runner.respond(to: [SystemTool.tccutil, "reset", "Camera", "com.example.App"],
+                       with: CommandResult(output: "Successfully reset Camera", exitCode: 0))
+        let (_, inventory) = makeStores(reader: reader)
+        await inventory.refresh()
+        let entries = try XCTUnwrap(inventory.inventory?.entries)
+
+        // Refresh clicked while tccutil runs: its read would race the reset's.
+        runner.whileNextCallRuns { await inventory.refresh() }
+        _ = await inventory.reset(entries)
+
+        XCTAssertEqual(reader.reads(of: .system), 2, "only the first read and the reset's own re-read")
+        XCTAssertEqual(inventory.inventory?.entries.count, 0)
     }
 
     func testResetNeverTouchesSystemManagedOrPathEntries() async throws {

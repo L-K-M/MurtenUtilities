@@ -28,14 +28,16 @@ public struct InventoryResetPlan: Sendable, Equatable {
 
     public var arguments: [[String]] { services.map { ["reset", $0, bundleIdentifier] } }
 
-    /// Letters and digits only, and never `All`, which would widen the
-    /// reset to every service.
+    /// Letters and digits only, and never `All` in any case, which would
+    /// widen the reset to every service.
     static func isServiceName(_ name: String) -> Bool {
-        name != "All" && name.range(of: "\\A[A-Za-z][A-Za-z0-9]*\\z", options: .regularExpression) != nil
+        name.caseInsensitiveCompare("All") != .orderedSame
+            && name.range(of: "\\A[A-Za-z][A-Za-z0-9]*\\z", options: .regularExpression) != nil
     }
 
-    /// One plan per app for the given entries, skipping those `tccutil`
-    /// cannot reset; those are left for System Settings.
+    /// One plan per app for the given entries, in the order of their first
+    /// entry, skipping those `tccutil` cannot reset; those are left for
+    /// System Settings. A selected entry is always in one or the other.
     public static func plans(for entries: [InventoryEntry]) -> (plans: [InventoryResetPlan], skipped: [InventoryEntry]) {
         var skipped: [InventoryEntry] = []
         var byClient: [String: [InventoryEntry]] = [:]
@@ -45,7 +47,15 @@ public struct InventoryResetPlan: Sendable, Equatable {
             if byClient[entry.record.client] == nil { order.append(entry.record.client) }
             byClient[entry.record.client, default: []].append(entry)
         }
-        let plans = order.compactMap { client in byClient[client].flatMap { try? InventoryResetPlan(entries: $0) } }
+        var plans: [InventoryResetPlan] = []
+        for client in order {
+            guard let group = byClient[client] else { continue }
+            do {
+                plans.append(try InventoryResetPlan(entries: group))
+            } catch {
+                skipped.append(contentsOf: group)
+            }
+        }
         return (plans, skipped)
     }
 }

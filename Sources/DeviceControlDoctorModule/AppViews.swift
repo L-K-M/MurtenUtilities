@@ -91,7 +91,7 @@ struct MainView: View {
                     .help("Choose apps or import existing permission entries")
                     .disabled(doctor.isRepairing)
                 Button { refreshShownView() } label: {
-                    if doctor.isChecking || inventory.isReading {
+                    if doctor.isChecking || inventory.isReading || inventory.isResetting {
                         ProgressView().controlSize(.small).frame(width: 16, height: 16)
                     } else {
                         Label("Check", systemImage: "arrow.clockwise")

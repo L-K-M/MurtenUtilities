@@ -76,8 +76,10 @@ import DoctorCore
     // MARK: - Reading
 
     /// Reads both databases and resolves every client, off the main actor.
+    /// Does nothing while a reset runs: the reset reads again when its
+    /// commands finish, and an earlier read would show a half-reset state.
     func refresh() async {
-        guard !isReading else { return }
+        guard !isReading, !isResetting else { return }
         isReading = true
         defer { isReading = false }
         inventory = await read()

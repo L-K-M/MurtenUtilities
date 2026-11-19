@@ -179,8 +179,8 @@ struct InventoryDetailView: View {
         return read.systemDatabaseRead ? "No permission entries were found." : "No permission entries could be read."
     }
 
-    /// The entry's whole reset: every entry of the same app and service,
-    /// since `tccutil` resets them together.
+    /// Every entry of the entry's app, so the sheet can widen the reset to
+    /// the app's other services; only this entry's unit is preselected.
     private func request(for entry: InventoryEntry) -> InventoryResetRequest {
         let all = inventory.inventory?.entries.filter { $0.clientKey == entry.clientKey } ?? [entry]
         return InventoryResetRequest(client: entry.client.name, entries: all,
@@ -308,10 +308,10 @@ private struct InventoryEntryRow: View {
                     }
                 }
                 .font(.caption).foregroundStyle(.secondary)
-                if !entry.flagTitles.isEmpty {
+                if !entry.flagLabels.isEmpty {
                     HStack(spacing: 4) {
-                        ForEach(Array(zip(entry.flagTitles.indices, entry.flagTitles)), id: \.0) { _, title in
-                            StatusPill(title: title, color: flagColor(title))
+                        ForEach(Array(entry.flagLabels.enumerated()), id: \.offset) { _, label in
+                            StatusPill(title: label.title, color: label.isWarning ? DoctorStyle.warning : .secondary)
                         }
                     }
                 }
@@ -330,10 +330,6 @@ private struct InventoryEntryRow: View {
             }
         }
         .padding(.vertical, 3)
-    }
-
-    private func flagColor(_ title: String) -> Color {
-        ["Leftover", "Look-alike", "Broken", "High-risk", "Target gone"].contains(title) ? DoctorStyle.warning : .secondary
     }
 }
 

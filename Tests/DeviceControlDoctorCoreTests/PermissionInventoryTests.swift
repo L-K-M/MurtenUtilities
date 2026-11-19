@@ -137,6 +137,8 @@ final class PermissionInventoryTests: XCTestCase {
         let entries = InventoryFixtures.inventory([missing, other]).entries
         let missingEntry = try XCTUnwrap(entries.first { $0.record.client == "com.foo" })
         XCTAssertFalse(missingEntry.flags.contains(.lookAlike))
+        let installedEntry = try XCTUnwrap(entries.first { $0.record.client == "com.other" })
+        XCTAssertFalse(installedEntry.flags.contains(.lookAlike))
     }
 
     // MARK: - Automation targets
@@ -155,6 +157,14 @@ final class PermissionInventoryTests: XCTestCase {
     }
 
     // MARK: - Reset
+
+    func testFlagLabelsMarkWarnings() {
+        let entry = InventoryFixtures.entry(record: InventoryFixtures.record(), client: InventoryFixtures.client(),
+                                            flags: [.leftover, .highRisk, .managed, .system])
+        XCTAssertEqual(entry.flagLabels.map(\.title), ["Leftover", "High-risk", "Managed", "macOS"])
+        XCTAssertEqual(entry.flagLabels.map(\.isWarning), [true, true, false, false])
+        XCTAssertEqual(entry.flagTitles, entry.flagLabels.map(\.title))
+    }
 
     func testCanReset() throws {
         let bundle = try entry(for: InventoryFixtures.resolved(InventoryFixtures.record(client: "com.foo")))
@@ -279,6 +289,8 @@ final class PermissionInventoryTests: XCTestCase {
 
         XCTAssertTrue(InventoryFixtures.inventory([], sources: [DatabaseSource(database: .user, reading: .missing)]).userDatabaseUnavailable)
         XCTAssertFalse(InventoryFixtures.inventory([], sources: [DatabaseSource(database: .user, reading: .read([]))]).userDatabaseUnavailable)
+        XCTAssertFalse(InventoryFixtures.inventory([], sources: [DatabaseSource(database: .user, reading: .needsFullDiskAccess)]).userDatabaseUnavailable,
+                       "a refused per-user database is a Full Disk Access problem, not an absent one")
     }
 
     // MARK: - Ordering

@@ -74,9 +74,6 @@ public struct InventoryResetResult: Sendable {
         items.filter { if case .uncertain = $0.outcome { return true }; return false }.count
     }
 
-    /// Everything removed that was asked for, nothing left over.
-    public var removedEverything: Bool { !items.isEmpty && count(.removed) == items.count }
-
     /// One sentence per kind of outcome, for the notice and the sheet.
     public var summary: String {
         var parts: [String] = []
