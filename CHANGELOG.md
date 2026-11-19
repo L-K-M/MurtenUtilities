@@ -25,6 +25,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   apps, and verifying they remain closed before each service-wide reset.
 - Ad-hoc builds omit Startup Manager and System Monitor's privileged helpers;
   their helper-backed actions remain disabled until a Developer ID build.
+- App Permission Checkup's All permissions view lists every recorded
+  privacy decision on the Mac, not just the watch list's three
+  device-control permissions. It reads the macOS privacy databases
+  read-only, on demand, and needs Full Disk Access. It shows per-app and
+  per-permission views with search. Its Leftover, Look-alike, Broken (code
+  requirement no longer met) and High-risk filters sit beside macOS,
+  Managed, disconnected-disk and missing-Automation-target flags. Confirmed,
+  bundle-scoped resets of an entry, an app or all leftovers are checked
+  against a fresh read. Entries tccutil cannot reset get System Settings
+  steps. Copy Report puts a plain-text report on the clipboard. On macOS
+  27, where the per-user database is out of reach, the view links each
+  per-user Settings list.
 
 ### Changed
 
