@@ -387,15 +387,16 @@ import UniformTypeIdentifiers
         return true
     }
 
-    /// Releases the lock. Watched apps whose decisions were reset lose
-    /// their test evidence, as after a per-app repair, and are checked again.
+    /// Releases the lock. Watched apps whose decisions may have changed
+    /// (a command that did not report failure) lose their test evidence,
+    /// as after a per-app repair, and are checked again.
     func endInventoryReset(resetBundles: Set<String>) {
         isRepairing = false
         let affected = apps.indices.filter { resetBundles.contains(apps[$0].bundleID) }
         guard !affected.isEmpty else { return }
         for index in affected {
             apps[index].functionalTest = nil
-            addEvent(apps[index], "Permissions were reset from All permissions. Effective access is unverified; approve access again in System Settings and test the app.")
+            addEvent(apps[index], "A reset from All permissions may have changed this app's decisions. Effective access is unverified; approve access again in System Settings and test the app.")
         }
         save()
         watchListChanged()

@@ -94,43 +94,51 @@ struct InventoryDetailView: View {
 
     private var busy: Bool { inventory.isReading || inventory.isResetting || doctor.isRepairing }
 
+    /// Title and actions on one row, the search below, so neither
+    /// truncates at the pane's minimum width.
     private var header: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(inventory.selectionTitle).font(.title3.weight(.semibold))
-                if let read = inventory.inventory {
-                    Text("\(inventory.visibleEntries.count) of \(read.entries.count) entries · read \(read.readAt.formatted(date: .omitted, time: .shortened))")
-                        .font(.caption).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(inventory.selectionTitle).font(.title3.weight(.semibold)).lineLimit(1)
+                    if let read = inventory.inventory {
+                        Text("\(inventory.visibleEntries.count) of \(read.entries.count) entries · read \(read.readAt.formatted(date: .omitted, time: .shortened))")
+                            .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    }
                 }
+                .layoutPriority(1)
+                Spacer(minLength: 8)
+                if !inventory.leftovers.isEmpty {
+                    Button("Clean Up Leftovers…") {
+                        resetRequest = InventoryResetRequest(cleanup: inventory.leftovers)
+                    }
+                    .help("Reset every leftover entry tccutil can still reach, and show System Settings steps for the rest")
+                    .disabled(busy)
+                    .fixedSize()
+                }
+                Button { inventory.copyReport() } label: { Label("Copy Report", systemImage: "doc.on.clipboard") }
+                    .help("Copy a plain-text report of every entry to the clipboard")
+                    .disabled(inventory.inventory == nil)
+                    .fixedSize()
+                Button { Task { await inventory.refresh() } } label: {
+                    if inventory.isReading {
+                        ProgressView().controlSize(.small).frame(width: 16, height: 16)
+                    } else {
+                        Label("Refresh", systemImage: "arrow.clockwise")
+                    }
+                }
+                .help("Read the privacy databases again")
+                .disabled(busy)
+                .fixedSize()
             }
-            Spacer()
             HStack(spacing: 4) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Search apps or permissions", text: $inventory.search)
+                TextField("Search apps, identifiers or permissions", text: $inventory.search)
                     .textFieldStyle(.plain)
-                    .frame(width: 190)
             }
             .padding(.horizontal, 8).padding(.vertical, 5)
             .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
             .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(DoctorStyle.border))
-            if !inventory.leftovers.isEmpty {
-                Button("Clean Up Leftovers…") {
-                    resetRequest = InventoryResetRequest(cleanup: inventory.leftovers)
-                }
-                .disabled(busy)
-            }
-            Button { inventory.copyReport() } label: { Label("Copy Report", systemImage: "doc.on.clipboard") }
-                .help("Copy a plain-text report of every entry to the clipboard")
-                .disabled(inventory.inventory == nil)
-            Button { Task { await inventory.refresh() } } label: {
-                if inventory.isReading {
-                    ProgressView().controlSize(.small).frame(width: 16, height: 16)
-                } else {
-                    Label("Refresh", systemImage: "arrow.clockwise")
-                }
-            }
-            .help("Read the privacy databases again")
-            .disabled(busy)
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 12)
@@ -139,12 +147,11 @@ struct InventoryDetailView: View {
     @ViewBuilder private var content: some View {
         if let read = inventory.inventory {
             List {
-                if read.needsFullDiskAccess || read.userDatabaseUnavailable || read.sources.contains(where: Self.isFailure) {
+                if read.needsFullDiskAccess || read.userDatabaseUnavailable || !read.problemSources.isEmpty {
                     Section { SourceBanners(inventory: read) }
                 }
                 if inventory.visibleGroups.isEmpty && !read.needsFullDiskAccess {
-                    Text(read.entries.isEmpty ? "No permission entries were found." : "No entries match.")
-                        .foregroundStyle(.secondary)
+                    Text(emptyText(read)).foregroundStyle(.secondary)
                 }
                 ForEach(inventory.visibleGroups) { group in
                     Section {
@@ -166,9 +173,10 @@ struct InventoryDetailView: View {
         }
     }
 
-    private static func isFailure(_ source: DatabaseSource) -> Bool {
-        if case .failed = source.reading { return true }
-        return false
+    /// An empty list says whether nothing is recorded or nothing was read.
+    private func emptyText(_ read: PermissionInventory) -> String {
+        guard read.entries.isEmpty else { return "No entries match." }
+        return read.systemDatabaseRead ? "No permission entries were found." : "No permission entries could be read."
     }
 
     /// The entry's whole reset: every entry of the same app and service,
@@ -222,7 +230,7 @@ private struct SourceBanners: View {
                     .fixedSize()
                 }
             }
-            ForEach(inventory.sources.filter(Self.isFailure), id: \.database) { source in
+            ForEach(inventory.problemSources, id: \.database) { source in
                 Label(source.summary, systemImage: "exclamationmark.triangle")
                     .font(.callout).foregroundStyle(DoctorStyle.warning).textSelection(.enabled)
             }
@@ -230,10 +238,6 @@ private struct SourceBanners: View {
         .padding(.vertical, 6)
     }
 
-    private static func isFailure(_ source: DatabaseSource) -> Bool {
-        if case .failed = source.reading { return true }
-        return false
-    }
 }
 
 // MARK: - Rows
@@ -253,7 +257,8 @@ private struct ClientGroupHeader: View {
                     .textSelection(.enabled)
             }
             Spacer()
-            if !group.resettableEntries.isEmpty {
+            // A single permission already has its row's Reset button.
+            if Set(group.resettableEntries.map(\.service.identifier)).count > 1 {
                 Button("Reset…", action: reset).disabled(busy)
                     .help("Choose which of this app's permissions to reset")
             }
@@ -261,13 +266,17 @@ private struct ClientGroupHeader: View {
         .padding(.vertical, 4)
     }
 
+    /// Where the app is, led by its identifier unless that is already
+    /// the title (an app known only by its identifier, or a path).
     private var location: String {
-        let identifier = group.kind == .path ? "Recorded by path" : group.identifier
+        let showsIdentifier = group.kind == .bundleIdentifier && group.client.name != group.identifier
+        let lead = showsIdentifier ? group.identifier + " · " : ""
         switch group.client.presence {
-        case .installed(let path): return group.kind == .path ? group.identifier : "\(identifier) · \(path)"
-        case .inTrash(let path): return "\(identifier) · in the Trash: \(path)"
-        case .offline(let path): return "\(identifier) · on a disk that is not connected: \(path)"
-        case .missing: return group.kind == .path ? group.identifier : "\(identifier) · not on this Mac"
+        case .installed(let path):
+            return group.kind == .path ? (group.client.name == group.identifier ? "Recorded by path" : group.identifier) : lead + path
+        case .inTrash(let path): return lead + "In the Trash: \(path)"
+        case .offline(let path): return lead + "On a disk that is not connected: \(path)"
+        case .missing: return group.kind == .path ? "Recorded by path, not on this Mac: \(group.identifier)" : lead + "Not on this Mac"
         }
     }
 }
@@ -354,6 +363,8 @@ private struct EntryDetails: View {
         .textSelection(.enabled)
         .padding(16)
         .frame(width: 380, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
+        .modifier(BoundedScroll(maxHeight: 460))
     }
 
     private var flags: [InventoryEntry.Flags] {
@@ -373,6 +384,15 @@ private struct EntryDetails: View {
             Text(label).font(.caption.weight(.medium)).foregroundStyle(.secondary)
             Text(value).font(.callout).fixedSize(horizontal: false, vertical: true)
         }
+    }
+}
+
+/// Scrolls content taller than `maxHeight` instead of growing past it.
+private struct BoundedScroll: ViewModifier {
+    let maxHeight: CGFloat
+
+    func body(content: Content) -> some View {
+        ScrollView { content }.frame(maxHeight: maxHeight)
     }
 }
 

@@ -79,6 +79,20 @@ final class PermissionRecordTests: XCTestCase {
         XCTAssertTrue(merged.allSatisfy { $0.database == .system && $0.clientKind == .bundleIdentifier })
     }
 
+    /// tccd can store an override with only `admin_auth_value`, leaving
+    /// `auth_value` at 1: it marks the entry managed but decides nothing.
+    func testAnOverrideWithoutADecisionKeepsTheRecordedOne() {
+        let access = InventoryFixtures.record(service: "kTCCServiceCamera", client: "com.a", decision: .allowed)
+        let adminOnly = InventoryFixtures.record(service: "kTCCServiceCamera", client: "com.a", decision: .unknown)
+        let standalone = InventoryFixtures.record(service: "kTCCServiceMicrophone", client: "com.b", decision: .unknown)
+
+        let merged = PermissionRecord.merging(access: [access], managed: [adminOnly, standalone])
+
+        XCTAssertEqual(merged.map(\.client), ["com.a"], "an override that decides nothing is not an entry of its own")
+        XCTAssertEqual(merged[0].decision, .allowed)
+        XCTAssertTrue(merged[0].isManaged)
+    }
+
     // MARK: - DatabaseReading
 
     func testOpenFailureMapsErrnos() {

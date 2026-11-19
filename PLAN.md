@@ -147,7 +147,7 @@ Per-module migration notes, satellites, and new-module ideas:
   RunningMan already works around both (`Sources/RunningManCore/Discovery.swift`,
   `Sources/RunningManServices/ForgejoConnectionStore.swift`). Shortking
   (Accessibility, Input Monitoring), BootCaptain (Automation, Full Disk Access
-  for login items) RepoMen (Documents, Full Disk Access for snapshots)
+  for login items), RepoMen (Documents, Full Disk Access for snapshots)
   and App Permission Checkup (Full Disk Access for its All permissions view)
   need a stable identity, Apple Development or Developer ID, to keep those
   grants across updates; until one is chosen they migrate with that

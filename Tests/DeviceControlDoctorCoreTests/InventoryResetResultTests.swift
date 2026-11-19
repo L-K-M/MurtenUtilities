@@ -34,6 +34,19 @@ final class InventoryResetResultTests: XCTestCase {
         XCTAssertEqual(result.summary, "Removed 1 entry. 1 entry is still recorded. A running app may have asked again, or your organization may manage it. tccutil did not reset 1 entry. 1 entry could not be checked afterwards. 1 entry can only be removed in System Settings.")
     }
 
+    func testUncertainCommandsAreJudgedByTheFreshRead() {
+        let gone = entry("kTCCServiceCamera", "com.a")
+        let kept = entry("kTCCServiceMicrophone", "com.a")
+        let uncertain = [
+            InventoryResetResult.commandKey(bundleIdentifier: "com.a", service: "Camera"): "timed out",
+            InventoryResetResult.commandKey(bundleIdentifier: "com.a", service: "Microphone"): "timed out",
+        ]
+        let result = InventoryResetResult.assess(requested: [gone, kept], skipped: [], commandFailures: [:],
+                                                 uncertainCommands: uncertain, after: after([kept]))
+        XCTAssertEqual(result.items.map(\.outcome), [.removed, .uncertain("timed out")])
+        XCTAssertEqual(result.summary, "Removed 1 entry. tccutil's outcome was uncertain for 1 entry, and it is still recorded.")
+    }
+
     func testWithoutAFreshReadNothingCountsAsRemoved() {
         let camera = entry("kTCCServiceCamera", "com.a")
         let result = InventoryResetResult.assess(requested: [camera], skipped: [], commandFailures: [:], after: nil)

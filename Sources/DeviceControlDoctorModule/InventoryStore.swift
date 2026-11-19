@@ -27,7 +27,8 @@ import DoctorCore
     private let resolver: any ClientResolving
     private let runner: any ProcessRunning
     private let doctor: DoctorStore
-    private let copyToPasteboard: @MainActor (String) -> Void
+    /// Writes the report; false when the pasteboard refused it.
+    private let copyToPasteboard: @MainActor (String) -> Bool
     private let systemDescription: String
     private let now: @Sendable () -> Date
 
@@ -35,7 +36,7 @@ import DoctorCore
          reader: any PrivacyDatabaseReading = TCCDatabaseReader(),
          resolver: any ClientResolving = ClientResolver(),
          runner: any ProcessRunning = ProcessRunner(),
-         copyToPasteboard: (@MainActor (String) -> Void)? = nil,
+         copyToPasteboard: (@MainActor (String) -> Bool)? = nil,
          systemDescription: String = "macOS " + ProcessInfo.processInfo.operatingSystemVersionString,
          now: @escaping @Sendable () -> Date = { Date() }) {
         self.doctor = doctor
@@ -44,7 +45,7 @@ import DoctorCore
         self.runner = runner
         self.copyToPasteboard = copyToPasteboard ?? { text in
             NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(text, forType: .string)
+            return NSPasteboard.general.setString(text, forType: .string)
         }
         self.systemDescription = systemDescription
         self.now = now
@@ -106,7 +107,7 @@ import DoctorCore
         guard doctor.beginInventoryReset() else { return nil }
         isResetting = true
         let (plans, skipped) = InventoryResetPlan.plans(for: entries)
-        let failures = await PermissionReset(runner: runner).apply(plans)
+        let outcomes = await PermissionReset(runner: runner).apply(plans)
         let requested = entries.filter { entry in !skipped.contains { $0.id == entry.id } }
 
         isReading = true
@@ -115,9 +116,11 @@ import DoctorCore
         inventory = after
 
         let result = InventoryResetResult.assess(requested: requested, skipped: skipped,
-                                                 commandFailures: failures, after: after)
+                                                 commandFailures: outcomes.failures, uncertainCommands: outcomes.uncertain,
+                                                 after: after)
         isResetting = false
-        doctor.endInventoryReset(resetBundles: Set(plans.map(\.bundleIdentifier)))
+        // Only apps whose decisions may have changed lose their test evidence.
+        doctor.endInventoryReset(resetBundles: outcomes.possiblyReset(plans))
         notice = result.summary
         return result
     }
@@ -126,7 +129,10 @@ import DoctorCore
 
     func copyReport() {
         guard let inventory else { return }
-        copyToPasteboard(InventoryReport.text(inventory, system: systemDescription))
+        guard copyToPasteboard(InventoryReport.text(inventory, system: systemDescription)) else {
+            notice = "The report could not be put on the clipboard. Try Copy Report again."
+            return
+        }
         notice = "Copied a report of \(inventory.entries.count) entries. It names your apps, their identifiers and paths; review it before you share it."
     }
 

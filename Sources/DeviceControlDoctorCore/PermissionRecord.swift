@@ -128,21 +128,27 @@ public struct PermissionRecord: Hashable, Sendable {
     // MARK: - Managed rows
 
     /// The `access` rows with `managed_overrides` folded in: an override for
-    /// a row's key marks that row managed and takes its decision; an
-    /// override without a row stands on its own.
+    /// a row's key marks that row managed and, when it sets a decision,
+    /// takes it; an override without a row stands on its own.
+    ///
+    /// tccd's upsert can store only `admin_auth_value` (whether a standard
+    /// user may change the setting), leaving `auth_value` at its default 1.
+    /// Such an override decides nothing: a row it matches keeps its own
+    /// decision, and one without a row is not listed.
     public static func merging(access: [PermissionRecord], managed: [PermissionRecord]) -> [PermissionRecord] {
         var overrides: [String: PermissionRecord] = [:]
         for record in managed { overrides[record.key] = record }
         var result: [PermissionRecord] = []
         for var record in access {
             if let override = overrides.removeValue(forKey: record.key) {
-                record.decision = override.decision
+                if override.decision != .unknown { record.decision = override.decision }
                 record.isManaged = true
             }
             result.append(record)
         }
         for record in managed where overrides[record.key] != nil {
             overrides[record.key] = nil
+            guard record.decision != .unknown else { continue }
             var record = record
             record.isManaged = true
             result.append(record)

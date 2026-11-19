@@ -24,19 +24,39 @@ struct PermissionReset {
         return outcomes
     }
 
-    /// Runs a confirmed inventory reset. Returns the failure of every
-    /// command that did not report success, by `InventoryResetResult.commandKey`.
-    func apply(_ plans: [InventoryResetPlan]) async -> [String: String] {
+    /// What a confirmed inventory reset's commands answered, by
+    /// `InventoryResetResult.commandKey`.
+    struct InventoryOutcomes: Equatable {
+        /// Commands tccutil reported failing.
         var failures: [String: String] = [:]
+        /// Commands that timed out or answered more than could be checked.
+        var uncertain: [String: String] = [:]
+
+        /// Apps with at least one command that did not report failure,
+        /// so their decisions may have changed.
+        func possiblyReset(_ plans: [InventoryResetPlan]) -> Set<String> {
+            Set(plans.filter { plan in
+                plan.services.contains { failures[InventoryResetResult.commandKey(bundleIdentifier: plan.bundleIdentifier, service: $0)] == nil }
+            }.map(\.bundleIdentifier))
+        }
+    }
+
+    /// Runs a confirmed inventory reset.
+    func apply(_ plans: [InventoryResetPlan]) async -> InventoryOutcomes {
+        var outcomes = InventoryOutcomes()
         for plan in plans {
             for (service, arguments) in zip(plan.services, plan.arguments) {
                 let result = await runner.run(SystemTool.tccutil, arguments)
-                if let failure = Self.failure(of: result) {
-                    failures[InventoryResetResult.commandKey(bundleIdentifier: plan.bundleIdentifier, service: service)] = failure
+                guard let failure = Self.failure(of: result) else { continue }
+                let key = InventoryResetResult.commandKey(bundleIdentifier: plan.bundleIdentifier, service: service)
+                if result.timedOut || result.outputTruncated {
+                    outcomes.uncertain[key] = failure
+                } else {
+                    outcomes.failures[key] = failure
                 }
             }
         }
-        return failures
+        return outcomes
     }
 
     /// nil when tccutil reported success; otherwise what it said.

@@ -44,6 +44,28 @@ public struct PermissionInventory: Sendable {
         }
     }
 
+    /// Sources that went unread for a reason the Full Disk Access and
+    /// per-user notices do not explain: a failed read, or no system
+    /// database at all. Each needs its own warning.
+    public var problemSources: [DatabaseSource] {
+        sources.filter { source in
+            switch source.reading {
+            case .read, .needsFullDiskAccess: return false
+            case .failed: return true
+            case .missing: return source.database == .system
+            }
+        }
+    }
+
+    /// Whether the system database, which holds most decisions, was read.
+    public var systemDatabaseRead: Bool {
+        sources.contains { source in
+            guard source.database == .system else { return false }
+            if case .read = source.reading { return true }
+            return false
+        }
+    }
+
     // MARK: - Views
 
     public func count(_ filter: InventoryFilter) -> Int {

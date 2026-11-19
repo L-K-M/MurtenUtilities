@@ -230,6 +230,7 @@ struct InventoryResetSheet: View {
         case .removed: return "Removed."
         case .stillRecorded: return "Still recorded after the reset. " + InventoryGuidance.steps(for: item.entry)
         case .failed(let detail): return "tccutil did not reset it: \(detail) " + InventoryGuidance.steps(for: item.entry)
+        case .uncertain(let detail): return "\(detail) It is still recorded. " + InventoryGuidance.steps(for: item.entry)
         case .unverified: return "tccutil reported success, but the database could not be read again to check."
         case .skipped: return InventoryGuidance.steps(for: item.entry)
         }

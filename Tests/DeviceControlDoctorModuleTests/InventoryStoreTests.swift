@@ -57,12 +57,14 @@ final class InventoryStoreTests: XCTestCase {
     private var runner: FakeProcessRunner!
     private var opened: [URL] = []
     private var copied: [String] = []
+    private var pasteboardAccepts = true
 
     override func setUp() async throws {
         mac = try FixtureMac()
         runner = FakeProcessRunner()
         opened = []
         copied = []
+        pasteboardAccepts = true
     }
 
     override func tearDown() async throws {
@@ -82,7 +84,11 @@ final class InventoryStoreTests: XCTestCase {
                                  runner: runner, storageURL: mac.watchList,
                                  settingsOpener: { [unowned self] in self.opened.append($0) })
         let inventory = InventoryStore(doctor: doctor, reader: reader, resolver: resolver, runner: runner,
-                                       copyToPasteboard: { [unowned self] in self.copied.append($0) },
+                                       copyToPasteboard: { [unowned self] in
+                                           guard self.pasteboardAccepts else { return false }
+                                           self.copied.append($0)
+                                           return true
+                                       },
                                        systemDescription: "macOS 27.0.1",
                                        now: { Date(timeIntervalSince1970: 1_800_000_000) })
         return (doctor, inventory)
@@ -224,6 +230,51 @@ final class InventoryStoreTests: XCTestCase {
         XCTAssertTrue(result.summary.contains("did not reset 1 entry"), result.summary)
     }
 
+    /// A timed-out command is judged by the fresh read, not reported as a
+    /// failure: gone is removed, still there is uncertain.
+    func testAnUncertainCommandIsJudgedByTheFreshRead() async throws {
+        let camera = record("kTCCServiceCamera", "com.example.Cam")
+        let microphone = record("kTCCServiceMicrophone", "com.example.Cam")
+        let reader = FakeDatabaseReader(system: .read([camera, microphone]))
+        reader.then(.system, .read([microphone]))
+        runner.respond(to: [SystemTool.tccutil, "reset", "Camera", "com.example.Cam"],
+                       with: CommandResult(output: "", exitCode: 15, timedOut: true))
+        runner.respond(to: [SystemTool.tccutil, "reset", "Microphone", "com.example.Cam"],
+                       with: CommandResult(output: "", exitCode: 15, timedOut: true))
+        let (_, inventory) = makeStores(reader: reader)
+        await inventory.refresh()
+
+        let outcome = await inventory.reset(inventory.inventory?.entries ?? [])
+        let result = try XCTUnwrap(outcome)
+
+        let outcomes = Dictionary(uniqueKeysWithValues: result.items.map { ($0.entry.service.resetName, $0.outcome) })
+        XCTAssertEqual(outcomes["Camera"], .removed)
+        guard case .uncertain(let detail) = outcomes["Microphone"] else { return XCTFail("expected uncertain") }
+        XCTAssertTrue(detail.contains("timed out"), detail)
+        XCTAssertFalse(result.summary.contains("did not reset"), result.summary)
+        XCTAssertTrue(result.summary.contains("uncertain for 1 entry"), result.summary)
+    }
+
+    /// A command tccutil reported failing changed nothing, so the watched
+    /// app keeps its test evidence and gets no reset event.
+    func testAFailedResetKeepsTheWatchedAppsEvidence() async throws {
+        let reader = FakeDatabaseReader(system: .read([record("kTCCServiceAccessibility", "com.example.Watched")]))
+        runner.respond(to: [SystemTool.tccutil, "reset", "Accessibility", "com.example.Watched"],
+                       with: CommandResult(output: "tccutil: No such bundle identifier", exitCode: 64))
+        let (doctor, inventory) = makeStores(reader: reader)
+        var watched = WatchedApp(name: "Watched", bundleID: "com.example.Watched", path: "/Applications/Watched.app", version: "1")
+        watched.functionalTest = .init(outcome: .passed, note: "ok", appPath: watched.path, appVersion: "1")
+        doctor.apps = [watched]
+        await inventory.refresh()
+
+        let outcome = await inventory.reset(inventory.inventory?.entries ?? [])
+
+        XCTAssertNotNil(outcome)
+        XCTAssertNotNil(doctor.apps[0].functionalTest)
+        XCTAssertFalse(doctor.events.contains { $0.message.contains("All permissions") })
+        XCTAssertFalse(doctor.isRepairing)
+    }
+
     func testAResetWhoseDatabaseCannotBeReadAgainIsUnverified() async throws {
         let reader = FakeDatabaseReader(system: .read([record("kTCCServiceCamera", "com.example.Cam")]))
         reader.then(.system, .needsFullDiskAccess)
@@ -284,6 +335,16 @@ final class InventoryStoreTests: XCTestCase {
         XCTAssertTrue(copied[0].contains("on macOS 27.0.1"), copied[0])
         XCTAssertTrue(copied[0].contains("Camera (kTCCServiceCamera), 1"), copied[0])
         XCTAssertTrue(inventory.notice?.contains("review it before you share it") == true)
+    }
+
+    func testCopyReportSaysWhenThePasteboardRefuses() async {
+        let (_, inventory) = makeStores(reader: FakeDatabaseReader(system: .read([record("kTCCServiceCamera", "com.example.Cam")])))
+        await inventory.refresh()
+        pasteboardAccepts = false
+
+        inventory.copyReport()
+
+        XCTAssertEqual(inventory.notice, "The report could not be put on the clipboard. Try Copy Report again.")
     }
 
     func testSettingsLinksUseTheServiceListOrThePrivacyPage() {

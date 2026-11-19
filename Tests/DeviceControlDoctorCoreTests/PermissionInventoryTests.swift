@@ -307,4 +307,29 @@ final class PermissionInventoryTests: XCTestCase {
         XCTAssertEqual(byService.map(\.service.title), ["Full Disk Access", "Camera"])
     }
 
+
+    /// A missing system database or a failed read gets its own warning; a
+    /// missing per-user database and Full Disk Access have notices of their own.
+    func testProblemSourcesExplainEveryUnreadDatabase() {
+        let missingSystem = InventoryFixtures.inventory([], sources: [
+            DatabaseSource(database: .system, reading: .missing),
+            DatabaseSource(database: .user, reading: .missing),
+        ])
+        XCTAssertEqual(missingSystem.problemSources.map(\.database), [.system])
+        XCTAssertFalse(missingSystem.systemDatabaseRead)
+
+        let failedUser = InventoryFixtures.inventory([], sources: [
+            DatabaseSource(database: .system, reading: .read([])),
+            DatabaseSource(database: .user, reading: .failed("locked")),
+        ])
+        XCTAssertEqual(failedUser.problemSources.map(\.database), [.user])
+        XCTAssertTrue(failedUser.systemDatabaseRead)
+
+        let noAccess = InventoryFixtures.inventory([], sources: [
+            DatabaseSource(database: .system, reading: .needsFullDiskAccess),
+            DatabaseSource(database: .user, reading: .missing),
+        ])
+        XCTAssertTrue(noAccess.problemSources.isEmpty)
+        XCTAssertFalse(noAccess.systemDatabaseRead)
+    }
 }

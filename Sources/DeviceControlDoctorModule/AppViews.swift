@@ -17,6 +17,7 @@ enum PaneSection: Hashable {
 
 struct MainView: View {
     @EnvironmentObject private var doctor: DoctorStore
+    @EnvironmentObject private var inventory: InventoryStore
     @Environment(\.openWindow) private var openWindow
     @State private var showsAddApps = false
     @State private var showsResetAll = false
@@ -89,19 +90,23 @@ struct MainView: View {
                 Button { showsAddApps = true } label: { Label("Add Apps", systemImage: "plus") }
                     .help("Choose apps or import existing permission entries")
                     .disabled(doctor.isRepairing)
-                Button { doctor.refresh() } label: {
-                    if doctor.isChecking {
+                Button { refreshShownView() } label: {
+                    if doctor.isChecking || inventory.isReading {
                         ProgressView().controlSize(.small).frame(width: 16, height: 16)
                     } else {
                         Label("Check", systemImage: "arrow.clockwise")
                     }
                 }
+                .help(section == .allPermissions ? "Read the privacy databases again" : "Check the watched apps' permissions")
                 .keyboardShortcut("r", modifiers: .command)
-                .disabled(doctor.isChecking || doctor.isRepairing || doctor.apps.isEmpty)
+                .disabled(section == .allPermissions ? !canRefreshInventory : doctor.isChecking || doctor.isRepairing || doctor.apps.isEmpty)
                 Button { openWindow(module: .testPad) } label: { Label("Test Pad", systemImage: "text.cursor") }
                     .help("Test an app against a controlled text field")
-                Button { doctor.exportReport() } label: { Label("Export Report", systemImage: "square.and.arrow.up") }
-                    .disabled(doctor.apps.isEmpty || doctor.isRepairing)
+                // The watch list's report; All permissions has Copy Report.
+                if section == .watchList {
+                    Button { doctor.exportReport() } label: { Label("Export Report", systemImage: "square.and.arrow.up") }
+                        .disabled(doctor.apps.isEmpty || doctor.isRepairing)
+                }
             }
         }
         .sheet(isPresented: $showsAddApps) { AddAppsView() }
@@ -112,7 +117,9 @@ struct MainView: View {
         .moduleCommands([
             ModuleCommand("Add Applications…", shortcut: KeyboardShortcut("o")) { doctor.chooseApps() },
             ModuleCommand("Refresh Permissions", shortcut: KeyboardShortcut("r"),
-                          isEnabled: !(doctor.isChecking || doctor.isRepairing)) { doctor.refresh() },
+                          isEnabled: section == .allPermissions ? canRefreshInventory : !(doctor.isChecking || doctor.isRepairing)) {
+                refreshShownView()
+            },
             ModuleCommand("Export Diagnostic Report…", shortcut: KeyboardShortcut("e", modifiers: [.command, .shift])) {
                 doctor.exportReport()
             }
@@ -124,6 +131,20 @@ struct MainView: View {
         }
         // Checks while the pane is visible; cancelled when it goes away.
         .task { await doctor.monitorWhileVisible() }
+    }
+
+    private var canRefreshInventory: Bool {
+        !(inventory.isReading || inventory.isResetting || doctor.isRepairing)
+    }
+
+    /// ⌘R refreshes what the pane shows: the watch list's check, or the
+    /// privacy databases' read.
+    private func refreshShownView() {
+        if section == .allPermissions {
+            Task { await inventory.refresh() }
+        } else {
+            doctor.refresh()
+        }
     }
 
     private var watchListSidebar: some View {
