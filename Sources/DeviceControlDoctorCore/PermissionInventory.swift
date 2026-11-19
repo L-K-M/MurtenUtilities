@@ -167,7 +167,13 @@ public struct PermissionInventory: Sendable {
     static func serviceOrder(_ a: PrivacyService, _ b: PrivacyService) -> Bool {
         let left = catalogIndex[a.identifier] ?? Int.max, right = catalogIndex[b.identifier] ?? Int.max
         if left != right { return left < right }
-        return a.title.localizedStandardCompare(b.title) == .orderedAscending
+        switch a.title.localizedStandardCompare(b.title) {
+        case .orderedAscending: return true
+        case .orderedDescending: return false
+        // Two unknown services can share a derived title; the identifier
+        // keeps the order strict.
+        case .orderedSame: return a.identifier < b.identifier
+        }
     }
 
     static func displayOrder(_ a: InventoryEntry, _ b: InventoryEntry) -> Bool {

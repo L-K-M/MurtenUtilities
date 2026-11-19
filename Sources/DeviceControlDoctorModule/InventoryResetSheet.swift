@@ -7,8 +7,9 @@ struct InventoryResetRequest: Identifiable {
     /// One app's entries of one service: what one command resets.
     struct Unit: Identifiable {
         let id: String
+        /// The unit's first entry, which names it; `entries` starts with it.
+        let first: InventoryEntry
         let entries: [InventoryEntry]
-        var first: InventoryEntry { entries[0] }
     }
 
     enum Kind { case app(String), cleanup }
@@ -40,7 +41,10 @@ struct InventoryResetRequest: Identifiable {
             if grouped[id] == nil { order.append(id) }
             grouped[id, default: []].append(entry)
         }
-        units = order.compactMap { id in grouped[id].map { Unit(id: id, entries: $0) } }
+        units = order.compactMap { id in
+            guard let entries = grouped[id], let first = entries.first else { return nil }
+            return Unit(id: id, first: first, entries: entries)
+        }
         self.settingsOnly = settingsOnly
         self.preselected = preselected ?? Set(order)
     }

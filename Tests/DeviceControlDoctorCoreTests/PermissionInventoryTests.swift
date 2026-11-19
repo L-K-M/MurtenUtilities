@@ -332,4 +332,21 @@ final class PermissionInventoryTests: XCTestCase {
         XCTAssertTrue(noAccess.problemSources.isEmpty)
         XCTAssertFalse(noAccess.systemDatabaseRead)
     }
+
+    /// Unknown services that derive the same title still sort strictly, so
+    /// equal-looking entries keep one stable order.
+    func testUnknownServicesWithTheSameTitleSortByIdentifier() {
+        XCTAssertEqual(PrivacyService.named("kTCCServiceFooBar").title, PrivacyService.named("FooBar").title)
+        let a = PrivacyService.named("FooBar"), b = PrivacyService.named("kTCCServiceFooBar")
+        XCTAssertNotEqual(PermissionInventory.serviceOrder(a, b), PermissionInventory.serviceOrder(b, a))
+
+        let records = [
+            InventoryFixtures.record(service: "kTCCServiceFooBar", database: .user),
+            InventoryFixtures.record(service: "FooBar", database: .system),
+            InventoryFixtures.record(service: "kTCCServiceFooBar", database: .system),
+        ]
+        let entries = InventoryFixtures.inventory(records.map { InventoryFixtures.resolved($0) }).entries
+        XCTAssertEqual(entries.map(\.record.service), ["FooBar", "kTCCServiceFooBar", "kTCCServiceFooBar"])
+        XCTAssertEqual(entries.map(\.record.database), [.system, .system, .user])
+    }
 }
