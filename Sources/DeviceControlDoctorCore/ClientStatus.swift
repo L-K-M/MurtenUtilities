@@ -56,10 +56,14 @@ public struct ClientStatus: Hashable, Sendable {
         return .missing
     }
 
-    /// `~/.Trash`, and the `.Trashes` folder at the root of any volume.
+    /// `~/.Trash`, any account's `/Users/<name>/.Trash` (the system
+    /// database holds every account's decisions), and the `.Trashes`
+    /// folder at the root of any volume.
     public static func isInTrash(_ path: String, home: String) -> Bool {
         let home = home.hasSuffix("/") ? String(home.dropLast()) : home
         if path.hasPrefix(home + "/.Trash/") || path.hasPrefix("/.Trashes/") { return true }
+        let parts = path.split(separator: "/", omittingEmptySubsequences: true)
+        if path.hasPrefix("/Users/"), parts.count > 3, parts[2] == ".Trash" { return true }
         guard let volume = volumeRoot(of: path) else { return false }
         return path.hasPrefix(volume + "/.Trashes/")
     }

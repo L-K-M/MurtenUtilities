@@ -109,6 +109,23 @@ final class TCCDatabaseReaderTests: XCTestCase {
         XCTAssertEqual(records.first?.database, .user)
     }
 
+    /// tccd's schema forbids NULL here; a database that breaks it gets its
+    /// odd rows skipped rather than read as Denied bundle clients.
+    func testRowsWithoutAClientTypeOrDecisionAreSkipped() throws {
+        let path = try makeDatabase("lenient.db", statements: [
+            "CREATE TABLE access (service TEXT, client TEXT, client_type INTEGER, auth_value INTEGER, auth_reason INTEGER, auth_version INTEGER, csreq BLOB, indirect_object_identifier TEXT, last_modified INTEGER)",
+            "INSERT INTO access VALUES ('kTCCServiceCamera', 'com.example.NoValue', 0, NULL, 2, 1, NULL, 'UNUSED', 1)",
+            "INSERT INTO access VALUES ('kTCCServiceCamera', 'com.example.NoType', NULL, 2, 2, 1, NULL, 'UNUSED', 1)",
+            "INSERT INTO access VALUES ('kTCCServiceCamera', 'com.example.Fine', 0, 2, 2, 1, NULL, NULL, NULL)",
+        ])
+        guard case .read(let records) = TCCDatabaseReader(systemPath: path, userPath: "/nonexistent").read(.system) else {
+            return XCTFail("expected a read")
+        }
+        XCTAssertEqual(records.map(\.client), ["com.example.Fine"])
+        XCTAssertNil(records.first?.target)
+        XCTAssertNil(records.first?.lastModified)
+    }
+
     func testNeverChangesTheDatabase() throws {
         let path = try systemDatabase()
         let before = try Data(contentsOf: URL(fileURLWithPath: path))

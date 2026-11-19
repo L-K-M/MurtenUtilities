@@ -83,4 +83,13 @@ final class ClientStatusTests: XCTestCase {
         XCTAssertNil(ClientStatus.enclosingAppPath(of: "/usr/local/bin/node"))
         XCTAssertEqual(ClientStatus.enclosingAppPath(of: "/Applications/Foo.app"), "/Applications/Foo.app")
     }
+
+    /// The system database holds other accounts' decisions too.
+    func testAnotherAccountsTrashIsATrash() {
+        XCTAssertTrue(ClientStatus.isInTrash("/Users/alice/.Trash/Foo.app", home: "/Users/bob"))
+        XCTAssertFalse(ClientStatus.isInTrash("/Users/alice/.Trash", home: "/Users/bob"))
+        XCTAssertFalse(ClientStatus.isInTrash("/Users/alice/Applications/Foo.app", home: "/Users/bob"))
+        XCTAssertEqual(ClientStatus.presence(of: ["/Users/alice/.Trash/Foo.app"], home: "/Users/bob", exists: { _ in true }),
+                       .inTrash(path: "/Users/alice/.Trash/Foo.app"))
+    }
 }

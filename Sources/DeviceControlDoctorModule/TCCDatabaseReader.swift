@@ -84,9 +84,10 @@ struct TCCDatabaseReader: PrivacyDatabaseReading {
             let step = sqlite3_step(statement)
             if step == SQLITE_DONE { break }
             guard step == SQLITE_ROW else { throw ReadError(message: "Reading \(table) stopped: \(message(handle)).") }
-            // A row without a service, a client or a known client type is
-            // not one the pane could explain; it is skipped, not guessed.
+            // A row without a service, a client, a decision or a known client
+            // type is not one the pane could explain; it is skipped, not guessed.
             guard let service = text(statement, 0), let client = text(statement, 1),
+                  sqlite3_column_type(statement, 2) != SQLITE_NULL, sqlite3_column_type(statement, 3) != SQLITE_NULL,
                   let kind = PermissionRecord.ClientKind(clientType: Int(sqlite3_column_int64(statement, 2))) else { continue }
             let target = text(statement, 6).flatMap { $0 == "UNUSED" || $0.isEmpty ? nil : $0 }
             let modified = sqlite3_column_type(statement, 7) == SQLITE_NULL

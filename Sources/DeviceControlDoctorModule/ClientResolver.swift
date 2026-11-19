@@ -23,8 +23,8 @@ struct ClientResolver: ClientResolving {
         var clients: [String: Resolution] = [:]
         var result: [ResolvedRecord] = []
         result.reserveCapacity(records.count)
+        // Never cut short: a partial list would read as a complete inventory.
         for record in records {
-            if Task.isCancelled { break }
             let key = Self.key(record.client, record.clientKind)
             let client = clients[key] ?? resolution(of: record.client, kind: record.clientKind)
             clients[key] = client
@@ -145,7 +145,8 @@ struct ClientResolver: ClientResolving {
         let flags = SecCSFlags(rawValue: kSecCSDoNotValidateResources | kSecCSDoNotValidateExecutable)
         switch SecStaticCodeCheckValidity(code, flags, requirement) {
         case errSecSuccess: return .success(())
-        case errSecCSReqFailed, errSecCSUnsigned: return .failure(.mismatch)
+        // A broken signature fails the requirement for tccd too.
+        case errSecCSReqFailed, errSecCSUnsigned, errSecCSSignatureFailed, errSecCSSignatureInvalid: return .failure(.mismatch)
         case let status: return .failure(.unchecked("The signature check did not finish (OSStatus \(status))."))
         }
     }
