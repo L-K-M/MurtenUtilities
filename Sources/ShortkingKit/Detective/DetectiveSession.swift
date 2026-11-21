@@ -180,9 +180,7 @@ public final class DetectiveSession: ObservableObject {
     ) {
         guard !isCapturing else { return }
         lastError = nil
-        let captureID = UUID()
-        self.captureID = captureID
-        captureCorrelation.reset(target: combo)
+        let captureID = beginCapture()
 
         let suspects = SystemDefinedSniffer.suspects(
             eventTaps: eventTaps,
@@ -194,16 +192,14 @@ public final class DetectiveSession: ObservableObject {
         // Both callbacks are delivered on the main queue by their sources.
         let attached = sniffer.start(apps: suspects) { [weak self] delivery in
             MainActor.assumeIsolated {
-                guard let self, self.captureID == captureID else { return }
-                self.record(delivery: delivery)
+                self?.record(delivery: delivery, captureID: captureID)
             }
         }
 
         let sandwichStarted = sandwich.start(
             onPress: { [weak self] combo, at in
                 MainActor.assumeIsolated {
-                    guard let self, self.captureID == captureID else { return }
-                    self.captureCorrelation.recordPress(combo, at: at)
+                    self?.recordPress(combo, at: at, captureID: captureID)
                 }
             },
             onObservation: { [weak self] observation in
@@ -255,8 +251,20 @@ public final class DetectiveSession: ObservableObject {
         capturedProcessCount = 0
     }
 
-    private func record(delivery: SystemDefinedSniffer.Delivery) {
-        guard isCapturing, delivery.isKeyDown,
+    func beginCapture() -> UUID {
+        let id = UUID()
+        captureID = id
+        captureCorrelation.reset(target: combo)
+        return id
+    }
+
+    func recordPress(_ combo: KeyCombo, at: Date, captureID: UUID) {
+        guard self.captureID == captureID else { return }
+        captureCorrelation.recordPress(combo, at: at)
+    }
+
+    func record(delivery: SystemDefinedSniffer.Delivery, captureID: UUID) {
+        guard self.captureID == captureID, delivery.isKeyDown,
               captureCorrelation.takeMatchingDelivery(at: delivery.receivedAt) else { return }
         guard let combo else { return }
 

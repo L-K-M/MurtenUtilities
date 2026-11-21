@@ -356,6 +356,10 @@ tests to find who owns — or stole — a hotkey. **Available.**
   to Command and `Super` to Option for these hotkeys. Saved rules appear disabled when
   the server using them is stopped. App-menu shortcuts apply in the frontmost app.
   The probe checks cross-process registration and reports when shared hotkeys can go undetected.
+- The live capture regression sends ⌘1 and ⌘2 to a temporary background app and checks its
+  receipts against the findings for ⌘1. Run
+  `SHORTKING_LIVE_HOTKEY_TEST=1 swift test --filter UnfamiliarHotkeyLiveTests` on a logged-in
+  Mac with Input Monitoring and Accessibility enabled for the test host.
 - **Watcher:** hourly, unprivileged. Reads the pane's last inventory
   (`claims.json`, never repaired or created), re-reads macOS's system
   shortcuts (the symbolic hotkey plist and SkyLight's read-only calls) when
