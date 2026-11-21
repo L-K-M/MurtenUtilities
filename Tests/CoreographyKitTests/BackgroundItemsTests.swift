@@ -205,10 +205,10 @@ final class BackgroundItemsTests: XCTestCase {
         let reply = try HelperWire.decode(HelperReply.self, from: await handler.reply(to: HelperWire.encode(HelperRequest.backgroundItems)))
         XCTAssertEqual(reply, .backgroundItems("dump text"))
 
-        let failed = HelperRequestHandler()
+        let failureReason = "sfltool exited with status 1"
+        let failed = HelperRequestHandler(readBackgroundItems: { .failure(.failed(failureReason)) })
         let refusal = try HelperWire.decode(HelperReply.self, from: await failed.reply(to: HelperWire.encode(HelperRequest.backgroundItems)))
-        guard case .backgroundItemsFailed(let reason) = refusal else { return XCTFail("a failure reason was expected") }
-        XCTAssertFalse(reason.isEmpty)
+        XCTAssertEqual(refusal, .backgroundItemsFailed(failureReason))
 
         let huge = HelperRequestHandler(readBackgroundItems: { .success(String(repeating: "x", count: HelperReply.maximumBytes)) })
         let message = await huge.reply(to: HelperWire.encode(HelperRequest.backgroundItems))
