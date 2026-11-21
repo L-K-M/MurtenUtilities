@@ -351,6 +351,11 @@ tests to find who owns — or stole — a hotkey. **Available.**
   `ShortkingProbe` (embedded as `Contents/MacOS/shortking-probe` by
   `scripts/build-app.sh`) and `ShortkingModule` (the standalone window as the
   pane, the provider, the watcher). The source's tests moved with the code.
+- **Deskflow shortcuts:** the pane reads the server's selected configuration and shows the
+  rule and line for each recognized keyboard trigger. Deskflow 1.27 on macOS maps `Alt`
+  to Command and `Super` to Option for these hotkeys. Saved rules appear disabled when
+  the server using them is stopped. App-menu shortcuts apply in the frontmost app.
+  The probe checks cross-process registration and reports when shared hotkeys can go undetected.
 - **Watcher:** hourly, unprivileged. Reads the pane's last inventory
   (`claims.json`, never repaired or created), re-reads macOS's system
   shortcuts (the symbolic hotkey plist and SkyLight's read-only calls) when

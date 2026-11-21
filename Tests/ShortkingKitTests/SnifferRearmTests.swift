@@ -7,6 +7,7 @@ final class SnifferRearmTests: XCTestCase {
     /// and a tap that is not switched back on stays dead while the panel still
     /// says it is listening.
     func testATapTheSystemDisabledIsSwitchedBackOn() throws {
+        try XCTSkipUnless(CGPreflightListenEventAccess(), "rearming an event tap needs Input Monitoring")
         let context = SnifferContext(pid: getpid(), ownerName: "test", bundleID: nil) { _ in }
         let boxed = Unmanaged.passRetained(context)
         defer { boxed.release() }
@@ -15,7 +16,6 @@ final class SnifferRearmTests: XCTestCase {
             tap: .cgSessionEventTap, place: .headInsertEventTap, options: .listenOnly,
             eventsOfInterest: CGEventMask(EventTapScanner.systemDefinedMask),
             callback: shortkingSniffCallback, userInfo: boxed.toOpaque())
-        // Without Input Monitoring no tap can be created, as on a CI runner.
         guard let tap = port else { throw XCTSkip("creating an event tap needs Input Monitoring") }
         defer { CFMachPortInvalidate(tap) }
         context.port = tap

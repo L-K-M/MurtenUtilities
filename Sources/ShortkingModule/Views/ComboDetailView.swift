@@ -30,13 +30,14 @@ struct ComboDetailView: View {
             KeyComboBadge(combo: group.combo, size: .large)
 
             if let winner = group.winner {
-                Label {
-                    Text("**\(winner.ownerName)** wins this combination at the "
-                        + "\(winner.layer.displayName) layer.")
-                } icon: {
-                    Image(systemName: "trophy")
-                }
+                Label(
+                    "\(winner.ownerName) has the highest-priority global claim (\(winner.layer.displayName)).",
+                    systemImage: "trophy"
+                )
                 .font(.callout)
+            } else if !group.menuOnlyBindings.isEmpty {
+                Label("Menu shortcuts apply only in the frontmost app.", systemImage: "menubar.rectangle")
+                    .font(.callout)
             }
 
             HStack {
@@ -60,8 +61,9 @@ struct ComboDetailView: View {
             Text(Plural.count(group.claims.count, "claim"))
                 .font(.headline)
 
+            let winnerID = group.winner?.id
             ForEach(group.claims) { claim in
-                ClaimCard(claim: claim, isWinner: claim.id == group.winner?.id)
+                ClaimCard(claim: claim, isWinner: claim.id == winnerID)
             }
         }
     }
@@ -98,7 +100,7 @@ struct ClaimCard: View {
                     Image(systemName: "trophy.fill")
                         .font(.caption)
                         .foregroundStyle(.orange)
-                        .help("This is the claim that actually fires.")
+                        .help("This is the highest-priority global claim in the inventory.")
                 }
                 Spacer()
                 if !claim.enabled {
